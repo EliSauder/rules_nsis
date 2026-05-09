@@ -1,3 +1,5 @@
+load("@bazel_skylib//lib:paths.bzl", "paths")
+
 toolchains = [
     "@rules_nsis//nsis:toolchain_type",
 ]
@@ -38,6 +40,7 @@ def _nsis_installer_impl(ctx):
 
   nsis_toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
   makensis = nsis_toolchain.makensis
+  nsis_dir = nsis_toolchain.nsis_dir
   nsis_files = nsis_toolchain.nsis_files
   args_style = nsis_toolchain.args_style
 
@@ -59,29 +62,38 @@ def _nsis_installer_impl(ctx):
   for key in sorted(ctx.attr.defines.keys()):
     args.add(_nsis_define(args_style, key, ctx.attr.defines[key]))
 
-  args.add(script.path)
-
-
   makensis_path = makensis.path
   makensis_path_normalized = makensis_path.replace("\\", "/")
 
-  if makensis_path_normalized.endswith("/bin/makensis"):
-    nsisdir = _parent_dir(makensis_path_normalized) + "/share/nsis"
-  else:
-    nsisdir = _parent_dir(makensis_path)
+  fd_inputs = []
+
+  for target, define in ctx.attr.srcs.items():
+    files = target[DefaultInfo].files.to_list()
+    if len(files) != 1:
+        fail("srcs entry for '{}' must produce exactly one file, but produced {}".format(
+            define,
+            len(files),
+          ))
+    file = files[0]
+    fd_inputs.append(file)
+
+    args.add(_nsis_define(args_style, define, file.path))
+
+  args.add(script.path)
 
   inputs = depset(
-    direct = [script] + ctx.files.srcs,
+    direct =  [script] + fd_inputs,
     transitive = [
       nsis_files,
+      nsis_dir.files,
     ],
   )
 
   tools = depset(
-      direct = [makensis],
-      transitive = [
-          nsis_files,
-      ],
+    direct = [makensis],
+    transitive = [
+      nsis_files,
+    ],
   )
 
   ctx.actions.run(
@@ -93,7 +105,7 @@ def _nsis_installer_impl(ctx):
     tools = tools,
     outputs = [out],
     env = {
-      "NSISDIR": nsisdir,
+      "NSISDIR": nsis_dir.files.to_list()[0].path,
     },
     use_default_shell_env = False,
   )
@@ -110,9 +122,9 @@ nsis_installer = rule(
       allow_single_file = [".nsi"],
       doc = "Main NSIS .nsi script",
     ),
-    "srcs": attr.label_list(
+    "srcs": attr.label_keyed_string_dict(
       allow_files = True,
-      doc = "Files referenced by the NSIS script",
+      doc = "Files referenced by the NSIS script in the format of file labels mapped to NSIS defines. This should be a one to one mapping.",
     ),
     "out": attr.string(
       mandatory = True,
@@ -135,7 +147,7 @@ nsis_installer = rule(
       doc = "Pass /NOCONFIG to disable loading nsisconf.nsi",
     ),
     "no_cd": attr.bool(
-      default = False,
+      default = True,
       doc = "Pass /NOCD. Leave false if includes are relative to *.nsi file.",
     ),
   },

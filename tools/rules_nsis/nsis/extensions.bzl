@@ -1,15 +1,34 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-load("@rules_nixpkgs_core//:nixpkgs.bzl", "nixpkgs_git_repository", "nixpkgs_package")
 
-_NSIS_NIX_BUILD_FILE = """
-exports_files(
-  ["bin/makensis"],
-  visibility = ["//visibility:public"],
+_NSIS_SRC_BUILD_FILE = """
+filegroup(
+  name = "nsis_src_files",
+  srcs = glob(["**"]),
 )
 
-filegroup(
-  name = "nsis_files",
-  srcs = glob(["**"]),
+genrule(
+  name = "nsis_bin",
+  executable = True,
+  srcs = [
+    "@zlib_nsis//:bin",
+    ":nsis_src_files",
+  ],
+  cmd = \"\"\"
+ls external
+prefix="$$(realpath "$$(dirname "$(OUTS)")")"
+$(execpath @rules_nsis//nsis:scons_bin) SKIPSTUBS=all SKIPPLUGINS=all SKIPUTILS=all SKIPMISC=all \
+  NSIS_CONFIG_CONST_DATA_PATH=no PREFIX="$$prefix" -C external/rules_nsis++nsis+nsis_src/ \
+  VERSION="{version}" install-compiler
+
+\"\"\",
+  outs = ["bin/makensis"],
+  toolchains = [
+    "@bazel_tools//tools/cpp:toolchain_type",
+    "@rules_python//python:current_py_toolchain",
+  ],
+  tools = [
+    "@rules_nsis//nsis:scons_bin",
+  ],
   visibility = ["//visibility:public"],
 )
 
@@ -21,6 +40,8 @@ alias(
 """
 
 _NSIS_WIN_BUILD_FILE = """
+load("@rules_nsis//nsis:dirrule.bzl", "dirrule")
+
 exports_files(
   ["Bin/makensis.exe"],
   visibility = ["//visibility:public"],
@@ -29,6 +50,12 @@ exports_files(
 filegroup(
   name = "nsis_files",
   srcs = glob(["**"]),
+  visibility = ["//visibility:public"],
+)
+
+dirrule(
+  name = "nsis_files_dir",
+  srcs = [":nsis_files"],
   visibility = ["//visibility:public"],
 )
 
@@ -45,9 +72,11 @@ def _nsis_tool_alias_repo_impl(repository_ctx):
   if os_name.startswith("windows"):
     actual = "@{}//:makensis".format(repository_ctx.attr.nsis_win_repo)
     nsis_files = "@{}//:nsis_files".format(repository_ctx.attr.nsis_win_repo)
+    nsis_files_dir = "@{}//:nsis_files_dir".format(repository_ctx.attr.nsis_win_repo)
   else:
-    actual = "@{}//:makensis".format(repository_ctx.attr.nsis_nix_repo)
-    nsis_files = "@{}//:nsis_files".format(repository_ctx.attr.nsis_nix_repo)
+    actual = "@{}//:makensis".format(repository_ctx.attr.nsis_src_repo)
+    nsis_files = "@{}//:nsis_files".format(repository_ctx.attr.nsis_win_repo)
+    nsis_files_dir = "@{}//:nsis_files_dir".format(repository_ctx.attr.nsis_win_repo)
 
   repository_ctx.file(
     "BUILD.bazel",
@@ -63,13 +92,19 @@ alias(
   actual = "{nsis_files}",
   visibility = ["//visibility:public"],
 )
-    """.format(actual = actual, nsis_files = nsis_files),
+
+alias(
+  name = "nsis_files_dir",
+  actual = "{nsis_files_dir}",
+  visibility = ["//visibility:public"],
+)
+    """.format(actual = actual, nsis_files = nsis_files, nsis_files_dir = nsis_files_dir),
   )
 
 _nsis_tool_alias_repo = repository_rule(
   implementation = _nsis_tool_alias_repo_impl,
   attrs = {
-    "nsis_nix_repo": attr.string(mandatory = True),
+    "nsis_src_repo": attr.string(mandatory = True),
     "nsis_win_repo": attr.string(mandatory = True),
   },
   local = True,
@@ -91,6 +126,7 @@ nsis_toolchain(
     name = "nsis_toolchain_impl",
     makensis = "@{tool_repo}//:makensis",
     nsis_files = "@{tool_repo}//:nsis_files",
+    nsis_dir = "@{tool_repo}//:nsis_files_dir",
     args_style = "{args_style}",
 )
 
@@ -112,80 +148,67 @@ _nsis_toolchains_repo = repository_rule(
     },
 )
 
-def _sourceforge_nsis_zip_url(version):
+_NSIS_VERSION_SHA = {
+    "3.11": {
+        "src": "19e72062676ebdc67c11dc032ba80b979cdbffd3886c60b04bb442cdd401ff4b",
+        "win": "c7d27f780ddb6cffb4730138cd1591e841f4b7edb155856901cdf5f214394fa1",
+    },
+}
+
+def _sourceforge_nsis_win_url(version):
   return "https://downloads.sourceforge.net/project/nsis/NSIS%203/{version}/nsis-{version}.zip".format(
       version = version,
   )
+def _sourceforge_nsis_src_url(version):
+  return "https://downloads.sourceforge.net/project/nsis/NSIS%203/{version}/nsis-{version}-src.tar.bz2".format(
+      version = version,
+  )
 
-def _sourceforge_nsis_zip_sha256(version):
-  mp = {
-    "3.11": "",
-  }
-  if version in mp:
-    return mp[version]
+def _sourceforge_nsis_sha256(version):
+  if version in _NSIS_VERSION_SHA:
+    return _NSIS_VERSION_SHA[version]
 
-  fail("Unknown version {v}, valid versions are: {vs}".format(v = version, vs = mp.keys()))
+  fail("Unknown version {v}, valid versions are: {vs}".format(v = version, vs = _NSIS_VERSION_SHA.keys()))
 
 
 def _fail_duplicate(kind, name, first_module, second_module):
   fail("Duplicate {} named '{}'. First declared by module '{}', again by module '{}'".format(
     kind, name, first_module, second_module))
 
-def _get_nixdetails_from_version(version):
-  mp = {
-    "3.11": {
-      "remote": "https://github.com/NixOS/nixpkgs",
-      "revision": "755f5aa91337890c432639c60b6064bb7fe67769",
-      "sha256": "affd300e16c3566c7b1c7ff8c6ef6734a13d61a343981f5c6868a11fbb735db3",
-      "attr": "nsis",
-    }
-  }
-  if version in mp:
-    return mp[version]
-
-  fail("Unknown version {v}, valid versions are: {vs}".format(v = version, vs = mp.keys()))
-
-
 def _create_nsis_repositories(module_ctx, mod, toolchain, deps, dev_deps):
     nsis_version = toolchain.version
 
-    nixpkg = _get_nixdetails_from_version(nsis_version)
-
-    nixpkg_repo_name = "nixpkgs_{}".format(toolchain.name)
-    nsis_nix_repo_name = "{}_nix".format(toolchain.name)
+    nsis_src_repo_name = "{}_src".format(toolchain.name)
     nsis_win_repo_name = "{}_win".format(toolchain.name)
     tool_repo_name = "{}_tool".format(toolchain.name)
     toolchains_repo_name = "{}_toolchains".format(toolchain.name)
 
-    sourceforge_sha256 = _sourceforge_nsis_zip_sha256(nsis_version)
-
-    nixpkgs_git_repository(
-        name = nixpkg_repo_name,
-        remote = nixpkg["remote"],
-        revision = nixpkg["revision"],
-        sha256 = nixpkg["sha256"],
-    )
-
-    nixpkgs_package(
-        name = nsis_nix_repo_name,
-        attribute_path = nixpkg["attr"],
-        repositories = {
-            "nixpkgs": "@{}//:default.nix".format(nixpkg_repo_name),
-        },
-        build_file_content = _NSIS_NIX_BUILD_FILE,
-    )
+    sha = _sourceforge_nsis_sha256(nsis_version)
+    sourceforge_win_sha256 = sha["win"]
+    sourceforge_src_sha256 = sha["src"]
 
     http_archive(
         name = nsis_win_repo_name,
-        urls = [_sourceforge_nsis_zip_url(nsis_version)],
+        urls = [_sourceforge_nsis_win_url(nsis_version)],
         strip_prefix = "nsis-{}".format(nsis_version),
-        sha256 = sourceforge_sha256,
+        sha256 = sourceforge_win_sha256,
         build_file_content = _NSIS_WIN_BUILD_FILE,
+    )
+
+    http_archive(
+        name = nsis_src_repo_name,
+        urls = [_sourceforge_nsis_src_url(nsis_version)],
+        strip_prefix = "nsis-{}-src".format(nsis_version),
+        sha256 = sourceforge_src_sha256,
+        build_file_content = _NSIS_SRC_BUILD_FILE.format(
+            version = nsis_version,
+            archive = nsis_src_repo_name,
+        ),
     )
 
     _nsis_tool_alias_repo(
         name = tool_repo_name,
-        nsis_nix_repo = nsis_nix_repo_name,
+        nsis_src_repo = nsis_src_repo_name,
         nsis_win_repo = nsis_win_repo_name,
     )
 
@@ -194,13 +217,12 @@ def _create_nsis_repositories(module_ctx, mod, toolchain, deps, dev_deps):
         tool_repo = tool_repo_name,
     )
 
-    if mod == None or mod.is_root:
-        if mod != None and module_ctx.is_dev_dependency(toolchain):
-            dev_deps.append(tool_repo_name)
-            dev_deps.append(toolchains_repo_name)
-        else:
-            deps.append(tool_repo_name)
-            deps.append(toolchains_repo_name)
+    if mod != None and module_ctx.is_dev_dependency(toolchain):
+        dev_deps.append(tool_repo_name)
+        dev_deps.append(toolchains_repo_name)
+    else:
+        deps.append(tool_repo_name)
+        deps.append(toolchains_repo_name)
 
 def _nsis_extension_impl(module_ctx):
   deps = []

@@ -4,4 +4,34 @@ module(
 )
 
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
-bazel_dep(name = "rules_nixpkgs_core", version = "0.13.0")
+bazel_dep(name = "rules_python", version = "2.0.0")
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    python_version = "3.12",
+)
+use_repo(python, "python_versions")
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "pypi",
+    python_version = "3.12",
+    requirements_lock = "@rules_nsis//nsis:requirements_lock_txt",
+)
+use_repo(pip, "pypi")
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "zlib_nsis",
+    urls = [
+        "https://nsis.sourceforge.io/mediawiki/images/c/ca/Zlib-1.2.7-win32-x86.zip",
+    ],
+    sha256 = "4f2819139f53ac23bfd77b3dca3068174d5c791b3e84f7984aa04a3a3f585eff",
+    build_file_content = """
+filegroup(
+    name = "bin",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+    """
+)

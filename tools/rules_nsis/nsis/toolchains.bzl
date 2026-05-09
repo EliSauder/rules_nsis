@@ -3,6 +3,7 @@ NsisToolChainInfo = provider(
     fields = {
         "makensis": "The makensis executable",
         "nsis_files": "Depset of files belonging to the NSIS distribution.",
+        "nsis_dir": "Directory to the files for NSIS.",
         "args_style": "The style of arguments to use -arg (dash) or /arg (slash).",
     },
 )
@@ -13,6 +14,7 @@ def _nsis_toolchain_impl(ctx):
             nsis = NsisToolChainInfo(
                 makensis = ctx.executable.makensis,
                 nsis_files = ctx.attr.nsis_files[DefaultInfo].files,
+                nsis_dir = ctx.attr.nsis_dir,
                 args_style = ctx.attr.args_style,
             ),
         ),
@@ -29,9 +31,14 @@ nsis_toolchain = rule(
             doc = "makensis executable.",
         ),
         "nsis_files": attr.label(
-            mandatory = True,
+            mandatory = False,
             allow_files = True,
             doc = "All NSIS distribution files.",
+        ),
+        "nsis_dir": attr.label(
+            mandatory = True,
+            allow_single_file = True,
+            doc = "The directory for NSISDIR.",
         ),
         "args_style": attr.string(
             mandatory = True,
