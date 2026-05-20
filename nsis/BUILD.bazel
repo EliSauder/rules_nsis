@@ -10,8 +10,8 @@ compile_pip_requirements(
 py_console_script_binary(
     name = "scons_bin",
     pkg = "@pypi//scons",
-    script = "scons",
     python_version = "3.12",
+    script = "scons",
     visibility = ["//visibility:public"],
 )
 
@@ -21,7 +21,7 @@ toolchain_type(
 )
 
 exports_files([
-  "defs.bzl",
-  "extensions.bzl",
-  "toolchains.bzl",
+    "defs.bzl",
+    "extensions.bzl",
+    "toolchains.bzl",
 ])
