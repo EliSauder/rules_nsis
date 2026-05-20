@@ -126,6 +126,10 @@ nsis_installer = rule(
       allow_files = True,
       doc = "Files referenced by the NSIS script in the format of file labels mapped to NSIS defines. This should be a one to one mapping.",
     ),
+    "icon": attr.label(
+      allow_files = True,
+      doc = "The icon to use for the installer."
+    ),
     "out": attr.string(
       mandatory = True,
       doc = "Output installer filename, usally ending in .exe."
