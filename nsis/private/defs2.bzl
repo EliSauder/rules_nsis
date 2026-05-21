@@ -421,7 +421,7 @@ def _build_script(ctx):
     ctx.actions.run(
         mnemonic = "RenderNsiTemplate",
         progress_message = "Rendering Nsis Template",
-        executable = "//nsis/buildtemplate_bin",
+        executable = "$(location @com_github_com_hairyhenderson_gomplate_v5//cmd/gomplate)",
         args = [args],
         inputs = inputs,
         tools = tools,
