@@ -29,7 +29,7 @@
             golines.enable = true;
             govet.enable = false;
 
-            nixfmt-rfc-style.enable = true;
+            nixfmt.enable = true;
           };
         };
       });
