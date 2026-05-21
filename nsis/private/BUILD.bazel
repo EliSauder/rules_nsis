@@ -1,5 +1,4 @@
-
 exports_files([
-    "defs.bzl",
     "extensions.bzl",
+    "defs.bzl",
 ])

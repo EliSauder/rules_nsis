@@ -114,14 +114,12 @@ Function .onInit
   ${EndIf}
 {{- end }}
 
-{{- if .AllowOnlyOneInstance }}
   System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_NAME}InstallerMutex") i .r1 ?e'
   Pop $R0
   ${If} $R0 != 0
     MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running."
     Abort
   ${EndIf}
-{{- end }}
 FunctionEnd
 
 Function CheckPreviousInstall
@@ -223,7 +221,7 @@ FunctionEnd
 ; Installer
 ; ---------------------
 
-{{- for .InstallTypes }}
+{{- range .InstallTypes }}
 InstType "{{.}}"
 {{- end }}
 
@@ -266,7 +264,7 @@ RMDir /r "{{ . }}"
 ; SECTIONS
 {{ define "section" }}
 Section {{if .Value.DisabledByDefault "\o", ""}} "{{if .Value.IsHidden "-" ""}}{{.Value.DisplayName}}" "{{.Value.Name}}"
-    SectionIn {{if .Value.Required "RO" ""}}{{for .Value.InstallTypeIndex}} {{.}}{{end}}
+    SectionIn {{if .Value.Required "RO" ""}}{{ .Value.InstallCategories}}
     SetOutPath "$INSTDIR"
 
     {{- if .Value.Service }}
