@@ -307,12 +307,17 @@ def _build_data_structure_component(component, inst_cat):
 
     return data
 
+def _vendor_path(ctx):
+    if ctx.attr.vendor_path == None or ctx.attr.vendor_path == "":
+        return ctx.attr.vendor
+    return ctx.attr.vendor_path
+
 def _build_data_structure(ctx):
     data = {
         "Name": str(ctx.attr.name),
         "Product": str(ctx.attr.directory),
         "Vendor": str(ctx.attr.vendor),
-        "VendorPath": str(ctx.attr.vendor),
+        "VendorPath": str(_vendor_path(ctx)),
         "Description": str(ctx.attr.description),
         "Copyright": str(ctx.attr.copyright),
         "LicenseFile": str(ctx.attr.license_file.path),
