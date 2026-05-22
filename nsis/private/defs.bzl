@@ -137,6 +137,7 @@ nsis_component = rule(
         ),
         "service_executable": attr.label(
             allow_single_file = True,
+            executable = True,
             doc = "The executable of the service. Required if service is True.",
             cfg = "target",
         ),
@@ -348,11 +349,6 @@ def _build_data_structure_component(component, inst_cat):
         "Name": str(component.name),
         "Directory": str(component.directory),
         "Service": bool(component.service),
-        "ServiceExecutable": (
-            str(component.service_executable.path)
-            if component.service_executable != None
-            else ""
-        ),
         "ServiceArgs": " ".join(component.service_args),
         "ServiceDependencies": "\\".join(component.service_dependencies),
         "ServiceStartType": str(component.service_start_type),
@@ -362,12 +358,19 @@ def _build_data_structure_component(component, inst_cat):
         "IsHidden": _hidden(component.selection_mode),
         "DisplayName": str(component.display_name),
         "Description": str(component.description),
-        "InstallCategories": " ".join([str(inst_cat.index(x)) for x in component.install_categories]),
+        "InstallCategories": " ".join([str(inst_cat.index(x) + 1) for x in component.install_categories]),
         "Files": [],
         "Directories": [],
         "Dependencies": [str(x[NsisComponentInfo].name) for x in component.dependencies],
         "Shortcuts": [],
     }
+    if component.service_executable != None:
+        f = component.service_executable[DefaultInfo].files.to_list()[0]
+
+        data["ServiceExecutable"] = {
+            "Name": f.basename,
+            "Source": f.path,
+        }
 
     for file in component.shortcuts:
         data["Shortcuts"].append({
@@ -452,36 +455,43 @@ def _build_data_structure(ctx):
 
     return data
 
-def _all_files_group(group):
-    srcs = None
-
-    for dep in group.components:
+def _all_files_component_list(lst):
+    srcs = depset()
+    for dep in lst:
         if NsisComponentInfo in dep:
             cmp = dep[NsisComponentInfo]
-            if cmp.service_executable != None:
-                srcs = depset(
-                    direct = [cmp.service_executable],
-                    transitive = [srcs],
-                )
-            srcs = depset(
-                transitive = [
-                    cmp.shortcuts,
-                    cmp.srcs,
-                    srcs,
-                ],
-            )
+            srcs = depset(transitive = [_all_files_component(cmp), srcs])
         elif NsisComponentGroupInfo in dep:
             grp = dep[NsisComponentGroupInfo]
-            srcs = depset(
-                transitive = [
-                    _all_files_group(grp),
-                    srcs,
-                ],
-            )
+            srcs = depset(transitive = [_all_files_group(grp), srcs])
         else:
             fail("provided dependency is not a component or a component group.")
 
     return srcs
+
+
+def _all_files_group(group):
+    return _all_files_component_list(group.components)
+
+def _all_files_component(cmp):
+    srcs = depset()
+    if cmp.service_executable != None:
+        svcexe = cmp.service_executable[DefaultInfo]
+        srcs = depset(
+            transitive = [
+                srcs,
+                svcexe.files,
+            ],
+        )
+    srcs = depset(
+        direct = [x[DefaultInfo].files for x in cmp.shortcuts],
+        transitive = [
+            cmp.srcs,
+            srcs,
+        ],
+    )
+    return srcs
+
 
 def _all_files(ctx):
     srcs = depset(
@@ -493,42 +503,21 @@ def _all_files(ctx):
         ] if x != None],
     )
 
-    for dep in ctx.attr.components:
-        if NsisComponentInfo in dep:
-            cmp = dep[NsisComponentInfo]
-            if cmp.service_executable != None:
-                srcs = depset(
-                    direct = [cmp.service_executable],
-                    transitive = [srcs],
-                )
-            srcs = depset(
-                direct = cmp.shortcuts,
-                transitive = [
-                    cmp.srcs,
-                    srcs,
-                ],
-            )
-        elif NsisComponentGroupInfo in dep:
-            grp = dep[NsisComponentGroupInfo]
-            srcs = depset(
-                transitive = [
-                    _all_files_group(grp),
-                    srcs,
-                ],
-            )
-        else:
-            fail("provided dependency is not a component or a component group.")
+    srcs = depset(transitive = [_all_files_component_list(ctx.attr.components), srcs])
 
     return srcs
 
-def _render_file(ctx, tmpl, data, outname):
-    datafile = ctx.actions.declare_file("data{}{}.json".format(hash(str(tmpl)), hash(str(outname))))
+def _render_file(ctx, tmpl, data):
+    hs = "{}{}".format(hash(ctx.attr.name), hash(tmpl.path))
+    datafile = ctx.actions.declare_file("data-{}.json".format(hs))
 
     ctx.actions.write(
         output = datafile,
         content = json.encode(data),
         mnemonic = "Render Tpl {} - Data File".format(tmpl.short_path),
     )
+
+    outname = "nsistmpl-{}.nsi".format(hs)
 
     renderedtmpl = ctx.actions.declare_file(str(outname))
 
@@ -538,7 +527,6 @@ def _render_file(ctx, tmpl, data, outname):
     args.add("--file")
     args.add(str(tmpl.path))
     args.add("--datasource")
-    #args.add("in=file://{}".format(str(datafile.path)))
     args.add("in={}".format(str(datafile.path)))
     args.add("--out")
     args.add(str(renderedtmpl.path))
@@ -562,8 +550,8 @@ def _render_file(ctx, tmpl, data, outname):
 def _build_rendered_templates(ctx):
     data = _build_data_structure(ctx)
 
-    script = _render_file(ctx, ctx.file._template, data, "NSIS.nsi")
-    option = _render_file(ctx, ctx.file._template_options, data, "NSIS.InstallOptions.nsi")
+    script = _render_file(ctx, ctx.file._template, data)
+    option = _render_file(ctx, ctx.file._template_options, data)
 
     return {"Script": script, "Options": option}
 

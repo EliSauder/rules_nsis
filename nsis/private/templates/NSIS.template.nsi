@@ -1,3 +1,6 @@
+!pragma warning disable 6010 ; Because we are using templates, some installers
+                             ; don't use everything defined.
+
 Unicode True
 
 !include LogicLib.nsh
@@ -362,6 +365,28 @@ FunctionEnd
   ExecWait 'sc.exe stop "${SERVICE_NAME}"' $R1
 !macroend
 
+
+Function WinSvcExists
+    Exch $R0
+    Push $R1
+
+    DetailPrint "Querying Windows service: $R0"
+
+    ExecWait '$SYSDIR\sc.exe query "$R0"' $R1
+
+    ${If} $R1 == 0
+        StrCpy $R0 1
+    ${Else}
+        StrCpy $R0 0
+    ${EndIf}
+
+    Pop $R1
+
+    Exch $R0
+FunctionEnd
+
+
+
 !macro WinSvcDelete SERVICE_NAME
   DetailPrint "Deleting Windows service: ${SERVICE_NAME}"
   ExecWait 'sc.exe delete "${SERVICE_NAME}"' $R1
@@ -419,7 +444,7 @@ RMDir /r "{{ .Name }}"
 {{ define "section" }}
 Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
     SectionIn {{if .Required}}RO {{end}}{{ .InstallCategories}}
-    SetOutPath "$INSTDIR"
+    SetOutPath "$INSTDIR\{{.Directory}}"
 
     {{- if .Service }}
     !insertmacro WinSvcStop "{{ .Name }}"
@@ -435,18 +460,22 @@ Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     {{- end }}
 
     {{- if .Service }}
-    !insertmacro WinSvcExists "{{ .Name }}" $R1
-    ${If} $R0 == 0
+    Push $0
+    Push "{{.Name}}"
+    Call WinSvcExists
+    Pop $0
+    ${If} $0 == 0
         !insertmacro WinSvcUpdate "{{ .Name }}" \
-                "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DispalayName}}" "{{ .ServiceExec }}" \
+                "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "$OUTDIR\{{ .ServiceExecutable.Name }}" \
                 "{{ .ServiceArgs }}" "{{ .ServiceStartType }}" \
-                "{{ .ServiceDepends }}"
+                "{{ .ServiceDependencies }}"
     ${Else}
         !insertmacro WinSvcCreate "{{ .Service }}" \
-                "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceExec }}" \
+                "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceExecutable }}" \
                 "{{ .ServiceArgs }}" "{{ .ServiceStartType }}" \
-                "{{ .ServiceDepends }}"
+                "{{ .ServiceDependencies }}"
     ${EndIf}
+    Pop $0
     {{- end }}
 SectionEnd
 {{ end }}
