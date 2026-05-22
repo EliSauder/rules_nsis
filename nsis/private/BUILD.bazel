@@ -1,3 +1,5 @@
+load("@rules_go//go:def.bzl", "go_binary")
+
 exports_files([
     "extensions.bzl",
     "defs.bzl",
@@ -33,4 +35,10 @@ platform(
         "@platforms//os:windows",
         "@platforms//cpu:arm",
     ],
+)
+
+alias(
+    name = "gomplate",
+    actual = "@com_github_hairyhenderson_gomplate_v5//cmd/gomplate",
+    visibility = ["//visibility:public"],
 )

@@ -714,7 +714,8 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
             allow_single_file = True,
         ),
         "_gomplate": attr.label(
-            default = "@com_github_hairyhenderson_gomplate_v5//cmd/gomplate",
+            default = ":gomplate",
+            #default = "@com_github_hairyhenderson_gomplate_v5//cmd/gomplate",
             executable = True,
             cfg = "exec",
         ),
