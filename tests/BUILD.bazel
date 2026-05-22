@@ -19,30 +19,37 @@ nsis_installer(
     product_path = "Minimal Installer",
 )
 
-#nsis_component(
-#    name = "nsis_component",
-#    directory = "",
-#    service = False,
-#    service_executable = "",
-#    service_args = [],
-#    service_start_type = "",
-#    service_dependencies = [],
-#    default = False,
-#    hidden = False,
-#    required = False,
-#    display_name = "Nsis Component",
-#    description = "",
-#    install_categories = [
-#        "Full",
-#        "Typical",
-#        "Minimal",
-#    ],
-#    srcs = [
-#        ":nsis_files",
-#    ],
-#    dependencies = [],
-#)
-#
+nsis_component(
+    name = "single_service_component",
+    service = True,
+    service_executable = "//tests/testdata:README.md",
+    service_start_type = "auto",
+    selection_mode = "required",
+    display_name = "README Service",
+    description = "README Service Description",
+    install_categories = ["Full", "Typical", "Minimal"],
+    srcs = [":nsis_files"],
+)
+
+nsis_installer(
+    name = "single_service_installer",
+    product = "Single Service Installer",
+    product_path = "SSI",
+    vendor = "Company Department",
+    vendor_path = "Company\\Department",
+    description = "Description",
+    version = "0.0.0.1",
+    execution_level = "admin",
+    components = [
+        ":single_service_component",
+    ],
+    install_categories = [
+        "Full",
+        "Typical",
+        "Minimal",
+    ],
+)
+
 #nsis_component_group(
 #    name = "nsis_group",
 #    description = "",
