@@ -1,81 +1,93 @@
-load("//nsis:def.bzl", "nsis", "nsis_component", "nsis_component_group")
+load("//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer")
 
 filegroup(
     name = "nsis_files",
     srcs = [
-        "testdata/README.md",
+        "//tests/testdata:README.md",
     ],
 )
 
 nsis_component(
-    name = "nsis_component",
-    directory = "",
-    service = False,
-    service_executable = "",
-    service_args = [],
-    service_start_type = "",
-    service_dependencies = [],
-    default = False,
-    hidden = False,
-    required = False,
-    display_name = "Nsis Component",
-    description = "",
-    install_categories = [
-        "Full",
-        "Typical",
-        "Minimal",
-    ],
-    srcs = [
-        ":nsis_files",
-    ],
-    dependencies = [],
-)
-
-nsis_component_group(
-    name = "nsis_group",
-    description = "",
-    expanded = True,
-    bold = True,
-    display_name = "Nsis Group",
-    components = [
-        "//:nsis_component"
-    ],
+    name = "test_minimal_component",
+    srcs = [":nsis_files"],
 )
 
 nsis_installer(
-    name = "nsis_installer",
-    product = "",
-    vendor = "",
-    vendor_path = "",
-    description = "",
-    copyright = "",
-    license_file = "",
-    version = "",
-
-    install_root = "",
-    install_path = "",
-    execution_level = "",
-    compressor = "",
-    compressor_dictsize = "",
-    icon = "",
-    header_image = "",
-    menu_image = "",
-
-    srcs = [
-        "//:nsis_group",
-    ],
-
-    platforms = [],
-
-    install_categories = [
-        "Full",
-        "Typical",
-        "Minimal",
-    ],
-
-    outfile = "Setup.exe",
-    defines = [],
-    verbosity = "",
-    strict = True,
-    no_config = False,
+    name = "minimal_installer",
+    components = [":test_minimal_component"],
+    product = "Minimal Installer",
+    product_path = "Minimal Installer",
 )
+
+#nsis_component(
+#    name = "nsis_component",
+#    directory = "",
+#    service = False,
+#    service_executable = "",
+#    service_args = [],
+#    service_start_type = "",
+#    service_dependencies = [],
+#    default = False,
+#    hidden = False,
+#    required = False,
+#    display_name = "Nsis Component",
+#    description = "",
+#    install_categories = [
+#        "Full",
+#        "Typical",
+#        "Minimal",
+#    ],
+#    srcs = [
+#        ":nsis_files",
+#    ],
+#    dependencies = [],
+#)
+#
+#nsis_component_group(
+#    name = "nsis_group",
+#    description = "",
+#    expanded = True,
+#    bold = True,
+#    display_name = "Nsis Group",
+#    components = [
+#        "//:nsis_component"
+#    ],
+#)
+#
+#nsis_installer(
+#    name = "nsis_installer",
+#    product = "",
+#    vendor = "",
+#    vendor_path = "",
+#    description = "",
+#    copyright = "",
+#    license_file = "",
+#    version = "",
+#
+#    install_root = "",
+#    install_path = "",
+#    execution_level = "",
+#    compressor = "",
+#    compressor_dictsize = "",
+#    icon = "",
+#    header_image = "",
+#    menu_image = "",
+#
+#    srcs = [
+#        "//:nsis_group",
+#    ],
+#
+#    platforms = [],
+#
+#    install_categories = [
+#        "Full",
+#        "Typical",
+#        "Minimal",
+#    ],
+#
+#    outfile = "Setup.exe",
+#    defines = [],
+#    verbosity = "",
+#    strict = True,
+#    no_config = False,
+#)

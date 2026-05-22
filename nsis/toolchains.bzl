@@ -1,3 +1,3 @@
-load("//nsis/toolchains:toolchains.bzl", _nsis_toolchain = "nsis_toolchain")
+load("//nsis/toolchain:toolchains.bzl", _nsis_toolchain = "nsis_toolchain")
 
 nsis_toolchain = _nsis_toolchain

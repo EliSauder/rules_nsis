@@ -7,6 +7,7 @@ module(
 ############################
 bazel_dep(name = "gazelle", version = "0.51.0")
 bazel_dep(name = "rules_go", version = "0.60.0")
+bazel_dep(name = "protobuf", version = "35.0-rc1")
 
 # Setup SDK
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
@@ -15,35 +16,16 @@ go_sdk.download(
     version = "1.26.2",
 )
 use_repo(go_sdk, "go_sdk")
+
 register_toolchains("@go_sdk//:all")
 
-go_deps = use_extension("@gazelle//:extensions.bzl", "go_dpes")
-go_deps.module(
-    name = "gomplate",
-    path = "github.com/hairyhenderson/gomplate/v5/cmd/gomplate",
-    sum = "h1:ZapXFRHO5mOeXXZentMaSmpWbMNWNxiQE8K+pm4n8Cw=",
-    version = "v5.1.0",
-)
-use_repo(go_deps, "com_github_com_hairyhenderson_gomplate_v5")
-
-
-############################
-# SETUP GAZELLE
-############################
-bazel_dep(name = "gazelle", version = "0.50.0")
-
-# Setup Dependencies
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_mod = "//:go.mod")
+use_repo(go_deps, "com_github_aws_aws_sdk_go_v2", "com_github_aws_aws_sdk_go_v2_config", "com_github_aws_aws_sdk_go_v2_feature_ec2_imds", "com_github_aws_aws_sdk_go_v2_service_ec2", "com_github_aws_aws_sdk_go_v2_service_kms", "com_github_aws_aws_sdk_go_v2_service_sts", "com_github_fullsailor_pkcs7", "com_github_google_uuid", "com_github_gosimple_slug", "com_github_hack_pad_hackpadfs", "com_github_hairyhenderson_go_fsimpl", "com_github_hairyhenderson_gomplate_v5", "com_github_hairyhenderson_toml", "com_github_hairyhenderson_xignore", "com_github_hairyhenderson_yaml", "com_github_hashicorp_go_sockaddr", "com_github_hashicorp_vault_api", "com_github_hashicorp_vault_api_auth_aws", "com_github_invopop_jsonschema", "com_github_itchyny_gojq", "com_github_johannesboyne_gofakes3", "com_github_joho_godotenv", "com_github_lmittmann_tint", "com_github_masterminds_goutils", "com_github_masterminds_semver_v3", "com_github_openwall_yescrypt_go", "com_github_santhosh_tekuri_jsonschema_v6", "com_github_shopify_ejson", "com_github_spf13_cobra", "com_github_stretchr_testify", "com_github_ugorji_go_codec", "io_k8s_client_go", "org_cuelang_go", "org_go4_netipx", "org_golang_x_crypto", "org_golang_x_sys", "org_golang_x_term", "org_golang_x_text", "tools_gotest_v3")
 
-# Make repos available to modules
 inject_repo(go_deps, "rules_go")
 
 inject_repo(go_deps, "gazelle")
-
-use_repo(
-    go_deps,
-)
 
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "platforms", version = "1.1.0")
@@ -63,7 +45,7 @@ pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 pip.parse(
     hub_name = "pypi",
     python_version = "3.12",
-    requirements_lock = "@rules_nsis//nsis:requirements_lock_txt",
+    requirements_lock = "//nsis/toolchain:requirements_lock_txt",
 )
 use_repo(pip, "pypi")
 
@@ -71,17 +53,35 @@ use_repo(pip, "pypi")
 # GET ZLIB
 ############################
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
 http_archive(
     name = "zlib_nsis",
-    urls = [
-        "https://nsis.sourceforge.io/mediawiki/images/c/ca/Zlib-1.2.7-win32-x86.zip",
-    ],
-    sha256 = "4f2819139f53ac23bfd77b3dca3068174d5c791b3e84f7984aa04a3a3f585eff",
     build_file_content = """
 filegroup(
     name = "bin",
     srcs = glob(["**"]),
     visibility = ["//visibility:public"],
 )
-    """
+    """,
+    sha256 = "4f2819139f53ac23bfd77b3dca3068174d5c791b3e84f7984aa04a3a3f585eff",
+    urls = [
+        "https://nsis.sourceforge.io/mediawiki/images/c/ca/Zlib-1.2.7-win32-x86.zip",
+    ],
 )
+
+############################
+# REGISTER CUSTOM TOOLCHAINS
+############################
+nsis_test = use_extension("//nsis:extensions.bzl", "nsis", dev_dependency = True)
+nsis_test.executable(
+    name = "test_nsis",
+    version = "3.11",
+)
+use_repo(nsis_test, "test_nsis_tool", "test_nsis_toolchains")
+
+register_toolchains(
+    "@test_nsis_toolchains//:toolchain",
+    dev_dependency = True,
+)
+#nsis = use_extension("//nsis:extensions.bzl", "nsis")
+#nsis.executable(name = "nsis", version = "3.11")

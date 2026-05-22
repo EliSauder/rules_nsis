@@ -1,9 +1,17 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 _NSIS_SRC_BUILD_FILE = """
+load("@rules_nsis//nsis/private:dirrule.bzl", "dirrule")
+
 filegroup(
   name = "nsis_src_files",
   srcs = glob(["**"]),
+)
+
+dirrule(
+    name = "nsis_src_files_dir",
+    srcs = [":nsis_src_files"],
+    visibility = ["//visibility:public"],
 )
 
 genrule(
@@ -11,13 +19,13 @@ genrule(
   executable = True,
   srcs = [
     "@zlib_nsis//:bin",
-    ":nsis_src_files",
+    ":nsis_src_files_dir",
   ],
   cmd = \"\"\"
 ls external
 prefix="$$(realpath "$$(dirname "$(OUTS)")")"
-$(execpath @rules_nsis//nsis:scons_bin) SKIPSTUBS=all SKIPPLUGINS=all SKIPUTILS=all SKIPMISC=all \
-  NSIS_CONFIG_CONST_DATA_PATH=no PREFIX="$$prefix" -C external/rules_nsis++nsis+nsis_src/ \
+$(execpath @rules_nsis//nsis/toolchain:scons_bin) SKIPSTUBS=all SKIPPLUGINS=all SKIPUTILS=all SKIPMISC=all \
+  NSIS_CONFIG_CONST_DATA_PATH=no PREFIX="$$prefix" -C "$(location :nsis_src_files_dir)" \
   VERSION="{version}" install-compiler
 
 \"\"\",
@@ -27,7 +35,7 @@ $(execpath @rules_nsis//nsis:scons_bin) SKIPSTUBS=all SKIPPLUGINS=all SKIPUTILS=
     "@rules_python//python:current_py_toolchain",
   ],
   tools = [
-    "@rules_nsis//nsis:scons_bin",
+    "@rules_nsis//nsis/toolchain:scons_bin",
   ],
   visibility = ["//visibility:public"],
 )
@@ -133,7 +141,14 @@ nsis_toolchain(
 toolchain(
     name = "toolchain",
     toolchain = ":nsis_toolchain_impl",
-    toolchain_type = "@rules_nsis//nsis:toolchain_type",
+    toolchain_type = "@rules_nsis//nsis/toolchain:toolchain_type",
+    #exec_compatible_with = [
+    #    "@platforms//os:linux",
+    #    "@platforms//os:windows",
+    #],
+    target_compatible_with = [
+        "@platforms//os:windows",
+    ],
     visibility = ["//visibility:public"],
 )
         """.format(tool_repo = repository_ctx.attr.tool_repo,

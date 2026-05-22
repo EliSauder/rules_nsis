@@ -2,20 +2,45 @@ Unicode True
 
 !include LogicLib.nsh
 !include MUI2.nsh
+!include x64.nsh
 
-!define PACKAGE_NAME "{{ .PackageName }}"
-!define PACKAGE_PATH_NAME "{{ .PackageNamePath }}"
-!define PACKAGE_VENDOR "{{ .PackageVendor }}"
-!define PACKAGE_VENDOR_PATH "{{ .PackageVendorPath }}"
-!define PACKAGE_VERSION "{{ .PackageVersion }}"
-!define PACKAGE_DESCRIPTION "{{ .PackageDescription }}"
-!define PACKAGE_COPYRIGHT "{{ .PackageCopyright }}"
+!define IsNativeARM32 '${IsNativeMachineArchitecture} 448'
 
-!define INSTALL_ROOT "{{ default "$PROGRAMFILES64" .InstallRoot }}"
-!define OUTFILE_NAME "{{ .OutFile }}"
-!define ICON_FILE "{{ .IconFile }}"
+!define PACKAGE_NAME "{{ (ds "in").Product }}"
+!define PACKAGE_PATH_NAME "{{ (ds "in").ProductPath }}"
+!define PACKAGE_VENDOR "{{ (ds "in").Vendor }}"
+!define PACKAGE_VENDOR_PATH "{{ (ds "in").VendorPath }}"
+!define PACKAGE_VERSION "{{ (ds "in").Version }}"
+!define PACKAGE_DESCRIPTION "{{ (ds "in").Description }}"
+!define PACKAGE_COPYRIGHT "{{ (ds "in").Copyright }}"
 
-!define PACKAGE_PATH "{{ default "${PACKAGE_VENDOR_PATH}\${PACKAGE_PATH_NAME}" .InstallPath }}"
+{{- if (ds "in").InstallRoot }}
+!define INSTALL_ROOT "{{(ds "in").InstallRoot}}"
+{{- else}}
+{{- if (ds "in").ArchitectureIs64}}
+!define INSTALL_ROOT "$PROGRAMFILES64"
+{{- else}}
+!define INSTALL_ROOT "$PROGRAMFILES"
+{{- end}}
+{{- end}}
+
+!ifdef OUTFILE
+!define OUTFILE_NAME "${OUTFILE}"
+!else
+!define OUTFILE_NAME "{{ (ds "in").Outfile }}"
+!endif
+
+!define ICON_FILE "{{ (ds "in").Icon }}"
+
+{{- if (ds "in").InstallPath}}
+!define PACKAGE_PATH "{{(ds "in").InstallPath}}"
+{{- else}}
+{{- if (ds "in").VendorPath}}
+!define PACKAGE_PATH "${PACKAGE_VENDOR_PATH}\${PACKAGE_PATH_NAME}"
+{{- else}}
+!define PACKAGE_PATH "${PACKAGE_PATH_NAME}"
+{{- end}}
+{{- end}}
 
 !define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_PATH}"
 !define REG_KEY "Software\${PACKAGE_PATH}"
@@ -23,16 +48,16 @@ Unicode True
 Name "${PACKAGE_NAME}"
 OutFile "${OUTFILE_NAME}"
 InstallDir "${INSTALL_ROOT}\${PACKAGE_PATH}"
-InstallDirRegKey SHCTX "Software\${PACKAGE_PATH}"
+#InstallDirRegKey SHCTX "${REG_KEY}" "InstallLocation"
 
-{{- if .ExecutionLevel }}
-RequestExecutionLevel {{ .ExecutionLevel }}
+{{- if (ds "in").ExecutionLevel }}
+RequestExecutionLevel {{ (ds "in").ExecutionLevel }}
 {{- else }}
 RequestExecutionLevel admin
 {{- end }}
 
-SetCompressor {{ default "lzma" .Compressor }}
-SetCompressorDictSize {{ default "32" .CompressorDictSize }}
+SetCompressor {{ (ds "in").Compressor }}
+SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 
 VIProductVersion "${PACKAGE_VERSION}"
 VIAddVersionKey "ProductName" "${PACKAGE_NAME}"
@@ -42,106 +67,231 @@ VIAddVersionKey "FileDescription" "${PACKAGE_DESCRIPTION}"
 VIAddVersionKey "LegalCopyright" "${PACKAGE_COPYRIGHT}"
 VIAddVersionKey "FileVersion" "${PACKAGE_VERSION}"
 
-Var INSTALL_DESKTOP
-Var INSTALL_STARTMENU
-var StartMenuFolder
+#Var INSTALL_DESKTOP
+#Var INSTALL_STARTMENU
+#var StartMenuFolder
 
-
-{{- if .IconFile }}
+{{- if (ds "in").Icon }}
 !define MUI_ICON "${ICON_FILE}"
 !define MUI_UNICON "${ICON_FILE}"
 {{ end }}
 
 !define MUI_ABORTWARNING
 
-{{- if .HeaderImage }}
+{{- if (ds "in").HeaderImage }}
 !define MUI_HEADERIMAGE
-!define MUI_HEADERIMAGE_BITMAP "{{ .HeaderImage }}"
+!define MUI_HEADERIMAGE_BITMAP "{{ (ds "in").HeaderImage }}"
 {{ end }}
 
-{{- if .WelcomeFinishImage }}
-!define MUI_WELCOMEFINISHPAGE_BITMAP "{{ .WelcomeFinishImage }}"
+{{- if (ds "in").MenuImage }}
+!define MUI_WELCOMEFINISHPAGE_BITMAP "{{ (ds "in").MenuImage }}"
 {{- end }}
 
 !insertmacro MUI_PAGE_WELCOME
-{{- if .LicenseFile }}
-!insertmacro MUI_PAGE_LICENSE "{{ nsisPath .LicenseFile }}"
+{{- if (ds "in").LicenseFile }}
+!insertmacro MUI_PAGE_LICENSE "{{ (ds "in").LicenseFile }}"
 {{- end }}
 
-Page custom InstallOptionsPage
+#Var Dialog
+#Var StartMenuCheckbox
+#Var StartMenuCheckboxState
+#
+#Page custom InstallOptionsPage
+#
+#Function InstallOptionsPage
+#    nsDialogs::Create 1018
+#    Pop $Dialog
+#    ${If} $Dialog == error
+#        Abort
+#    ${EndIf}
+#
+#    ${NSD_CreateCheckbox} 0 30u 100% 10u "&Create Start Menu Entries"
+#    Pop $StartMenuCheckbox
+#
+#    ${NSD_SetState} $StartMenuCheckboxState
+#
+#    nsDialogs::Show
+#FunctionEnd
 
 !insertmacro MUI_PAGE_DIRECTORY
 
-!define MUI_STARTMENUPAGE_REGISTRY_ROOT "SHCTX"
-!define MUI_STARTMENUPAGE_REGISTRY_KEY "${REG_KEY}"
-!define MUI_STARTMENUPAGE_REGISTRY_VALUENAME "Start Menu Folder"
-!insertmacro MUI_PAGE_STARTMENU Application $StartMenuFolder
+#!define MUI_STARTMENUPAGE_REGISTRY_ROOT "SHCTX"
+#!define MUI_STARTMENUPAGE_REGISTRY_KEY "${REG_KEY}"
+#!define MUI_STARTMENUPAGE_REGISTRY_VALUENAME "Start Menu Folder"
+#!insertmacro MUI_PAGE_STARTMENU Application $StartMenuFolder
 
-{{- if .EnableComponentsPage }}
 !insertmacro MUI_PAGE_COMPONENTS
-{{- end }}
 
 !insertmacro MUI_PAGE_INSTFILES
 
-!insertmacro MUI_PAGE_FINISH
+#!insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
+#!insertmacro MUI_UNPAGE_FINISH
 
-ReserveFile "NSIS.InstallOptions.ini"
-!insertmacro MUI_RESERVEFILE_INSTALLOPTIONS
-ReserveFile /plugin 'UserInfo.dll'
+;--------------------------------
+;Languages
+
+  !insertmacro MUI_LANGUAGE "English" ;first language is the default language
+  !insertmacro MUI_LANGUAGE "Afrikaans"
+  !insertmacro MUI_LANGUAGE "Albanian"
+  !insertmacro MUI_LANGUAGE "Arabic"
+  !insertmacro MUI_LANGUAGE "Asturian"
+  !insertmacro MUI_LANGUAGE "Basque"
+  !insertmacro MUI_LANGUAGE "Belarusian"
+  !insertmacro MUI_LANGUAGE "Bosnian"
+  !insertmacro MUI_LANGUAGE "Breton"
+  !insertmacro MUI_LANGUAGE "Bulgarian"
+  !insertmacro MUI_LANGUAGE "Catalan"
+  !insertmacro MUI_LANGUAGE "Corsican"
+  !insertmacro MUI_LANGUAGE "Croatian"
+  !insertmacro MUI_LANGUAGE "Czech"
+  !insertmacro MUI_LANGUAGE "Danish"
+  !insertmacro MUI_LANGUAGE "Dutch"
+  !insertmacro MUI_LANGUAGE "Esperanto"
+  !insertmacro MUI_LANGUAGE "Estonian"
+  !insertmacro MUI_LANGUAGE "Farsi"
+  !insertmacro MUI_LANGUAGE "Finnish"
+  !insertmacro MUI_LANGUAGE "French"
+  !insertmacro MUI_LANGUAGE "Galician"
+  !insertmacro MUI_LANGUAGE "German"
+  !insertmacro MUI_LANGUAGE "Greek"
+  !insertmacro MUI_LANGUAGE "Hebrew"
+  !insertmacro MUI_LANGUAGE "Hungarian"
+  !insertmacro MUI_LANGUAGE "Icelandic"
+  !insertmacro MUI_LANGUAGE "Indonesian"
+  !insertmacro MUI_LANGUAGE "Irish"
+  !insertmacro MUI_LANGUAGE "Italian"
+  !insertmacro MUI_LANGUAGE "Japanese"
+  !insertmacro MUI_LANGUAGE "Korean"
+  !insertmacro MUI_LANGUAGE "Kurdish"
+  !insertmacro MUI_LANGUAGE "Latvian"
+  !insertmacro MUI_LANGUAGE "Lithuanian"
+  !insertmacro MUI_LANGUAGE "Luxembourgish"
+  !insertmacro MUI_LANGUAGE "Macedonian"
+  !insertmacro MUI_LANGUAGE "Malay"
+  !insertmacro MUI_LANGUAGE "Mongolian"
+  !insertmacro MUI_LANGUAGE "Norwegian"
+  !insertmacro MUI_LANGUAGE "NorwegianNynorsk"
+  !insertmacro MUI_LANGUAGE "Pashto"
+  !insertmacro MUI_LANGUAGE "Polish"
+  !insertmacro MUI_LANGUAGE "Portuguese"
+  !insertmacro MUI_LANGUAGE "PortugueseBR"
+  !insertmacro MUI_LANGUAGE "Romanian"
+  !insertmacro MUI_LANGUAGE "Russian"
+  !insertmacro MUI_LANGUAGE "ScotsGaelic"
+  !insertmacro MUI_LANGUAGE "Serbian"
+  !insertmacro MUI_LANGUAGE "SerbianLatin"
+  !insertmacro MUI_LANGUAGE "SimpChinese"
+  !insertmacro MUI_LANGUAGE "Slovak"
+  !insertmacro MUI_LANGUAGE "Slovenian"
+  !insertmacro MUI_LANGUAGE "Spanish"
+  !insertmacro MUI_LANGUAGE "SpanishInternational"
+  !insertmacro MUI_LANGUAGE "Swedish"
+  !insertmacro MUI_LANGUAGE "Tatar"
+  !insertmacro MUI_LANGUAGE "Thai"
+  !insertmacro MUI_LANGUAGE "TradChinese"
+  !insertmacro MUI_LANGUAGE "Turkish"
+  !insertmacro MUI_LANGUAGE "Ukrainian"
+  !insertmacro MUI_LANGUAGE "Uzbek"
+  !insertmacro MUI_LANGUAGE "Vietnamese"
+  !insertmacro MUI_LANGUAGE "Welsh"
+
+
+Var Is64BitInstall
+Var IsArmInstall
 
 Function .onInit
-{{- if eq .Architecture "amd64" }}
-  ${IfNot} ${RunningX64}
-    MessageBox MB_ICONSTOP "This installer requires a 64-bit version of Windows."
-    Abort
-  ${EndIf}
+{{- if eq (ds "in").Architecture "x86_64" }}
+    ${IfNot} ${IsNativeAMD64}
+        MessageBox MB_ICONSTOP "This installer requires a 64-bit x86 version of Windows."
+        Abort
+    ${EndIf}
 
-  SetRegView 64
-  StrCpy $Is64BitInstall "1"
-{{- else if eq .Architecture "amd32" }}
-  SetRegView 32
-  StrCpy $Is64BitInstall "0"
-{{- else }}
-  ${If} ${RunningX64}
     SetRegView 64
     StrCpy $Is64BitInstall "1"
-  ${Else}
+    StrCpy $IsArmInstall "0"
+{{- else if eq (ds "in").Architecture "x86_32" }}
+    ${IfNot} ${IsNativeIA32}
+        MessageBox MB_ICONSTOP "This installer requires a 32-bit x86 version of Windows."
+        Abort
+    ${EndIf}
+
     SetRegView 32
     StrCpy $Is64BitInstall "0"
-  ${EndIf}
+    StrCpy $IsArmInstall "0"
+{{- else if eq (ds "in").Architecture "arm64" }}
+    ${IfNot} ${IsNativeARM64}
+        MessageBox MB_ICONSTOP "This installer requires a 64-bit ARM version of Windows."
+        Abort
+    ${EndIf}
+
+    SetRegView 64
+    StrCpy $Is64BitInstall "1"
+    StrCpy $IsArmInstall "1"
+{{- else if eq (ds "in").Architecture "arm32" }}
+    ${IfNot} ${IsNativeARM32}
+        MessageBox MB_ICONSTOP "This installer requires a 32-bit ARM version of Windows."
+        Abort
+    ${EndIf}
+
+    SetRegView 32
+    StrCpy $Is64BitInstall "0"
+    StrCpy $IsArmInstall "1"
+{{- else }}
+    ${If} ${IsNativeX64}
+        SetRegView 64
+        StrCpy $Is64BitInstall "1"
+        StrCpy $IsArmInstall "0"
+    ${ElseIf} ${IsNativeIA32}
+        StrCpy $Is64BitInstall "0"
+        StrCpy $IsArmInstall "0"
+    ${ElseIf} ${IsNativeARM64}
+        StrCpy $Is64BitInstall "1"
+        StrCpy $IsArmInstall "1"
+    ${ElseIf} ${IsNativeARM32}
+        StrCpy $Is64BitInstall "0"
+        StrCpy $IsArmInstall "1"
+    ${ElseIf} ${RunningX64}
+        SetRegView 64
+        StrCpy $Is64BitInstall "1"
+        StrCpy $IsArmInstall "0"
+    ${Else}
+        SetRegView 32
+        StrCpy $Is64BitInstall "0"
+        StrCpy $IsArmInstall "0"
+    ${EndIf}
 {{- end }}
 
-  System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_NAME}InstallerMutex") i .r1 ?e'
-  Pop $R0
-  ${If} $R0 != 0
-    MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running."
-    Abort
-  ${EndIf}
-FunctionEnd
-
-Function CheckPreviousInstall
-  ReadRegStr $R0 HKLM "${REG_KEY}" "InstallDir"
-
-  ${If} $R0 != ""
-    ${If} ${FileExists} "$R0\Uninstall.exe"
-      MessageBox MB_YESNO|MB_ICONQUESTION \
-        "A previous version of ${PACKAGE_NAME} was found. Do you want to uninstall it first?" \
-        IDYES do_uninstall IDNO skip_uninstall
-
-      do_uninstall:
-        ExecWait '"$R0\Uninstall.exe" /S _?=$R0'
-        Goto done
-
-      skip_uninstall:
-        Goto done
-
-      done:
+    System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_NAME}InstallerMutex") i .r1 ?e'
+    Pop $R0
+    ${If} $R0 != 0
+        MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running."
+        Abort
     ${EndIf}
-  ${EndIf}
 FunctionEnd
+
+#Function CheckPreviousInstall
+#  ReadRegStr $R0 HKLM "${REG_KEY}" "InstallDir"
+#
+#  ${If} $R0 != ""
+#    ${If} ${FileExists} "$R0\Uninstall.exe"
+#      MessageBox MB_YESNO|MB_ICONQUESTION \
+#        "A previous version of ${PACKAGE_NAME} was found. Do you want to uninstall it first?" \
+#        IDYES do_uninstall IDNO skip_uninstall
+#
+#      do_uninstall:
+#        ExecWait '"$R0\Uninstall.exe" /S _?=$R0'
+#        Goto done
+#
+#      skip_uninstall:
+#        Goto done
+#
+#      done:
+#    ${EndIf}
+#  ${EndIf}
+#FunctionEnd
 
 Function ConditionalAddToRegistry
   Pop $0
@@ -221,7 +371,7 @@ FunctionEnd
 ; Installer
 ; ---------------------
 
-{{- range .InstallTypes }}
+{{- range (ds "in").InstallTypes }}
 InstType "{{.}}"
 {{- end }}
 
@@ -235,74 +385,88 @@ InstType "{{.}}"
 {{ end }}
 
 {{define "sectionGroup"}}
-SectionGroup {{if .Value.Expanded "/e " ""}}"{{if .Value.IsBold "!" ""}}{{.Value.DisplayName}}" "{{.Value.Name}}"
-{{- range .SubGroups }}
-    {{ template "sectionGroup" . }}
-{{- end}}
+SectionGroup {{if .Expanded}}"/e"{{end}}"{{if .IsBold}}!{{end}}{{.DisplayName}}" "{{.Name}}"
 {{- range .Components }}
     {{ template "section" . }}
 {{- end }}
+{{- range .SubGroups }}
+    {{ template "sectionGroup" . }}
+{{- end}}
 SectionGroupEnd
 {{ end }}
 
+#Var RootPath
+
 {{ define "sectionDelete" }}
-{{- if .Value.Service }}
-!insertmacro WinSvcStop "{{ .Value.Service }}"
+{{- if .Service }}
+!insertmacro WinSvcStop "{{ .Name }}"
 Sleep 2000
-!insertmacro WinSvcDelete "{{ .Value.Service }}"
+!insertmacro WinSvcDelete "{{ .Name }}"
 Sleep 2000
 {{- end }}
-{{- range .Value.Files }}
-Delete "{{ . }}"
+{{- with $d := .Directory}}
+{{- range .Files }}
+Delete "{{$d}}\{{ .Name }}"
 {{- end}}
-{{- range .Value.Directories }}
-RMDir /r "{{ . }}"
+{{- end}}
+{{- range .Directories }}
+RMDir /r "{{ .Name }}"
 {{- end}}
 {{ end }}
 
 ; ------------------------
 ; SECTIONS
 {{ define "section" }}
-Section {{if .Value.DisabledByDefault "\o", ""}} "{{if .Value.IsHidden "-" ""}}{{.Value.DisplayName}}" "{{.Value.Name}}"
-    SectionIn {{if .Value.Required "RO" ""}}{{ .Value.InstallCategories}}
+Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
+    SectionIn {{if .Required}}RO {{end}}{{ .InstallCategories}}
     SetOutPath "$INSTDIR"
 
-    {{- if .Value.Service }}
-    !insertmacro WinSvcStop "{{ .Value.Service }}"
+    {{- if .Service }}
+    !insertmacro WinSvcStop "{{ .Name }}"
     Sleep 2000
     {{- end }}
 
-    {{- range .Value.Files }}
+    {{- range .Files }}
     File /oname={{.Name}} "{{.Source}}"
     {{- end }}
 
-    {{- range .Value.Directories }}
+    {{- range .Directories }}
     File /r "{{ . }}\*.*"
     {{- end }}
 
-    {{- if .Value.Service }}
-    !insertmacro WinSvcExists "{{ .Value.Service }}" $R1
+    {{- if .Service }}
+    !insertmacro WinSvcExists "{{ .Name }}" $R1
     ${If} $R0 == 0
-        !insertmacro WinSvcUpdate "{{ .Value.Service }}" \
-                "${PACKAGE_VENDOR} ${PACKAGE_NAME}" "{{ .Value.ServiceExec }}" \
-                "{{ .Value.ServiceArgs }}" "{{ .Value.ServiceStartType }}" \
-                "{{ .Value.ServiceDepends }}"
+        !insertmacro WinSvcUpdate "{{ .Name }}" \
+                "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DispalayName}}" "{{ .ServiceExec }}" \
+                "{{ .ServiceArgs }}" "{{ .ServiceStartType }}" \
+                "{{ .ServiceDepends }}"
     ${Else}
-        !insertmacro WinSvcCreate "{{ .Value.Service }}" \
-                "${PACKAGE_VENDOR} ${PACKAGE_NAME}" "{{ .Value.ServiceExec }}" \
-                "{{ .Value.ServiceArgs }}" "{{ .Value.ServiceStartType }}" \
-                "{{ .Value.ServiceDepends }}"
+        !insertmacro WinSvcCreate "{{ .Service }}" \
+                "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceExec }}" \
+                "{{ .ServiceArgs }}" "{{ .ServiceStartType }}" \
+                "{{ .ServiceDepends }}"
     ${EndIf}
     {{- end }}
 SectionEnd
 {{ end }}
 
-{{- range .ComponentGroups }}
+{{- range (ds "in").Components }}
+{{template "section" .}}
+{{- end}}
+
+{{- range (ds "in").ComponentGroups }}
 {{template "sectionGroup" .}}
-!macro RemoveComponents
-{{template "sectionGroupDelete" .}}
-!macroend
 {{- end }}
+
+!macro RemoveComponents
+{{- range (ds "in").Components }}
+{{template "sectionDelete" .}}
+{{- end}}
+{{- range (ds "in").ComponentGroups }}
+{{template "sectionGroupDelete" .}}
+{{- end }}
+!macroend
 
 Section "-Core Installation"
     SetOutPath "$INSTDIR"
@@ -334,29 +498,23 @@ Section "-Core Installation"
     Push "$INSTDIR\${ICON_FILE}"
     Call ConditionalAddToRegistry
 
-    !insertmacro MUI_INSTALLOPTIONS_READ $INSTALL_STARTMENU \
-            "NSIS.InstallOptions.ini" "Field 1" "State"
+    #${If} "$INSTALL_STARTMENU" == "1"
+    #!insertmacro MUI_STARTMENU_WRITE_BEGIN Application
+    #    CreateDirectory "$SMPROGRAMS\$StartMenuFolder"
+    #    CreateShortCut "$SMPROGRAMS\$StartMenuFolder\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
 
-    ${If} "$INSTALL_STARTMENU" == "1"
-    !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
-        CreateDirectory "$SMPROGRAMS\$StartMenuFolder"
-        {{- range .Executables }}
-        CreateShortCut "$SMPROGRAMS\$StartMenuFolder\{{.}}.lnk" "$INSTDIR\${PACKAGE_PATH}\{{.}}.exe
-        {{ end }}
-        CreateShortCut "$SMPROGRAMS\$StartMenuFolder\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
-
-        Push "StartMenu"
-        Push "$StartMenuFolder"
-        Call ConditionalAddToRegistry
-    !insertmacro MUI_STARTMENU_WRITE_END
-    ${EndIf}
+    #    Push "StartMenu"
+    #    Push "$StartMenuFolder"
+    #    Call ConditionalAddToRegistry
+    #!insertmacro MUI_STARTMENU_WRITE_END
+    #${EndIf}
 
 SectionEnd
 
-Function InstallOptionsPage
-  !insertmacro MUI_HEADER_TEXT "Install Options" "Choose options for installing ${PACKAGE_NAME}"
-  !insertmacro MUI_INSTALLOPTIONS_DISPLAY "NSIS.InstallOptions.ini"
-FunctionEnd
+#Function InstallOptionsPage
+#  !insertmacro MUI_HEADER_TEXT "Install Options" "Choose options for installing ${PACKAGE_NAME}"
+#  !insertmacro MUI_INSTALLOPTIONS_DISPLAY "NSIS(ds "in").InstallOptions.ini"
+#FunctionEnd
 
 Function un.onInit
   ClearErrors
@@ -373,14 +531,15 @@ Function un.onInit
   ${EndUnless}
 FunctionEnd
 
-Function .onSelChange
-  !insertmacro SectionList MaybeSelectionChanged
-FunctionEnd
+# TODO: HANDLE DEPENDENCIES
+#Function .onSelChange
+#  !insertmacro SectionList MaybeSelectionChanged
+#FunctionEnd
 
 Section "Uninstall"
-  {{- if eq .Architecture "x64" }}
+  {{- if eq (ds "in").Architecture "x64" }}
     SetRegView 64
-  {{- else if eq .Architecture "x86" }}
+  {{- else if eq (ds "in").Architecture "x86" }}
     SetRegView 32
   {{- else }}
     ${If} ${RunningX64}
@@ -390,13 +549,13 @@ Section "Uninstall"
     ${EndIf}
   {{- end }}
 
-  ReadRegStr $StartMenuFolder SHCTX "${UN_REG_KEY}" "StartMenu"
-  ${Unless} ${Errors}
-    !insertmacro MUI_STARTMENU_GETFOLDER Application $StartMenuFolder
-    Delete "$SMPROGRAMS\$StartMenuFolder\Uninstall.lnk"
-    RMDir $SMPROGRAMS\$StartMenuFolder
-  ${EndUnless}
-  ClearErrors
+  #ReadRegStr $StartMenuFolder SHCTX "${UN_REG_KEY}" "StartMenu"
+  #${Unless} ${Errors}
+  #  !insertmacro MUI_STARTMENU_GETFOLDER Application $StartMenuFolder
+  #  Delete "$SMPROGRAMS\$StartMenuFolder\Uninstall.lnk"
+  #  RMDir $SMPROGRAMS\$StartMenuFolder
+  #${EndUnless}
+  #ClearErrors
 
   !insertmacro RemoveComponents
 
