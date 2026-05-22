@@ -11,9 +11,9 @@ bazel_dep(name = "protobuf", version = "35.0-rc1")
 
 # Setup SDK
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
-go_sdk.download(
+go_sdk.from_file(
     name = "go_sdk",
-    version = "1.26.2",
+    go_mod = "//:go.mod",
 )
 use_repo(go_sdk, "go_sdk")
 
