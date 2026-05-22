@@ -3,49 +3,49 @@ module github.com/EliSauder/rules_nsis
 go 1.26.0
 
 require (
-	cuelang.org/go v0.16.1
-	github.com/Masterminds/goutils v1.1.1
-	github.com/Masterminds/semver/v3 v3.4.0
-	github.com/Shopify/ejson v1.5.4
-	github.com/aws/aws-sdk-go-v2 v1.41.6
-	github.com/aws/aws-sdk-go-v2/config v1.32.16
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.22
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.299.0
-	github.com/aws/aws-sdk-go-v2/service/kms v1.51.0
-	github.com/aws/aws-sdk-go-v2/service/sts v1.42.0
-	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
-	github.com/google/uuid v1.6.0
-	github.com/gosimple/slug v1.15.0
-	github.com/hack-pad/hackpadfs v0.2.4
-	github.com/hairyhenderson/go-fsimpl v0.4.2
+	cuelang.org/go v0.16.1 // indirect
+	github.com/Masterminds/goutils v1.1.1 // indirect
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/Shopify/ejson v1.5.4 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.41.6 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.32.16 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.22 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.299.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/kms v1.51.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.42.0 // indirect
+	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa // indirect
+	github.com/google/uuid v1.6.0 // indirect
+	github.com/gosimple/slug v1.15.0 // indirect
+	github.com/hack-pad/hackpadfs v0.2.4 // indirect
+	github.com/hairyhenderson/go-fsimpl v0.4.2 // indirect
 	github.com/hairyhenderson/gomplate/v5 v5.1.0
-	github.com/hairyhenderson/toml v0.4.2-0.20210923231440-40456b8e66cf
-	github.com/hairyhenderson/xignore v0.3.3-0.20230403012150-95fe86932830 // iofs-port branch
-	github.com/hashicorp/go-sockaddr v1.0.7
-	github.com/hashicorp/vault/api v1.23.0
-	github.com/hashicorp/vault/api/auth/aws v0.12.0
-	github.com/invopop/jsonschema v0.14.0
-	github.com/itchyny/gojq v0.12.19
-	github.com/johannesboyne/gofakes3 v0.0.0-20260208201424-4c385a1f6a73
-	github.com/joho/godotenv v1.5.1
-	github.com/lmittmann/tint v1.1.3
-	github.com/openwall/yescrypt-go v1.0.0
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/spf13/cobra v1.10.2
-	github.com/stretchr/testify v1.11.1
-	github.com/ugorji/go/codec v1.3.1
-	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba
-	golang.org/x/crypto v0.50.0
-	golang.org/x/sys v0.43.0
-	golang.org/x/term v0.42.0
-	golang.org/x/text v0.36.0
-	gotest.tools/v3 v3.5.2
-	k8s.io/client-go v0.36.0
+	github.com/hairyhenderson/toml v0.4.2-0.20210923231440-40456b8e66cf // indirect
+	github.com/hairyhenderson/xignore v0.3.3-0.20230403012150-95fe86932830 // indirect
+	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
+	github.com/hashicorp/vault/api v1.23.0 // indirect
+	github.com/hashicorp/vault/api/auth/aws v0.12.0 // indirect
+	github.com/invopop/jsonschema v0.14.0 // indirect
+	github.com/itchyny/gojq v0.12.19 // indirect
+	github.com/johannesboyne/gofakes3 v0.0.0-20260208201424-4c385a1f6a73 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/lmittmann/tint v1.1.3 // indirect
+	github.com/openwall/yescrypt-go v1.0.0 // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
+	github.com/spf13/cobra v1.10.2 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
+	github.com/ugorji/go/codec v1.3.1 // indirect
+	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
+	golang.org/x/crypto v0.50.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/term v0.42.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
+	gotest.tools/v3 v3.5.2 // indirect
+	k8s.io/client-go v0.36.0 // indirect
 )
 
 // TODO: replace with gopkg.in/yaml.v3 after https://github.com/go-yaml/yaml/pull/862
 // is merged
-require github.com/hairyhenderson/yaml v0.0.0-20220618171115-2d35fca545ce
+require github.com/hairyhenderson/yaml v0.0.0-20220618171115-2d35fca545ce // indirect
 
 require (
 	cel.dev/expr v0.25.1 // indirect
