@@ -461,7 +461,7 @@ def _all_files_group(group):
             if cmp.service_executable != None:
                 srcs = depset(
                     direct = [cmp.service_executable],
-                    indirect = [srcs],
+                    transitive = [srcs],
                 )
             srcs = depset(
                 transitive = [
@@ -499,7 +499,7 @@ def _all_files(ctx):
             if cmp.service_executable != None:
                 srcs = depset(
                     direct = [cmp.service_executable],
-                    indirect = [srcs],
+                    transitive = [srcs],
                 )
             srcs = depset(
                 direct = cmp.shortcuts,
