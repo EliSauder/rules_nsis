@@ -32,7 +32,7 @@ EOF
         data = [installer, f],
         args = [
             "$(location {})".format(installer),
-            f,
+            "$(location {})".format(f),
         ],
         target_compatible_with = ["@platforms//os:windows"],
         timeout = "moderate",
