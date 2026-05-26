@@ -70,7 +70,7 @@ if __name__ == "__main__":
         raise SystemExit("installer does not exist")
 
     try:
-        CONFIG = json.loads(sys.argv[2])
+        CONFIG = json.load(sys.argv[2])
     except json.JSONDecodeError as e:
         raise SystemExit(f"Invalid config JSON: {e}\nValue: {sys.argv[2]}")
     except:

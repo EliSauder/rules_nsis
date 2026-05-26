@@ -13,6 +13,18 @@ def nsis_installer_test(
         "expected_installer_name": str(expected_installer_name),
     }
 
+    f = name + "_config.json"
+
+    native.genrule(
+        name = name + "_config",
+        outs = [f],
+        cmd = """
+cat > "$@" << EOF
+{}
+EOF
+""".format(json.encode(test_config)),
+    )
+
     py_test(
         name = name,
         srcs = [":nsis_install_test.py"],
@@ -20,7 +32,7 @@ def nsis_installer_test(
         data = [installer],
         args = [
             "$(location {})".format(installer),
-            json.encode(test_config),
+            "$(location {})".format(f),
         ],
         target_compatible_with = ["@platforms//os:windows"],
         timeout = "moderate",
