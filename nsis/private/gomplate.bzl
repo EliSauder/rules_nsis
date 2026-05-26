@@ -25,12 +25,12 @@ _PLATFORMS = {
         "bin": "gomplate_linux-arm64",
     },
     ("windows", "amd32"): {
-        "url": "https://github.com/hairyhenderson/gomplate/releases/download/v5.1.0/gomplate_windows-386",
+        "url": "https://github.com/hairyhenderson/gomplate/releases/download/v5.1.0/gomplate_windows-386.exe",
         "sha256": "d0e9129305b52e7a7893906ed5f49b1267cb2b8a4043f566ef648f3e1ba79cab",
         "bin": "gomplate_windows-386.exe",
     },
     ("windows", "amd64"): {
-        "url": "https://github.com/hairyhenderson/gomplate/releases/download/v5.1.0/gomplate_windows-amd64",
+        "url": "https://github.com/hairyhenderson/gomplate/releases/download/v5.1.0/gomplate_windows-amd64.exe",
         "sha256": "4e089caf4aa57bdbb0017516ad65f74150cc47fd462771778c3b2ee18e3a95b3",
         "bin": "gomplate_windows-amd64.exe",
     },
