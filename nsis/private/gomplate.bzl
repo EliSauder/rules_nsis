@@ -59,6 +59,9 @@ def _gomplate_repo_impl(ctx):
     elif "darwin" in os_name:
         platform = "darwin"
         ext = ""
+    elif "mac os x" in os_name:
+        platform = "darwin"
+        ext = ""
     else:
         fail("Unsupported OS: {}".format(os_name))
 
