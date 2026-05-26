@@ -6,6 +6,9 @@ on:
 
 jobs:
   windows-bazel-test:
+    concurrency:
+      group: ${{ github.workflow }}-windows-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: [windows-latest]
     steps:
       - name: bazel
@@ -22,6 +25,9 @@ jobs:
         run: bazel test //...
   linux-darwin-bazel-test:
     runs-on: [ubuntu-latest, macos-latest]
+    concurrency:
+      group: ${{ github.workflow }}-nonwindows-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: bazel
         uses: bazel-contrib/setup-bazel@0.19.0
