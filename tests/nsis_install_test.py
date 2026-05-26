@@ -70,7 +70,8 @@ if __name__ == "__main__":
         raise SystemExit("installer does not exist")
 
     try:
-        CONFIG = json.load(sys.argv[2])
+        with open(sys.argv[2], "r", encoding="utf-8") as f:
+            CONFIG = json.load(f)
     except json.JSONDecodeError as e:
         raise SystemExit(f"Invalid config JSON: {e}\nValue: {sys.argv[2]}")
     except:
