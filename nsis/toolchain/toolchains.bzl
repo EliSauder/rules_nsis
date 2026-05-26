@@ -5,6 +5,7 @@ NsisToolChainInfo = provider(
         "nsis_files": "Depset of files belonging to the NSIS distribution.",
         "nsis_dir": "Directory to the files for NSIS.",
         "args_style": "The style of arguments to use -arg (dash) or /arg (slash).",
+        "path_style": "The style of the path to use.",
     },
 )
 
@@ -16,6 +17,7 @@ def _nsis_toolchain_impl(ctx):
                 nsis_files = ctx.attr.nsis_files[DefaultInfo].files,
                 nsis_dir = ctx.attr.nsis_dir,
                 args_style = ctx.attr.args_style,
+                path_style = ctx.attr.path_style,
             ),
         ),
     ]
