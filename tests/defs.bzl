@@ -29,7 +29,7 @@ EOF
         name = name,
         srcs = [":nsis_install_test.py"],
         main = ":nsis_install_test.py",
-        data = [installer],
+        data = [installer, f],
         args = [
             "$(location {})".format(installer),
             f,
