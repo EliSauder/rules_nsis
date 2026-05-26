@@ -20,9 +20,9 @@ jobs:
       - name: checkout
         uses: actions/checkout@v6
       - name: build
-        run: bazel build //... --verbose_failures
+        run: bazel build //... --verbose_failures --sandbox_debug
       - name: test
-        run: bazel test //... --verbose_failures
+        run: bazel test //... --verbose_failures --sandbox_debug
   linux-bazel-test:
     runs-on: [ubuntu-latest]
     concurrency:
@@ -38,9 +38,9 @@ jobs:
       - name: checkout
         uses: actions/checkout@v6
       - name: build
-        run: bazel build //... --verbose_failures
+        run: bazel build //... --verbose_failures --sandbox_debug
       - name: test
-        run: bazel test //... --verbose_failures
+        run: bazel test //... --verbose_failures --sandbox_debug
   macos-bazel-test:
     runs-on: [macos-latest]
     concurrency:
@@ -56,6 +56,6 @@ jobs:
       - name: checkout
         uses: actions/checkout@v6
       - name: build
-        run: bazel build //... --verbose_failures
+        run: bazel build //... --verbose_failures --sandbox_debug
       - name: test
-        run: bazel test //... --verbose_failures
+        run: bazel test //... --verbose_failures --sandbox_debug
