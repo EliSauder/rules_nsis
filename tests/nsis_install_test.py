@@ -58,5 +58,5 @@ class InstallerTest(unittest.TestCase):
 
             self.assertTrue(os.path.exists(path), f"Expected file missing: {path}")
 
-if __name__ = "__main__":
+if __name__ == "__main__":
     unittest.main()
