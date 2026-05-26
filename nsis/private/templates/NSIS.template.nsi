@@ -208,7 +208,9 @@ Var IsArmInstall
 Function .onInit
 {{- if eq (ds "in").Architecture "x86_64" }}
     ${IfNot} ${IsNativeAMD64}
-        MessageBox MB_ICONSTOP "This installer requires a 64-bit x86 version of Windows."
+        ${IfNot} ${Silent}
+            MessageBox MB_ICONSTOP "This installer requires a 64-bit x86 version of Windows."
+        ${EndIf}
         Abort
     ${EndIf}
 
@@ -217,7 +219,9 @@ Function .onInit
     StrCpy $IsArmInstall "0"
 {{- else if eq (ds "in").Architecture "x86_32" }}
     ${IfNot} ${IsNativeIA32}
-        MessageBox MB_ICONSTOP "This installer requires a 32-bit x86 version of Windows."
+        ${IfNot} ${Silent}
+            MessageBox MB_ICONSTOP "This installer requires a 32-bit x86 version of Windows."
+        ${EndIf}
         Abort
     ${EndIf}
 
@@ -226,7 +230,9 @@ Function .onInit
     StrCpy $IsArmInstall "0"
 {{- else if eq (ds "in").Architecture "arm64" }}
     ${IfNot} ${IsNativeARM64}
-        MessageBox MB_ICONSTOP "This installer requires a 64-bit ARM version of Windows."
+        ${IfNot} ${Silent}
+            MessageBox MB_ICONSTOP "This installer requires a 64-bit ARM version of Windows."
+        ${EndIf}
         Abort
     ${EndIf}
 
@@ -235,7 +241,9 @@ Function .onInit
     StrCpy $IsArmInstall "1"
 {{- else if eq (ds "in").Architecture "arm32" }}
     ${IfNot} ${IsNativeARM32}
-        MessageBox MB_ICONSTOP "This installer requires a 32-bit ARM version of Windows."
+        ${IfNot} ${Silent}
+            MessageBox MB_ICONSTOP "This installer requires a 32-bit ARM version of Windows."
+        ${EndIf}
         Abort
     ${EndIf}
 
@@ -270,7 +278,9 @@ Function .onInit
     System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_NAME}InstallerMutex") i .r1 ?e'
     Pop $R0
     ${If} $R0 != 0
-        MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running."
+        ${IfNot} ${Silent}
+            MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running."
+        ${EndIf}
         Abort
     ${EndIf}
 FunctionEnd
