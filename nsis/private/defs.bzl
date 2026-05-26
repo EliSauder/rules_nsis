@@ -39,6 +39,17 @@ NsisComponentGroupInfo = provider(
     },
 )
 
+def _always_make_win_path(value):
+    v = str(value)
+    if v.startswith("/"):
+        v = "C:{}".format(v)
+    return v.replace("/", "\\")
+
+def _make_win_path(toolchain, value):
+    if toolchain.path_style == "windows":
+        return _always_make_win_path(value)
+    else:
+        return str(value)
 
 def _quote_nsi_string(value):
     return str(value).replace("\\", "\\\\").replace('"', '\\"')
@@ -250,7 +261,7 @@ def _make_nsis_args(ctx, toolchain, outfile):
 
     return args
 
-def _makensis(ctx, script, options_file, inputs):
+def _makensis(ctx, toolchain, script, options_file, inputs):
     if script == None:
         fail("script can not be None")
     if options_file == None:
@@ -258,12 +269,16 @@ def _makensis(ctx, script, options_file, inputs):
     if inputs == None or None in inputs.to_list():
         fail("inputs can not be None")
 
-    toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
-
     outfile = _get_outfile(ctx)
     args = _make_nsis_args(ctx, toolchain, outfile)
-    args.add(_nsis_define(toolchain.args_style, "INSTALL_OPTIONS_FILE", _quote_nsi_string(options_file.path)))
-    args.add(script.path)
+    args.add(
+        _nsis_define(
+            toolchain.args_style,
+            "INSTALL_OPTIONS_FILE",
+            _quote_nsi_string(_make_win_path(toolchain, options_file.path)),
+        ),
+    )
+    args.add(_make_win_path(toolchain, script.path))
 
     makensis = toolchain.makensis
     makensis_dir = toolchain.nsis_dir.files.to_list()
@@ -287,7 +302,6 @@ def _makensis(ctx, script, options_file, inputs):
         ]
     )
 
-
     ctx.actions.run(
         mnemonic = "MakeNSIS",
         progress_message = "Building NSIS installer {}".format(outfile.short_path),
@@ -297,7 +311,7 @@ def _makensis(ctx, script, options_file, inputs):
         tools = tools,
         outputs = [outfile],
         env = {
-            "NSISDIR": makensis_dir[0].path,
+            "NSISDIR": _make_win_path(toolchain, makensis_dir[0].path),
         },
         use_default_shell_env = False,
     )
@@ -306,7 +320,7 @@ def _makensis(ctx, script, options_file, inputs):
         DefaultInfo(files = depset([outfile]))
     ]
 
-def _build_data_structure_component_group(group, inst_cat):
+def _build_data_structure_component_group(toolchain, group, inst_cat):
     data = {
         "Name": str(group.name),
         "DisplayName": str(group.display_name),
@@ -320,10 +334,10 @@ def _build_data_structure_component_group(group, inst_cat):
     for dep in group.components:
         if NsisComponentInfo in dep:
             cmp = dep[NsisComponentInfo]
-            data["Components"].append(_build_data_structure_component(cmp, inst_cat))
+            data["Components"].append(_build_data_structure_component(toolchain, cmp, inst_cat))
         elif NsisComponentGroupInfo in dep:
             grp = dep[NsisComponentGroupInfo]
-            data["ComponentGroups"].append(_build_data_structure_component_group(grp, inst_cat))
+            data["ComponentGroups"].append(_build_data_structure_component_group(toolchain, grp, inst_cat))
         else:
             fail("provided dependency is not a component or a component group.")
 
@@ -344,10 +358,10 @@ def _hidden(mode):
         return True
     return False
 
-def _build_data_structure_component(component, inst_cat):
+def _build_data_structure_component(toolchain, component, inst_cat):
     data = {
         "Name": str(component.name),
-        "Directory": str(component.directory),
+        "Directory": str(_always_make_win_path(component.directory)),
         "Service": bool(component.service),
         "ServiceArgs": " ".join(component.service_args),
         "ServiceDependencies": "\\".join(component.service_dependencies),
@@ -368,23 +382,24 @@ def _build_data_structure_component(component, inst_cat):
         f = component.service_executable[DefaultInfo].files.to_list()[0]
 
         data["ServiceExecutable"] = {
-            "Name": f.basename,
-            "Source": f.path,
+            "Name": _always_make_win_path(f.basename),
+            "Source": _make_win_path(toolchain, f.path),
         }
 
     for file in component.shortcuts:
         data["Shortcuts"].append({
-            "Name": str(file.basename),
-            "Source": str(file.path),
+            "Name": str(_always_make_win_path(toolchain, file.basename)),
+            "Source": str(_make_win_path(toolchain, file.path)),
         })
 
     for file in component.srcs.to_list():
         if file.is_directory:
-            data["Directories"].append(str(file.path))
+            data["Directories"].append(
+                str(_make_win_path(toolchain, file.path)))
         else:
             data["Files"].append({
-                "Name": str(file.basename),
-                "Source": str(file.path),
+                "Name": str(_always_make_win_path(file.basename)),
+                "Source": str(_make_win_path(toolchain, file.path)),
             })
 
     return data
@@ -394,17 +409,17 @@ def _vendor_path(ctx):
         return ctx.attr.vendor
     return ctx.attr.vendor_path
 
-def _build_data_structure(ctx):
+def _build_data_structure(ctx, toolchain):
     data = {
         "Name": str(ctx.attr.name),
         "Product": str(ctx.attr.product),
-        "ProductPath": str(ctx.attr.product_path),
+        "ProductPath": str(_always_make_win_path(ctx.attr.product_path)),
         "Vendor": str(ctx.attr.vendor),
-        "VendorPath": str(_vendor_path(ctx)),
+        "VendorPath": str(_always_make_win_path(_vendor_path(ctx))),
         "Description": str(ctx.attr.description),
         "Copyright": str(ctx.attr.copyright),
         "LicenseFile": (
-            str(ctx.attr.license_file.path)
+            str(_make_win_path(toolchain, ctx.attr.license_file.path))
             if ctx.attr.license_file != None
             else None
         ),
@@ -415,24 +430,24 @@ def _build_data_structure(ctx):
             if str(ctx.attr.arch) == "x86_64" or str(ctx.attr.arch) == "arm64"
             else False
         ),
-        "InstallRoot": str(ctx.attr.install_root),
-        "InstallPath": str(ctx.attr.install_path),
+        "InstallRoot": str(_always_make_win_path(ctx.attr.install_root)),
+        "InstallPath": str(_always_make_win_path(ctx.attr.install_path)),
         "ExecutionLevel": str(ctx.attr.execution_level),
         "InstallTypes": [str(x) for x in ctx.attr.install_categories],
         "Compressor": str(ctx.attr.compressor),
         "CompressorDictSize": int(ctx.attr.compressor_dictsize),
         "Icon": (
-            str(ctx.attr.icon.path)
+            str(_make_win_path(toolchain, ctx.attr.icon.path))
             if ctx.attr.icon != None
             else None
         ),
         "HeaderImage": (
-            str(ctx.attr.header_image.path)
+            str(_make_win_path(toolchain, ctx.attr.header_image.path))
             if ctx.attr.header_image != None
             else None
         ),
         "MenuImage": (
-            str(ctx.attr.menu_image.path)
+            str(_make_win_path(toolchain, ctx.attr.menu_image.path))
             if ctx.attr.menu_image != None
             else None
         ),
@@ -446,10 +461,10 @@ def _build_data_structure(ctx):
     for dep in ctx.attr.components:
         if NsisComponentInfo in dep:
             cmp = dep[NsisComponentInfo]
-            data["Components"].append(_build_data_structure_component(cmp, inst_cat))
+            data["Components"].append(_build_data_structure_component(toolchain, cmp, inst_cat))
         elif NsisComponentGroupInfo in dep:
             grp = dep[NsisComponentGroupInfo]
-            data["ComponentGroups"].append(_build_data_structure_component_group(grp, inst_cat))
+            data["ComponentGroups"].append(_build_data_structure_component_group(toolchain, grp, inst_cat))
         else:
             fail("provided dependency is not a component or a component group.")
 
@@ -546,9 +561,8 @@ def _render_file(ctx, tmpl, data):
 
     return renderedtmpl
 
-
-def _build_rendered_templates(ctx):
-    data = _build_data_structure(ctx)
+def _build_rendered_templates(ctx, toolchain):
+    data = _build_data_structure(ctx, toolchain)
 
     script = _render_file(ctx, ctx.file._template, data)
     option = _render_file(ctx, ctx.file._template_options, data)
@@ -556,9 +570,12 @@ def _build_rendered_templates(ctx):
     return {"Script": script, "Options": option}
 
 def _nsis_installer_impl(ctx):
+    toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
+
     srcs = _all_files(ctx)
-    values = _build_rendered_templates(ctx)
-    return _makensis(ctx, values["Script"], values["Options"], srcs)
+    values = _build_rendered_templates(ctx, toolchain)
+
+    return _makensis(ctx, toolchain, values["Script"], values["Options"], srcs)
 
 nsis_installer = rule(
     implementation = _nsis_installer_impl,

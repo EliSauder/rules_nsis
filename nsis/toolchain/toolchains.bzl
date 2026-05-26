@@ -45,6 +45,11 @@ nsis_toolchain = rule(
             values = ["slash", "dash"],
             doc = "The possible type of argument prefix. Slash for win and dash for unix.",
         ),
+        "path_style": attr.string(
+            mandatory = True,
+            values = ["windows", "unix"],
+            doc = "The style of path that things should be output as.",
+        ),
     },
     doc = "Defines an NSIS Bazel toolchain implementation.",
 )

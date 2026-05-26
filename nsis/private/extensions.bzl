@@ -128,8 +128,10 @@ def _nsis_toolchains_repo_impl(repository_ctx):
     os_name = repository_ctx.os.name.lower()
     if os_name.startswith("windows"):
       args_style = "slash"
+      path_style = "windows"
     else:
       args_style = "dash"
+      path_style = "unix"
 
     repository_ctx.file(
         "BUILD.bazel",
@@ -142,6 +144,7 @@ nsis_toolchain(
     nsis_files = "@{tool_repo}//:nsis_files",
     nsis_dir = "@{tool_repo}//:nsis_files_dir",
     args_style = "{args_style}",
+    path_style = "{path_style}",
 )
 
 toolchain(
@@ -153,8 +156,10 @@ toolchain(
     ],
     visibility = ["//visibility:public"],
 )
-        """.format(tool_repo = repository_ctx.attr.tool_repo,
-        args_style = args_style,
+        """.format(
+            tool_repo = repository_ctx.attr.tool_repo,
+            args_style = args_style,
+            path_style = path_style,
         ),
     )
 
