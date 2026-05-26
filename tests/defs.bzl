@@ -3,9 +3,9 @@ load("@rules_python//python:defs.bzl", "py_test")
 def nsis_installer_test(
     name,
     installer,
-    installer_args,
     expected_installer_name,
     expected_files,
+    installer_args = [],
     tags = None,
     visibility = None):
 
@@ -21,8 +21,8 @@ def nsis_installer_test(
         main = ":nsis_install_test.py",
         data = [installer],
         args = [
-            "$(location {})".format(installer)
-            json.encode(config),
+            "$(location {})".format(installer),
+            json.encode(test_config),
         ],
         tags = [
             "local",
