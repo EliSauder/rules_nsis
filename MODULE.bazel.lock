@@ -194,7 +194,7 @@
   "moduleExtensions": {
     "//nsis:extensions.bzl%nsis": {
       "general": {
-        "bzlTransitiveDigest": "/PJhnMrwW4obnZ/ZNhqramH3A/GUqiq3cJCH+ZUrPyA=",
+        "bzlTransitiveDigest": "t0eTIf0nq9687ix63xt/3jOsCKotkHXBNuGjaDK5TxU=",
         "usagesDigest": "tuflfUzWBosQsT/MFMrsvIUw6oEOgja+dw2W9p7GIOs=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_tools bazel_tools"
@@ -219,7 +219,7 @@
               ],
               "strip_prefix": "nsis-3.11-src",
               "sha256": "19e72062676ebdc67c11dc032ba80b979cdbffd3886c60b04bb442cdd401ff4b",
-              "build_file_content": "\nload(\"@rules_nsis//nsis/private:dirrule.bzl\", \"dirrule\")\n\nfilegroup(\n  name = \"nsis_src_files\",\n  srcs = glob([\"**\"]),\n)\n\ndirrule(\n    name = \"nsis_src_files_dir\",\n    srcs = [\":nsis_src_files\"],\n    visibility = [\"//visibility:public\"],\n)\n\ngenrule(\n  name = \"nsis_bin\",\n  executable = True,\n  srcs = [\n    \"@zlib_nsis//:bin\",\n    \":nsis_src_files_dir\",\n  ],\n  cmd = \"\"\"\nls external\nprefix=\"$$(realpath \"$$(dirname \"$(OUTS)\")\")\"\n$(execpath @rules_nsis//nsis/toolchain:scons_bin) SKIPSTUBS=all SKIPPLUGINS=all SKIPUTILS=all SKIPMISC=all   NSIS_CONFIG_CONST_DATA_PATH=no PREFIX=\"$$prefix\" -C \"$(location :nsis_src_files_dir)\"   VERSION=\"3.11\" install-compiler\n\n\"\"\",\n  outs = [\"bin/makensis\"],\n  toolchains = [\n    \"@bazel_tools//tools/cpp:toolchain_type\",\n    \"@rules_python//python:current_py_toolchain\",\n  ],\n  tools = [\n    \"@rules_nsis//nsis/toolchain:scons_bin\",\n  ],\n  visibility = [\"//visibility:public\"],\n)\n\nalias(\n    name = \"makensis\",\n    actual = \"bin/makensis\",\n    visibility = [\"//visibility:public\"],\n)\n"
+              "build_file_content": "\nload(\"@rules_nsis//nsis/private:dirrule.bzl\", \"dirrule\")\n\nfilegroup(\n  name = \"nsis_src_files\",\n  srcs = glob([\"**\"]),\n)\n\ndirrule(\n    name = \"nsis_src_files_dir\",\n    srcs = [\":nsis_src_files\"],\n    visibility = [\"//visibility:public\"],\n)\n\ngenrule(\n  name = \"nsis_bin\",\n  executable = True,\n  srcs = [\n    \"@zlib_nsis//:bin\",\n    \":nsis_src_files_dir\",\n  ],\n  cmd = \"\"\"\nls external\nprefix=\"$$(realpath \"$$(dirname \"$(OUTS)\")\")\"\n$(execpath @rules_nsis//nsis/toolchain:scons_bin) SKIPSTUBS=all SKIPPLUGINS=all SKIPUTILS=all SKIPMISC=all   NSIS_CONFIG_CONST_DATA_PATH=no PREFIX=\"$$prefix\" -C \"$(location :nsis_src_files_dir)\"   VERSION=\"3.11\" install-compiler\n\n\"\"\",\n  outs = [\"bin/makensis\"],\n  toolchains = [\n    \"@bazel_tools//tools/cpp:toolchain_type\",\n    \"@rules_python//python:current_py_toolchain\",\n  ],\n  tools = [\n    \"@rules_nsis//nsis/toolchain:scons_bin\",\n  ],\n  target_compatible_with = [\n    \"@platforms//os:linux\",\n    \"@platforms//os:osx\",\n  ],\n  visibility = [\"//visibility:public\"],\n)\n\nalias(\n    name = \"makensis\",\n    actual = \"bin/makensis\",\n    visibility = [\"//visibility:public\"],\n)\n"
             }
           },
           "test_nsis_tool": {
