@@ -5,9 +5,7 @@ def nsis_installer_test(
     installer,
     expected_installer_name,
     expected_files,
-    installer_args = [],
-    tags = None,
-    visibility = None):
+    installer_args = []):
 
     test_config = {
         "installer_args": [str(x) for x in (installer_args or [])],
@@ -24,10 +22,7 @@ def nsis_installer_test(
             "$(location {})".format(installer),
             json.encode(test_config),
         ],
-        tags = [
-            "local",
-            "requires-windows",
-        ] + (tags or []),
         target_compatible_with = ["@platforms//os:windows"],
-        visibility = visibility,
+        timeout = "moderate",
+        visibility = ["//visibility:public"],
     )
