@@ -20,13 +20,13 @@ jobs:
       - name: checkout
         uses: actions/checkout@v6
       - name: build
-        run: bazel build //...
+        run: bazel build //... --verbose_failures
       - name: test
-        run: bazel test //...
-  linux-darwin-bazel-test:
-    runs-on: [ubuntu-latest, macos-latest]
+        run: bazel test //... --verbose_failures
+  linux-bazel-test:
+    runs-on: [ubuntu-latest]
     concurrency:
-      group: ${{ github.workflow }}-nonwindows-${{ github.ref }}
+      group: ${{ github.workflow }}-linux-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - name: bazel
@@ -38,6 +38,24 @@ jobs:
       - name: checkout
         uses: actions/checkout@v6
       - name: build
-        run: bazel build //...
+        run: bazel build //... --verbose_failures
       - name: test
-        run: bazel test //...
+        run: bazel test //... --verbose_failures
+  macos-bazel-test:
+    runs-on: [macos-latest]
+    concurrency:
+      group: ${{ github.workflow }}-macos-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: bazel
+        uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}
+          repository-cache: true
+      - name: checkout
+        uses: actions/checkout@v6
+      - name: build
+        run: bazel build //... --verbose_failures
+      - name: test
+        run: bazel test //... --verbose_failures
