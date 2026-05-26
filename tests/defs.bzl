@@ -35,6 +35,6 @@ EOF
             "$(location {})".format(f),
         ],
         target_compatible_with = ["@platforms//os:windows"],
-        timeout = "moderate",
+        timeout = "short",
         visibility = ["//visibility:public"],
     )
