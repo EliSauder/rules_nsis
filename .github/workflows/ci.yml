@@ -19,8 +19,6 @@ jobs:
           repository-cache: true
       - name: checkout
         uses: actions/checkout@v6
-      - name: build
-        run: bazel build //... --verbose_failures --sandbox_debug
       - name: test
         run: bazel test //... --verbose_failures --sandbox_debug
   linux-bazel-test:
@@ -37,8 +35,6 @@ jobs:
           repository-cache: true
       - name: checkout
         uses: actions/checkout@v6
-      - name: build
-        run: bazel build //... --verbose_failures --sandbox_debug
       - name: test
         run: bazel test //... --verbose_failures --sandbox_debug
   macos-bazel-test:
@@ -55,7 +51,5 @@ jobs:
           repository-cache: true
       - name: checkout
         uses: actions/checkout@v6
-      - name: build
-        run: bazel build //... --verbose_failures --sandbox_debug
       - name: test
         run: bazel test //... --verbose_failures --sandbox_debug
