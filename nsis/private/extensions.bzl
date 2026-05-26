@@ -146,10 +146,6 @@ toolchain(
     name = "toolchain",
     toolchain = ":nsis_toolchain_impl",
     toolchain_type = "@rules_nsis//nsis/toolchain:toolchain_type",
-    #exec_compatible_with = [
-    #    "@platforms//os:linux",
-    #    "@platforms//os:windows",
-    #],
     target_compatible_with = [
         "@platforms//os:windows",
     ],
