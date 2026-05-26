@@ -1,6 +1,6 @@
 load("@rules_python//python:defs.bzl", "py_test")
 
-def nsis_install_test(
+def nsis_installer_test(
     name,
     installer,
     installer_args,
