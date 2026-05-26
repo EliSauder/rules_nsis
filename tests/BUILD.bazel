@@ -1,3 +1,4 @@
+load("//tests/:defs.bzl", "nsis_install_test")
 load("//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer")
 
 filegroup(
@@ -8,15 +9,24 @@ filegroup(
 )
 
 nsis_component(
-    name = "test_minimal_component",
+    name = "minimal_component",
     srcs = [":nsis_files"],
 )
 
 nsis_installer(
     name = "minimal_installer",
-    components = [":test_minimal_component"],
+    components = [":minimal_component"],
     product = "Minimal Installer",
     product_path = "Minimal Installer",
+)
+
+nsis_installer_test(
+    name = "minimal_installer_test",
+    installer = ":minimal_installer",
+    expected_installer_name = "Minimal Installer Setup.exe",
+    expected_files = [
+        "README.md",
+    ],
 )
 
 nsis_component(
