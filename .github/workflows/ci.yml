@@ -20,7 +20,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v6
       - name: test
-        run: bazel test //... --verbose_failures --sandbox_debug
+        run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed
       - name: test-specific
         run: bazel test //tests:minimal_installer_test --verbose_failures --sandbox_debug
   linux-bazel-test:
