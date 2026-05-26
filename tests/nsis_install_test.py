@@ -1,18 +1,20 @@
 import os
+import json
 import pathlib
 import shutil
 import subprocess
 import sys
 import unittest
 
-class InstallerTest(unittest.TestCase):
-    def test_install_files_into_dir(self) -> None:
-        if len(sys.argv) < 3:
-            self.fail("Expected argv: <installer_path> <config_json>")
+INSTALLER=None
+CONFIG=None
 
-        installer = pathlib.Path(sys.argv[1]).resolve()
-        config = json.loads(sys.argv[2])
-        self.assertTrue(installer.exists(), f"Installer does not exist: {installer}")
+class NsisInstallerTest(unittest.TestCase):
+
+    def test_installer(self) -> None:
+
+        installer = INSTALLER
+        config = CONFIG
 
         exp_inst_name = config.get("expected_installer_name", "")
         self.assertTrue(
@@ -59,4 +61,17 @@ class InstallerTest(unittest.TestCase):
             self.assertTrue(os.path.exists(path), f"Expected file missing: {path}")
 
 if __name__ == "__main__":
-    unittest.main()
+    if len(sys.argv) < 3:
+        raise SystemError("Expected argv: <installer_path> <config_json>")
+
+    INSTALLER = sys.argv[1]
+    path = pathlib.Path(INSTALLER).resolve()
+    if not path.exists():
+        raise SystemExit("installer does not exist")
+
+    try:
+        CONFIG = json.load(sys.argv[2])
+    except:
+        raise SystemExit("error parsing json parameter")
+
+    unittest.main(argv=[sys.argv[0]])
