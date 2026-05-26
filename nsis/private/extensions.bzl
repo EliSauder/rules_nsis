@@ -79,16 +79,18 @@ alias(
 """
 
 def _nsis_tool_alias_repo_impl(repository_ctx):
-  os_name = repository_ctx.name.lower()
+  os_name = repository_ctx.os.name.lower()
 
-  if os_name.startswith("windows"):
+  if "windows" in os_name:
     actual = "@{}//:makensis".format(repository_ctx.attr.nsis_win_repo)
     nsis_files = "@{}//:nsis_files".format(repository_ctx.attr.nsis_win_repo)
     nsis_files_dir = "@{}//:nsis_files_dir".format(repository_ctx.attr.nsis_win_repo)
-  else:
+  elif "linux" in os_name or "darwin" in os_name or "mac os x" in os_name:
     actual = "@{}//:makensis".format(repository_ctx.attr.nsis_src_repo)
     nsis_files = "@{}//:nsis_files".format(repository_ctx.attr.nsis_win_repo)
     nsis_files_dir = "@{}//:nsis_files_dir".format(repository_ctx.attr.nsis_win_repo)
+  else:
+    fail("Unsupported platform {} for nsis tool repo".format(str(os_name)))
 
   repository_ctx.file(
     "BUILD.bazel",
@@ -116,7 +118,7 @@ alias(
 _nsis_tool_alias_repo = repository_rule(
   implementation = _nsis_tool_alias_repo_impl,
   attrs = {
-    "nsis_src_repo": attr.string(mandatory = True),
+    "nsis_src_repo": attr.string(mandatory = False),
     "nsis_win_repo": attr.string(mandatory = True),
   },
   local = True,
