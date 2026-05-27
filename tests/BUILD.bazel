@@ -27,6 +27,7 @@ nsis_installer_test(
     expected_files = [
         "README.md",
     ],
+    expected_product_path = "Minimal Installer",
 )
 
 nsis_component(

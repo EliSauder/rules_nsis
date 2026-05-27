@@ -7,6 +7,42 @@ toolchains = [
     "//nsis/toolchain:toolchain_type"
 ]
 
+NsisInstallerInfo = provider(
+    doc = "",
+    fields = {
+        "name": "The name of the installer",
+        "product": "The display name of the software being packaged.",
+        "product_path": "The path name of the software being packaged.",
+        "vendor": "The display name of the vendor providing the software.",
+        "vendor_path": "The optional path to use after the root by default. E.g. Company\\Vendor. Defaults to the vendor field.",
+        "description": "The descripiton of the software being packaged.",
+        "copyright": "The copyright of the software being packaged.",
+        "license_file": "The licens file to use for the installer",
+        "version": "The numric version for the installer.",
+        "install_root": """
+The root path to install the software into. Defaults to NSIS's built in
+$PROGRAMFILES64 (or $PROGRAMFILES if 32bit) when installed as admin. When
+installed as a user, defaults to $LOCALAPPDATA\\Programs.
+
+The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
+""",
+        "install_path": "Overrides product_path and vendor_path with a specific path.",
+        "execution_level": "Set the execution level for the installer.",
+        "compressor": "Set the compressor to be used for building the installer.",
+        "compressor_dictsize": "Set the compressor dict size for the lzma compression alg.",
+        "icon": "The icon file for the installer.",
+        "header_image": "The header image to use.",
+        "menu_image": "The image to ues for the welcome and finsih installer pages.",
+        "install_categories": "The possible install types to use when selecting components.",
+        "defines": "The defines to use for the installer.",
+        "verbosity": "The verbosity of outupt.",
+        "no_config": "Whether to pass /NOCONFIG or not",
+        "components": "List of root components and component groups.",
+        "outfile": "Specify the outfile.",
+        "arch": "The architecture to built the installer for.",
+    },
+)
+
 NsisComponentInfo = provider(
     doc = "NSIS Component Information",
     fields = {
@@ -249,8 +285,7 @@ def _make_nsis_args(ctx, toolchain, outfile):
 
     args.add(_nsis_flag(args_style, "V{}".format(ctx.attr.verbosity)))
 
-    if ctx.attr.strict:
-        args.add(_nsis_flag(args_style, "WX"))
+    args.add(_nsis_flag(args_style, "WX"))
 
     if ctx.attr.no_config:
         args.add(_nsis_flag(args_style, "NOCONFIG"))
@@ -575,7 +610,34 @@ def _nsis_installer_impl(ctx):
     srcs = _all_files(ctx)
     values = _build_rendered_templates(ctx, toolchain)
 
-    return _makensis(ctx, toolchain, values["Script"], values["Options"], srcs)
+    return _makensis(ctx, toolchain, values["Script"], values["Options"], srcs) + [
+        NsisInstallerInfo(
+            name = ctx.attr.name,
+            product = ctx.attr.product,
+            product_path = ctx.attr.product_path,
+            vendor = ctx.attr.vendor,
+            vendor_path = ctx.attr.vendor_path,
+            description = ctx.attr.descripiton,
+            copyright = ctx.attr.copyright,
+            license_file = ctx.attr.license_file,
+            version = ctx.attr.version,
+            install_root = ctx.attr.install_root,
+            install_path = ctx.attr.install_path,
+            execution_level = ctx.attr.execution_level,
+            compressor = ctx.attr.compressor,
+            compressor_dictsize = ctx.attr.compressor_dictsize,
+            icon = ctx.attr.icon,
+            header_image = ctx.attr.header_image,
+            menu_image = ctx.attr.menu_image,
+            install_categories = ctx.attr.install_categories,
+            defines = ctx.attr.defines,
+            verbosity = ctx.attr.verbosity,
+            no_config = ctx.attr.no_config,
+            components = ctx.attr.components,
+            outfile = ctx.attr.outfile,
+            arch = ctx.attr.arch,
+        ),
+    ]
 
 nsis_installer = rule(
     implementation = _nsis_installer_impl,
@@ -686,11 +748,6 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
             default = 2,
             doc = "makensis verbosity: 0 none, 1 errors, 2 warnings, 3 info, 4 all.",
             values = [0, 1, 2, 3, 4],
-        ),
-        "strict": attr.bool(
-            mandatory = False,
-            default = True,
-            doc = "Pass /WX so warnings are treated as errors.",
         ),
         "no_config": attr.bool(
             mandatory = False,

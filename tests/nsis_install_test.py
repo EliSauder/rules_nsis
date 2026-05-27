@@ -5,9 +5,81 @@ import shutil
 import subprocess
 import sys
 import unittest
+import winreg
 
 INSTALLER=None
 CONFIG=None
+
+def _get_sub_path(product_path, vendor_path, install_path) -> str:
+    subpath = ""
+    if install_path != None:
+        subpath = str(install_path)
+
+    if product_path == None:
+        raise SystemError("both install path and product path can not be None")
+
+    if vendor_path != None:
+        subpath = f"{str(vendor_path)}\\{str(product_path)}"
+    else:
+        subpath = str(product_path)
+
+    return subpath
+
+def _get_reg_path(subpath) -> str:
+    return f"Software\\{subpath}", f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{subpath}"
+
+def _get_reg_db(execution_level: str) -> int:
+    if execution_level == "admin":
+        return winreg.HKEY_LOCAL_MACHINE
+    if execution_level == "user":
+        return winreg.HKEY_CURRENT_USER
+
+    raise SystemError(f"unsupported execution_level {execution_level}")
+
+def _get_reg_view(bitwidth: str) -> str:
+    if bitwidth == "32":
+        return "KEY_WOW64_32KEY"
+    if bitwidth == "64":
+        return "KEY_WOW64_64KEY"
+
+    raise SystemError(f"unsupported bitwidth {bitwidth}")
+
+def _get_reg_access(bitwidth: str) -> int:
+    access = winreg.KEY_READ
+    access |= getattr(winreg, _get_reg_width(bitwidth), 0)
+    return access
+
+def _reg_open(root_db: int, path: str, view: str):
+    return winreg.OpenKey(root_db, path, 0, view)
+
+def _reg_value(root: int, path: str, view: str, name: str):
+    with _reg_open(root, path, view) as hkey:
+        value, value_type = winreg.QueryValueEx(hkey, name)
+        return value, value_type
+
+
+def _validate_reg(testcase: unittest.TestCase, inst_root: str, config: dict):
+    root = _get_reg_db(config["expected_execution_level"] or "admin")
+    subpath = _get_sub_path(
+        config["expected_product_path"] or None,
+        config["expected_vendor_path"] or None,
+        config["expected_install_path"] or None,
+    )
+
+    instdir = f"{inst_root}\\{subpath}"
+
+    inpath, unpath = _get_reg_path(subpath)
+    view = _get_reg_view(config["expected_bitwidth"] or "64")
+
+    with _reg_open(root, inpath, view): pass
+    with _reg_open(root, outpath, view): pass
+
+    instdirval, instdirtyp = _reg_value(root, inpath, view, "InstallDir")
+    versionval, versiontyp = _reg_value(root, inpath, view, "VERSION")
+
+    testcase.assertEqual(instdir, val, f"expected InstallDir to equal install path")
+
+
 
 class NsisInstallerTest(unittest.TestCase):
 
@@ -23,7 +95,7 @@ class NsisInstallerTest(unittest.TestCase):
         )
 
         test_tmpdir = pathlib.Path(os.environ["TEST_TMPDIR"]).resolve()
-        install_root = test_tmpdir / "nsis-install-root"
+        install_root = f"{test_tmpdir}\\nsis-install-root"
 
         if install_root.exists():
             shutil.rmtree(install_root)
@@ -59,6 +131,8 @@ class NsisInstallerTest(unittest.TestCase):
                 path = os.path.join(install_root, path)
 
             self.assertTrue(os.path.exists(path), f"Expected file missing: {path}")
+
+        check_expected_regkeys(self, config.get("expected_product_path"))
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
