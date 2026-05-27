@@ -355,16 +355,34 @@ def _makensis(ctx, toolchain, script, options_file, inputs):
         DefaultInfo(files = depset([outfile]))
     ]
 
+def _name_to_displayname(val):
+    fin = ""
+    for v in val.split("_"):
+        v = v.strip().capitalize()
+        if len(v) == 0:
+            continue
+        if len(fin) == 0:
+            fin = fin + v
+            continue
+        fin = fin + " " + v
+    return fin
+
+
 def _build_data_structure_component_group(toolchain, group, inst_cat):
+    dispname = group.display_name
+    if dispname == None or len(dispname.strip()) == 0:
+        dispname = _name_to_displayname(group.name)
+
     data = {
         "Name": str(group.name),
-        "DisplayName": str(group.display_name),
+        "DisplayName": str(dispname),
         "Description": str(group.description),
         "Expanded": bool(group.expanded),
         "Bold": bool(group.expanded),
         "Components": [],
         "ComponentGroups": [],
     }
+
 
     for dep in group.components:
         if NsisComponentInfo in dep:
@@ -394,6 +412,10 @@ def _hidden(mode):
     return False
 
 def _build_data_structure_component(toolchain, component, inst_cat):
+    dispname = component.display_name
+    if dispname == None or len(dispname.strip()) == 0:
+        dispname = _name_to_displayname(component.name)
+
     data = {
         "Name": str(component.name),
         "Directory": str(_always_make_win_path(component.directory)),
@@ -405,7 +427,7 @@ def _build_data_structure_component(toolchain, component, inst_cat):
         "DisabledByDefault": _disabled_by_default(component.selection_mode),
         "Required": _required(component.selection_mode),
         "IsHidden": _hidden(component.selection_mode),
-        "DisplayName": str(component.display_name),
+        "DisplayName": str(dispname),
         "Description": str(component.description),
         "InstallCategories": " ".join([str(inst_cat.index(x) + 1) for x in component.install_categories]),
         "Files": [],
