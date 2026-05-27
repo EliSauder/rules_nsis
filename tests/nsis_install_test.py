@@ -59,12 +59,12 @@ def _reg_value(root: int, path: str, view: str, name: str):
         return value, value_type
 
 
-def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str):
+def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, inst_subpath: str):
     root = _get_reg_db(config["expected_execution_level"] or "admin")
 
-    instdir = f"{inst_root}\\{subpath}"
+    instdir = f"{inst_root}"
 
-    inpath, unpath = _get_reg_path(subpath)
+    inpath, unpath = _get_reg_path(inst_subpath)
     view = _get_reg_view(config["expected_bitwidth"] or "64")
 
     with _reg_open(root, inpath, view): pass
@@ -149,7 +149,7 @@ class NsisInstallerTest(unittest.TestCase):
         log.debug("nsis stderr=%r", proc.stderr)
 
         _validate_files(self, config, install_root)
-        _validate_reg(self, config, install_subpath)
+        _validate_reg(self, config, install_root, install_subpath)
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
