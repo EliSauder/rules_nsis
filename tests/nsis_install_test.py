@@ -141,14 +141,7 @@ class NsisInstallerTest(unittest.TestCase):
             check=False
         )
 
-        if proc.returncode != 0:
-            self.fail(
-                "Installer failed.\n"
-                f"exit_code: {proc.returncode}\n"
-                f"cmd: {cmd}\n"
-                f"stdout:\n{proc.stdout}\n"
-                f"stderr:\n{proc.stderr}\n"
-            )
+        self.assertEqual(0, proc.returncode, f"Installer failed.\nexit_code: {proc.returncode}\ncmd: {cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
         log = logging.getLogger("NsisInstallerTest.test_installer")
         log.debug("nsis stdout=%r", proc.stdout)
