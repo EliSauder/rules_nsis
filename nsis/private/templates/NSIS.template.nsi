@@ -68,10 +68,10 @@ RequestExecutionLevel admin
 
 {{- if ne (ds "in").ExecutionLevel "admin"}}
 InstallDirRegKey HKCU "${REG_KEY}" "InstallDir"
-!define IS_ADMIN_EXECUTION_LEVEL 1
+!define IS_ADMIN_EXECUTION_LEVEL 0
 {{- else }}
 InstallDirRegKey HKLM "${REG_KEY}" "InstallDir"
-!define IS_ADMIN_EXECUTION_LEVEL 0
+!define IS_ADMIN_EXECUTION_LEVEL 1
 {{- end}}
 
 SetCompressor {{ (ds "in").Compressor }}
