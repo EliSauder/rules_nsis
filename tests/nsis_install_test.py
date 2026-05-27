@@ -129,7 +129,7 @@ class NsisInstallerTest(unittest.TestCase):
         installer_cmd = _get_installer_cmd(installer, install_root, config)
 
         proc = subprocess.run(
-            cmd,
+            installer_cmd,
             capture_output=True,
             text=True,
             timeout=120,
