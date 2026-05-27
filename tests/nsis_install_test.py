@@ -112,7 +112,7 @@ def _validate_files(testcase, config, install_root, install_subpath):
         if not os.path.isabs(path):
             path = os.path.join(install_root, install_subpath, path)
 
-        dir = pathlib.Path(os.path.join(install_root, install_subpath)).resolve()
+        dir = pathlib.Path(install_root).resolve()
         fs = [x.as_uri() for x in dir.iterdir() if x.is_file()]
 
         testcase.assertTrue(os.path.exists(path), f"Expected file missing: {path}. Found: {fs}")
