@@ -110,7 +110,10 @@ def _validate_files(testcase, config, install_root, install_subpath):
         if not os.path.isabs(path):
             path = os.path.join(install_root, install_subpath, path)
 
-        testcase.assertTrue(os.path.exists(path), f"Expected file missing: {path}")
+        dir = pathlib.Path(os.path.join(install_root, install_subpath)).resolve()
+        fs = [x.as_uri() for x in dir.iterdir() if x.is_file()]
+
+        testcase.assertTrue(os.path.exists(path), f"Expected file missing: {path}. Found: {fs}")
 
 class NsisInstallerTest(unittest.TestCase):
     def test_installer(self) -> None:
