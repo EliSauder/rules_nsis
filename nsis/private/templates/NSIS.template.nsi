@@ -51,7 +51,7 @@ Unicode True
 Name "${PACKAGE_NAME}"
 OutFile "${OUTFILE_NAME}"
 InstallDir "${INSTALL_ROOT}\${PACKAGE_PATH}"
-#InstallDirRegKey SHCTX "${REG_KEY}" "InstallLocation"
+InstallDirRegKey SHCTX "${REG_KEY}" "InstallDir"
 
 {{- if (ds "in").ExecutionLevel }}
 RequestExecutionLevel {{ (ds "in").ExecutionLevel }}
@@ -508,7 +508,7 @@ Section "-Core Installation"
     SetOutPath "$INSTDIR"
 
     WriteRegStr SHCTX "${REG_KEY}" "InstallDir" "$INSTDIR"
-    WriteRegStr SHCTX "${REG_KEY}" "VERSION" "${PACKAGE_VERSION}"
+    WriteRegStr SHCTX "${REG_KEY}" "Version" "${PACKAGE_VERSION}"
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 
     Push "DisplayName"
