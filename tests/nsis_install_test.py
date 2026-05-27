@@ -58,7 +58,7 @@ def _reg_value(root: int, path: str, view: str, name: str):
         return value, value_type
 
 
-def _validate_reg(testcase: unittest.TestCase, inst_root: str, config: dict):
+def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str):
     root = _get_reg_db(config["expected_execution_level"] or "admin")
 
     instdir = f"{inst_root}\\{subpath}"
@@ -145,8 +145,8 @@ class NsisInstallerTest(unittest.TestCase):
                 f"stderr:\n{proc.stderr}\n"
             )
 
-        _validate_files(self, config)
-        _validate_reg(self, install_root, config)
+        _validate_files(self, config, install_root, install_subpath)
+        _validate_reg(self, config, install_subpath)
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
