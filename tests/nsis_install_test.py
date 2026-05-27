@@ -94,12 +94,14 @@ class NsisInstallerTest(unittest.TestCase):
             f"Installer {installer} does not match expected name {exp_inst_name}",
         )
 
-        test_tmpdir = pathlib.Path(os.environ["TEST_TMPDIR"]).resolve()
+        test_tmpdir = str(os.environ["TEST_TMPDIR"])
         install_root = f"{test_tmpdir}\\nsis-install-root"
 
-        if install_root.exists():
-            shutil.rmtree(install_root)
-        install_root.mkdir(parents=True, exist_ok=True)
+        pth = pathlib.Path(install_root).resolve()
+
+        if pth.exists():
+            shutil.rmtree(pth)
+        pth.mkdir(parents=True, exist_ok=True)
 
         installer_args = list(config.get("installer_args", []))
         cmd = [
