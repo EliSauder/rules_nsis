@@ -51,7 +51,10 @@ def _get_reg_access(bitwidth: str) -> int:
     return access
 
 def _reg_open(root_db: int, path: str, view: int):
-    return winreg.OpenKey(root_db, path, 0, view)
+    try:
+        winreg.OpenKey(root_db, path, 0, view)
+    except:
+        raise SystemError(f"error opening key {root_db} {path} {view}")
 
 def _reg_value(root: int, path: str, view: str, name: str):
     with _reg_open(root, path, view) as hkey:
