@@ -51,13 +51,18 @@ Unicode True
 Name "${PACKAGE_NAME}"
 OutFile "${OUTFILE_NAME}"
 InstallDir "${INSTALL_ROOT}\${PACKAGE_PATH}"
-InstallDirRegKey SHCTX "${REG_KEY}" "InstallDir"
 
 {{- if (ds "in").ExecutionLevel }}
 RequestExecutionLevel {{ (ds "in").ExecutionLevel }}
 {{- else }}
 RequestExecutionLevel admin
 {{- end }}
+
+{{- if ne (ds "in").ExecutionLevel "admin"}}
+InstallDirRegKey HKCU "${REG_KEY}" "InstallDir"
+{{- else }}
+InstallDirRegKey HKLM "${REG_KEY}" "InstallDir"
+{{- end}}
 
 SetCompressor {{ (ds "in").Compressor }}
 SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
