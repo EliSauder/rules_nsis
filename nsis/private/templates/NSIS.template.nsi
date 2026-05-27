@@ -208,9 +208,8 @@ Var IsArmInstall
 Function .onInit
 {{- if eq (ds "in").Architecture "x86_64" }}
     ${IfNot} ${IsNativeAMD64}
-        ${IfNot} ${Silent}
-            MessageBox MB_ICONSTOP "This installer requires a 64-bit x86 version of Windows."
-        ${EndIf}
+        DetailPrint "Not AMD64, Aborting"
+        MessageBox MB_ICONSTOP "This installer requires a 64-bit x86 version of Windows." /SD IDOK
         Abort
     ${EndIf}
 
@@ -219,9 +218,8 @@ Function .onInit
     StrCpy $IsArmInstall "0"
 {{- else if eq (ds "in").Architecture "x86_32" }}
     ${IfNot} ${IsNativeIA32}
-        ${IfNot} ${Silent}
-            MessageBox MB_ICONSTOP "This installer requires a 32-bit x86 version of Windows."
-        ${EndIf}
+        DetailPrint "Not IA32, Aborting"
+        MessageBox MB_ICONSTOP "This installer requires a 32-bit x86 version of Windows." /SD IDOK
         Abort
     ${EndIf}
 
@@ -230,9 +228,8 @@ Function .onInit
     StrCpy $IsArmInstall "0"
 {{- else if eq (ds "in").Architecture "arm64" }}
     ${IfNot} ${IsNativeARM64}
-        ${IfNot} ${Silent}
-            MessageBox MB_ICONSTOP "This installer requires a 64-bit ARM version of Windows."
-        ${EndIf}
+        DetailPrint "Not ARM64, Aborting"
+        MessageBox MB_ICONSTOP "This installer requires a 64-bit ARM version of Windows." /SD IDOK
         Abort
     ${EndIf}
 
@@ -241,9 +238,8 @@ Function .onInit
     StrCpy $IsArmInstall "1"
 {{- else if eq (ds "in").Architecture "arm32" }}
     ${IfNot} ${IsNativeARM32}
-        ${IfNot} ${Silent}
-            MessageBox MB_ICONSTOP "This installer requires a 32-bit ARM version of Windows."
-        ${EndIf}
+        DetailPrint "Not ARM32, Aborting"
+        MessageBox MB_ICONSTOP "This installer requires a 32-bit ARM version of Windows." /SD IDOK
         Abort
     ${EndIf}
 
@@ -278,9 +274,8 @@ Function .onInit
     System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_NAME}InstallerMutex") i .r1 ?e'
     Pop $R0
     ${If} $R0 != 0
-        ${IfNot} ${Silent}
-            MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running."
-        ${EndIf}
+        MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running." /SD IDOK
+        DetailPrint "Another instance is already running, aborting"
         Abort
     ${EndIf}
 FunctionEnd
@@ -421,6 +416,7 @@ InstType "{{.}}"
 
 {{define "sectionGroup"}}
 SectionGroup {{if .Expanded}}"/e"{{end}}"{{if .IsBold}}!{{end}}{{.DisplayName}}" "{{.Name}}"
+    DetailPrint "Entering Section Group {{.Name}}-{{.DisplayName}}"
 {{- range .Components }}
     {{ template "section" . }}
 {{- end }}
@@ -453,6 +449,7 @@ RMDir /r "{{ .Name }}"
 ; SECTIONS
 {{ define "section" }}
 Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
+    DetailPrint "Entering Section {{.Name}}-{{.DisplayName}}"
     SectionIn {{if .Required}}RO {{end}}{{ .InstallCategories}}
     SetOutPath "$INSTDIR\{{.Directory}}"
 
