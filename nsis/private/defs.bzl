@@ -617,7 +617,7 @@ def _nsis_installer_impl(ctx):
             product_path = ctx.attr.product_path,
             vendor = ctx.attr.vendor,
             vendor_path = ctx.attr.vendor_path,
-            description = ctx.attr.descripiton,
+            description = ctx.attr.description,
             copyright = ctx.attr.copyright,
             license_file = ctx.attr.license_file,
             version = ctx.attr.version,
