@@ -108,7 +108,7 @@ def _get_installer_cmd(installer, install_root, config):
 
 def _validate_files(testcase, config, install_root):
     expected_files = config.get("expected_files", [])
-    expected_files.add("Uninstall.exe")
+    expected_files.append("Uninstall.exe")
     for path in expected_files:
         if not os.path.isabs(path):
             path = os.path.join(install_root, path)
