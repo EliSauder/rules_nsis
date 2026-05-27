@@ -60,11 +60,6 @@ def _reg_value(root: int, path: str, view: str, name: str):
 
 def _validate_reg(testcase: unittest.TestCase, inst_root: str, config: dict):
     root = _get_reg_db(config["expected_execution_level"] or "admin")
-    subpath = _get_sub_path(
-        config["expected_product_path"] or None,
-        config["expected_vendor_path"] or None,
-        config["expected_install_path"] or None,
-    )
 
     instdir = f"{inst_root}\\{subpath}"
 
@@ -80,9 +75,44 @@ def _validate_reg(testcase: unittest.TestCase, inst_root: str, config: dict):
     testcase.assertEqual(instdir, val, f"expected InstallDir to equal install path")
 
 
+def _get_install_root():
+    test_tmpdir = str(os.environ["TEST_TMPDIR"])
+    install_root = f"{test_tmpdir}\\nsis-install-root"
+
+    pth = pathlib.Path(install_root).resolve()
+
+    if pth.exists():
+        shutil.rmtree(pth)
+    pth.mkdir(parents=True, exist_ok=True)
+
+    return install_root
+
+def _get_install_subpath(config):
+    subpath = _get_sub_path(
+        config["expected_product_path"] or None,
+        config["expected_vendor_path"] or None,
+        config["expected_install_path"] or None,
+    )
+    return subpath
+
+def _get_installer_cmd(config):
+    installer_args = list(config.get("installer_args", []))
+    cmd = [
+        str(installer),
+        "/S",
+        f"/D={install_root}"
+    ] + installer_args
+    return cmd
+
+def _validate_files(testcase, config, install_root, install_subpath):
+    expected_files = config.get("expected_files", [])
+    for path in expected_files:
+        if not os.path.isabs(path):
+            path = os.path.join(install_root, install_subpath, path)
+
+        testcase.assertTrue(os.path.exists(path), f"Expected file missing: {path}")
 
 class NsisInstallerTest(unittest.TestCase):
-
     def test_installer(self) -> None:
 
         installer = INSTALLER
@@ -94,21 +124,9 @@ class NsisInstallerTest(unittest.TestCase):
             f"Installer {installer} does not match expected name {exp_inst_name}",
         )
 
-        test_tmpdir = str(os.environ["TEST_TMPDIR"])
-        install_root = f"{test_tmpdir}\\nsis-install-root"
-
-        pth = pathlib.Path(install_root).resolve()
-
-        if pth.exists():
-            shutil.rmtree(pth)
-        pth.mkdir(parents=True, exist_ok=True)
-
-        installer_args = list(config.get("installer_args", []))
-        cmd = [
-            str(installer),
-            "/S",
-            f"/D={install_root}"
-        ] + installer_args
+        install_root = _get_install_root()
+        install_subpath = _get_install_subpath(config)
+        installer_cmd = _get_installer_cmd(config)
 
         proc = subprocess.run(
             cmd,
@@ -127,14 +145,8 @@ class NsisInstallerTest(unittest.TestCase):
                 f"stderr:\n{proc.stderr}\n"
             )
 
-        expected_files = config.get("expected_files", [])
-        for path in expected_files:
-            if not os.path.isabs(path):
-                path = os.path.join(install_root, path)
-
-            self.assertTrue(os.path.exists(path), f"Expected file missing: {path}")
-
-        check_expected_regkeys(self, config.get("expected_product_path"))
+        _validate_files(self, config)
+        _validate_reg(self, install_root, config)
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
