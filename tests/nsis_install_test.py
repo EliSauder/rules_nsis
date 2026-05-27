@@ -95,7 +95,7 @@ def _get_install_subpath(config):
     )
     return subpath
 
-def _get_installer_cmd(installer, config):
+def _get_installer_cmd(installer, install_root, config):
     installer_args = list(config.get("installer_args", []))
     cmd = [
         str(installer),
@@ -126,7 +126,7 @@ class NsisInstallerTest(unittest.TestCase):
 
         install_root = _get_install_root()
         install_subpath = _get_install_subpath(config)
-        installer_cmd = _get_installer_cmd(installer, config)
+        installer_cmd = _get_installer_cmd(installer, install_root, config)
 
         proc = subprocess.run(
             cmd,
