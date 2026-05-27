@@ -37,10 +37,6 @@ $(execpath @rules_nsis//nsis/toolchain:scons_bin) SKIPSTUBS=all SKIPPLUGINS=all 
   tools = [
     "@rules_nsis//nsis/toolchain:scons_bin",
   ],
-  target_compatible_with = [
-    "@platforms//os:linux",
-    "@platforms//os:osx",
-  ],
   visibility = ["//visibility:public"],
 )
 
