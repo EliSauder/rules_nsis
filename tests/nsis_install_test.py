@@ -141,7 +141,7 @@ class NsisInstallerTest(unittest.TestCase):
             check=False
         )
 
-        self.assertEqual(0, proc.returncode, f"Installer failed.\nexit_code: {proc.returncode}\ncmd: {cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+        self.assertEqual(0, proc.returncode, f"Installer failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
         log = logging.getLogger("NsisInstallerTest.test_installer")
         log.debug("nsis stdout=%r", proc.stdout)
