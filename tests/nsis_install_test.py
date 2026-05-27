@@ -77,7 +77,7 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str):
 
 
 def _get_install_root():
-    test_tmpdir = str(os.environ["TEST_TMPDIR"])
+    test_tmpdir = os.path.abspath(str(os.environ["TEST_TMPDIR"]))
     install_root = f"{test_tmpdir}\\nsis-install-root"
 
     pth = pathlib.Path(install_root).resolve()
