@@ -28,6 +28,7 @@ def nsis_installer_test(
         "expected_installer_name": str(expected_installer_name),
         "expected_product_path": str(expected_product_path),
         "expected_vendor_path": str(expected_vendor_path or ""),
+        "expected_install_path": expected_install_path,
         "expected_bitwidth": expected_bitwidth,
         "expected_execution_level": expected_execution_level,
     }
