@@ -108,6 +108,7 @@ def _get_installer_cmd(installer, install_root, config):
 
 def _validate_files(testcase, config, install_root, install_subpath):
     expected_files = config.get("expected_files", [])
+    expected_files.add("Uninstall.exe")
     for path in expected_files:
         if not os.path.isabs(path):
             path = os.path.join(install_root, install_subpath, path)
@@ -147,7 +148,7 @@ class NsisInstallerTest(unittest.TestCase):
         log.debug("nsis stdout=%r", proc.stdout)
         log.debug("nsis stderr=%r", proc.stderr)
 
-        _validate_files(self, config, install_root, install_subpath)
+        _validate_files(self, config, install_root)
         _validate_reg(self, config, install_subpath)
 
 if __name__ == "__main__":
