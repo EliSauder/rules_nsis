@@ -347,6 +347,9 @@ def _makensis(ctx, toolchain, script, options_file, inputs):
         outputs = [outfile],
         env = {
             "NSISDIR": _make_win_path(toolchain, makensis_dir[0].path),
+            "LANG": "en_US.UTF-8",
+            "LC_ALL": "en_US.UTF-8",
+            "LC_CTYPE": "en_US.UTF-8",
         },
         use_default_shell_env = False,
     )
