@@ -6,6 +6,7 @@ import subprocess
 import sys
 import unittest
 import winreg
+import logging
 
 INSTALLER=None
 CONFIG=None
@@ -148,6 +149,10 @@ class NsisInstallerTest(unittest.TestCase):
                 f"stderr:\n{proc.stderr}\n"
             )
 
+        log = logging.getLogger("NsisInstallerTest.test_installer")
+        log.debug("nsis stdout=%r", proc.stdout)
+        log.debug("nsis stderr=%r", proc.stderr)
+
         _validate_files(self, config, install_root, install_subpath)
         _validate_reg(self, config, install_subpath)
 
@@ -168,4 +173,6 @@ if __name__ == "__main__":
     except:
         raise SystemExit(f"error parsing json parameter: {sys.argv[2]}")
 
+    logging.basicConfig(stream=sys.stderr)
+    logging.getLogger("NsisInstallerTest.test_installer").setLevel(logging.DEBUG)
     unittest.main(argv=[sys.argv[0]])
