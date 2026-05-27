@@ -101,8 +101,9 @@ def _get_installer_cmd(installer, install_root, config):
     cmd = [
         str(installer),
         "/S",
+    ] + installer_args + [
         f"/D={install_root}"
-    ] + installer_args
+    ]
     return cmd
 
 def _validate_files(testcase, config, install_root, install_subpath):
