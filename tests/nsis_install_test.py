@@ -52,9 +52,9 @@ def _get_reg_access(bitwidth: str) -> int:
 
 def _reg_open(root_db: int, path: str, view: int):
     try:
-        winreg.OpenKey(root_db, path, 0, view)
+        return winreg.OpenKey(root_db, path, 0, view)
     except:
-        raise SystemError(f"error opening key {root_db} {path} {view}")
+        raise SystemError(f"error opening key {path}")
 
 def _reg_value(root: int, path: str, view: str, name: str):
     with _reg_open(root, path, view) as hkey:
@@ -74,7 +74,7 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, ins
     with _reg_open(root, outpath, view): pass
 
     instdirval, instdirtyp = _reg_value(root, inpath, view, "InstallDir")
-    versionval, versiontyp = _reg_value(root, inpath, view, "VERSION")
+    versionval, versiontyp = _reg_value(root, inpath, view, "Version")
 
     testcase.assertEqual(instdir, val, f"expected InstallDir to equal install path")
 
