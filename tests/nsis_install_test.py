@@ -37,11 +37,11 @@ def _get_reg_db(execution_level: str) -> int:
 
     raise SystemError(f"unsupported execution_level {execution_level}")
 
-def _get_reg_view(bitwidth: str) -> str:
+def _get_reg_view(bitwidth: str) -> int:
     if bitwidth == "32":
-        return "KEY_WOW64_32KEY"
+        return winreg.KEY_WOW64_32KEY
     if bitwidth == "64":
-        return "KEY_WOW64_64KEY"
+        return winreg.KEY_WOW64_64KEY
 
     raise SystemError(f"unsupported bitwidth {bitwidth}")
 
@@ -50,7 +50,7 @@ def _get_reg_access(bitwidth: str) -> int:
     access |= getattr(winreg, _get_reg_width(bitwidth), 0)
     return access
 
-def _reg_open(root_db: int, path: str, view: str):
+def _reg_open(root_db: int, path: str, view: int):
     return winreg.OpenKey(root_db, path, 0, view)
 
 def _reg_value(root: int, path: str, view: str, name: str):
