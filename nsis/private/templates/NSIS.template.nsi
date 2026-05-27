@@ -17,6 +17,9 @@ Unicode True
 !define PACKAGE_DESCRIPTION "{{ (ds "in").Description }}"
 !define PACKAGE_COPYRIGHT "{{ (ds "in").Copyright }}"
 
+{{- if eq (ds "in").ExecutionLevel "current" }}
+!define INSTALL_ROOT "$LOCALAPPDATA\Programs"
+{{- else}}
 {{- if (ds "in").InstallRoot }}
 !define INSTALL_ROOT "{{(ds "in").InstallRoot}}"
 {{- else}}
@@ -26,6 +29,7 @@ Unicode True
 !define INSTALL_ROOT "$PROGRAMFILES"
 {{- end}}
 {{- end}}
+{{- end}}
 
 !ifdef OUTFILE
 !define OUTFILE_NAME "${OUTFILE}"
@@ -33,7 +37,11 @@ Unicode True
 !define OUTFILE_NAME "{{ (ds "in").Outfile }}"
 !endif
 
+{{- if (ds "in").Icon }}
 !define ICON_FILE "{{ (ds "in").Icon }}"
+{{- else}}
+!define ICON_FILE ""
+{{- end}}
 
 {{- if (ds "in").InstallPath}}
 !define PACKAGE_PATH "{{(ds "in").InstallPath}}"
@@ -60,8 +68,10 @@ RequestExecutionLevel admin
 
 {{- if ne (ds "in").ExecutionLevel "admin"}}
 InstallDirRegKey HKCU "${REG_KEY}" "InstallDir"
+!define IS_ADMIN_EXECUTION_LEVEL 1
 {{- else }}
 InstallDirRegKey HKLM "${REG_KEY}" "InstallDir"
+!define IS_ADMIN_EXECUTION_LEVEL 0
 {{- end}}
 
 SetCompressor {{ (ds "in").Compressor }}
@@ -211,6 +221,11 @@ Var Is64BitInstall
 Var IsArmInstall
 
 Function .onInit
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
+    ${EndIf}
 {{- if eq (ds "in").Architecture "x86_64" }}
     ${IfNot} ${IsNativeAMD64}
         DetailPrint "Not AMD64, Aborting"
@@ -455,6 +470,12 @@ RMDir /r "{{ .Name }}"
 {{ define "section" }}
 Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
     DetailPrint "Entering Section {{.Name}}-{{.DisplayName}}"
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
+    ${EndIf}
+
     SectionIn {{if .Required}}RO {{end}}{{ .InstallCategories}}
     SetOutPath "$INSTDIR\{{.Directory}}"
 
@@ -510,6 +531,12 @@ SectionEnd
 !macroend
 
 Section "-Core Installation"
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
+    ${EndIf}
+
     SetOutPath "$INSTDIR"
 
     WriteRegStr SHCTX "${REG_KEY}" "InstallDir" "$INSTDIR"
@@ -535,9 +562,11 @@ Section "-Core Installation"
     Push "1"
     Call ConditionalAddToRegistry
 
-    Push "DisplayIcon"
-    Push "$INSTDIR\${ICON_FILE}"
-    Call ConditionalAddToRegistry
+    ${If} "${ICON_FILE}" != ""
+        Push "DisplayIcon"
+        Push "$INSTDIR\${ICON_FILE}"
+        Call ConditionalAddToRegistry
+    ${EndIf}
 
     #${If} "$INSTALL_STARTMENU" == "1"
     #!insertmacro MUI_STARTMENU_WRITE_BEGIN Application
@@ -558,18 +587,11 @@ SectionEnd
 #FunctionEnd
 
 Function un.onInit
-  ClearErrors
-  UserInfo::GetName
-  ${Unless} ${Errors}
-    Pop $0
-    UserInfo::GetAccountType
-    Pop $1
-    ${If} $1 == "Admin"
-      SetShellVarContext all
-    ${ElseIf} $1 == "Power"
-      SetShellVarContext all
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
     ${EndIf}
-  ${EndUnless}
 FunctionEnd
 
 # TODO: HANDLE DEPENDENCIES
@@ -578,6 +600,12 @@ FunctionEnd
 #FunctionEnd
 
 Section "Uninstall"
+  ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+      SetShellVarContext all
+  ${Else}
+      SetShellVarContext current
+  ${EndIf}
+
   {{- if eq (ds "in").Architecture "x64" }}
     SetRegView 64
   {{- else if eq (ds "in").Architecture "x86" }}
