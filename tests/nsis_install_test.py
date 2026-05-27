@@ -106,12 +106,12 @@ def _get_installer_cmd(installer, install_root, config):
     ]
     return cmd
 
-def _validate_files(testcase, config, install_root, install_subpath):
+def _validate_files(testcase, config, install_root):
     expected_files = config.get("expected_files", [])
     expected_files.add("Uninstall.exe")
     for path in expected_files:
         if not os.path.isabs(path):
-            path = os.path.join(install_root, install_subpath, path)
+            path = os.path.join(install_root, path)
 
         dir = pathlib.Path(install_root).resolve()
         fs = [x.as_uri() for x in dir.iterdir() if x.is_file()]
