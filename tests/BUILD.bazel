@@ -80,7 +80,7 @@ nsis_installer_test(
     expected_services = {
         "single_service_component": {
             "start_type": "auto",
-            "display_name": "README Service",
+            "display_name": "Company Department Single Service Installer README Service",
             "description": "README Service Description",
             "executable": "README.md",
             "args": [],
