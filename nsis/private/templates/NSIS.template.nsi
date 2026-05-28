@@ -217,12 +217,9 @@ VIAddVersionKey "FileVersion" "${PACKAGE_VERSION}"
 
 Var StdOutHandle
 
-!macro DefineLogLine FuncName
-Function ${FuncName}
-    Exch $0
-
-    ${If} ${Silent}
-        DetailPrint "$0"
+!macro Log TEXT
+    ${IfNot} ${Silent}
+        DetailPrint `${TEXT}`
     ${ElseIf} $StdOutHandle == ""
         System::Call 'kernel32::AttachConsole(i -1)i.r1'
         ${If} $1 != 0
@@ -232,24 +229,12 @@ Function ${FuncName}
     ${EndIf}
 
     ${If} $StdOutHandle != ""
-        FileWrite $StdOutHandle "$0$\r$\n"
+        FileWrite $StdOutHandle `${TEXT}$\r$\n`
     ${EndIf}
-
-    Pop $0
-FunctionEnd
-!macroend
-
-!insertmacro DefineLogLine LogLine
-!insertmacro DefineLogLine un.LogLine
-
-!macro Log TEXT
-    Push "${TEXT}"
-    Call LogLine
 !macroend
 
 !macro UnLog TEXT
-    Push "${TEXT}"
-    Call un.LogLine
+    !insertmacro Log `${TEXT}`
 !macroend
 
 Var Is64BitInstall
@@ -369,95 +354,59 @@ Function AddToRegistry
   !insertmacro Log "Set install registry entry: '$1' to '$0'"
 FunctionEnd
 
-!macro WinSvcUpdate SvcName DispName Exe Args StartType Depends
-    !insertmacro Log "Updating windows Service: ${SvcName}"
+!macro _ServiceScExec ARGS OUT_RC
+    !insertmacro Log `Executing $SYSDIR\sc.exe: ${ARGS}`
+    ClearErrors
 
-    ${If} "${Args}" == ""
-        StrCpy $R0 "${Exe}"
-    ${Else}
-        StrCpy $R0 '${Exe} ${Args}'
-    ${EndIf}
+    nsExec::ExecToStack `"$SYSDIR\sc.exe" ${ARGS}`
+    Pop ${OUT_RC}
 
-    ExecWait '$SYSDIR\sc.exe config "${SvcName}" binPath="$R0" DisplayName="${DispName}" start=${StartType}' $R1
-
-    ${If} "${Depends}" != ""
-        ExecWait '$SYSDIR\sc.exe config "${SvcName}" depends="${Depends}"' $R1
-    ${EndIf}
 !macroend
 
-!macro WinSvcCreate SvcName DispName Exe Args StartType Depends
-    !insertmacro Log "Creating windows Service: ${SvcName}"
-
-    ${If} "${Args}" == ""
-        StrCpy $R0 "${Exe}"
-    ${Else}
-        StrCpy $R0 '${Exe} ${Args}'
-    ${EndIf}
-
-    ExecWait '$SYSDIR\sc.exe create "${SvcName}" binPath="$R0" DisplayName="${DispName}" start=${StartType}' $R1
-
-    ${If} $R1 != 0
-        !insertmacro Log "$SYSDIR\sc.exe create returned $R1 for service ${SvcName}"
-    ${EndIf}
-
-    ${If} "${Depends}" != ""
-        ExecWait '$SYSDIR\sc.exe config "${SvcName}" depends="${Depends}"' $R1
-    ${EndIf}
+!macro Service_Create SERVICE_NAME BIN_PATH DISPLAY_NAME START_TYPE DEPENDENCIES OUT_RC
+  !insertmacro _ServiceScExec \
+    `create "${SERVICE_NAME}" binPath= "${BIN_PATH}" DisplayName= "${DISPLAY_NAME}" start= ${START_TYPE} depend= "${DEPENDENCIES}"` \
+    ${OUT_RC}
 !macroend
 
-!macro WinSvcSetDesc SERVICE_NAME DESCRIPTION
-  ${If} "${DESCRIPTION}" != ""
-    !insertmacro Log "Setting service description: ${SERVICE_NAME}"
-    ExecWait '$SYSDIR\sc.exe description "${SERVICE_NAME}" "${DESCRIPTION}"' $R1
-  ${EndIf}
+!macro Service_Query SERVICE_NAME OUT_RC
+  !insertmacro _ServiceScExec \
+    `query "${SERVICE_NAME}"` \
+    ${OUT_RC}
 !macroend
 
-!macro WinSvcDelayedAutoStart SERVICE_NAME
-  !insertmacro Log "Enabling delayed auto-start for service: ${SERVICE_NAME}"
-  ExecWait '$SYSDIR\sc.exe config "${SERVICE_NAME}" start= delayed-auto' $R1
+!macro Service_Update SERVICE_NAME BIN_PATH DISPLAY_NAME START_TYPE DEPENDENCIES OUT_RC
+  !insertmacro _ServiceScExec \
+    `config "${SERVICE_NAME}" binPath= "${BIN_PATH}" DisplayName= "${DISPLAY_NAME}" start= ${START_TYPE} depend= "${DEPENDENCIES}"`  \
+    ${OUT_RC}
 !macroend
 
-!macro WinSvcStart SERVICE_NAME
-  !insertmacro Log "Starting Windows service: ${SERVICE_NAME}"
-  ExecWait '$SYSDIR\sc.exe start "${SERVICE_NAME}"' $R1
+!macro Service_Start SERVICE_NAME OUT_RC
+  !insertmacro _ServiceScExec \
+    `start "${SERVICE_NAME}"` \
+    ${OUT_RC}
 !macroend
 
-!macro WinSvcStop SERVICE_NAME
-  DetailPrint "Stopping Windows service: ${SERVICE_NAME}"
-  ExecWait '$SYSDIR\sc.exe stop "${SERVICE_NAME}"' $R1
+!macro Service_Stop SERVICE_NAME OUT_RC
+  !insertmacro _ServiceScExec \
+    `stop "${SERVICE_NAME}"` \
+    ${OUT_RC}
 !macroend
 
+!macro Service_Delete SERVICE_NAME OUT_RC
+  !insertmacro _ServiceScExec \
+    `delete "${SERVICE_NAME}"` \
+    ${OUT_RC}
+!macroend
 
-Function WinSvcExists
-    Exch $R0
-    Push $R1
-
-    !insertmacro Log "Querying Windows service: $R0"
-
-    ExecWait '$SYSDIR\sc.exe query "$R0"' $R1
-
-    ${If} $R1 == 0
-        StrCpy $R0 1
-    ${Else}
-        StrCpy $R0 0
-    ${EndIf}
-
-    Pop $R1
-
-    Exch $R0
-FunctionEnd
-
-
-
-!macro WinSvcDelete SERVICE_NAME
-  !insertmacro UnLog "Deleting Windows service: ${SERVICE_NAME}"
-  ExecWait 'sc.exe delete "${SERVICE_NAME}"' $R1
+!macro Service_SetDescription SERVICE_NAME DESCRIPTION OUT_RC
+    !insertmacro _ServiceScExec \
+        `description "${SERVICE_NAME}" "${DESCRIPTION}"` ${OUT_RC}
 !macroend
 
 ; ---------------------
 ; Installer
 ; ---------------------
-
 {{- range (ds "in").InstallTypes }}
 InstType "{{.}}"
 {{- end }}
@@ -487,9 +436,9 @@ SectionGroupEnd
 
 {{ define "sectionDelete" }}
 {{- if .Service }}
-!insertmacro WinSvcStop "{{ .Name }}"
+!insertmacro Service_Stop "{{ .Name }}" $0
 Sleep 2000
-!insertmacro WinSvcDelete "{{ .Name }}"
+!insertmacro Service_Delete "{{ .Name }}" $0
 Sleep 2000
 {{- end }}
 {{- with $d := .Directory}}
@@ -517,7 +466,7 @@ Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     SetOutPath "$INSTDIR\{{.Directory}}"
 
     {{- if .Service }}
-    !insertmacro WinSvcStop "{{ .Name }}"
+    !insertmacro Service_Stop "{{ .Name }}" $0
     Sleep 2000
     {{- end }}
 
@@ -530,16 +479,12 @@ Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     {{- end }}
 
     {{- if .Service }}
-    Push $0
-    Push "{{.Name}}"
-    Call WinSvcExists
-    Pop $0
+    !insertmacro Service_Query "{{.Name}}" $0
     ${If} $0 == 0
-        !insertmacro WinSvcUpdate "{{ .Name }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "$OUTDIR\{{ .ServiceExecutable.Name }}" "{{ .ServiceArgs }}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}"
+        !insertmacro Service_Update "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
     ${Else}
-        !insertmacro WinSvcCreate "{{ .Name }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "$OUTDIR\{{ .ServiceExecutable.Name }}" "{{ .ServiceArgs }}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}"
+        !insertmacro Service_Create "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
     ${EndIf}
-    Pop $0
     {{- end }}
 SectionEnd
 {{ end }}
