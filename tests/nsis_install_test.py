@@ -191,9 +191,8 @@ if __name__ == "__main__":
         raise SystemError("Expected argv: <installer_path> <config_json>")
 
     INSTALLER = sys.argv[1]
-    path = pathlib.Path(INSTALLER).resolve()
-    if not path.exists():
-        raise SystemExit("installer does not exist")
+    if not os.path.exists(INSTALLER):
+        raise SystemExit(f"installer '{INSTALLER}' does not exist")
 
     try:
         with open(sys.argv[2], "r", encoding="utf-8") as f:
