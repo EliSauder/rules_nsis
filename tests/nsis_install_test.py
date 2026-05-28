@@ -47,7 +47,7 @@ def _get_reg_view(bitwidth: str) -> int:
 
 def _get_reg_access(bitwidth: str) -> int:
     access = winreg.KEY_READ
-    access |= getattr(winreg, _get_reg_width(bitwidth), 0)
+    access |= getattr(winreg, _get_reg_view(bitwidth), 0)
     return access
 
 def _reg_open(root_db: int, path: str, view: int):
@@ -56,25 +56,26 @@ def _reg_open(root_db: int, path: str, view: int):
     except:
         raise SystemError(f"error opening key {path}")
 
-def _reg_value(root: int, path: str, view: str, name: str):
+def _reg_value(root: int, path: str, view: int, name: str):
     with _reg_open(root, path, view) as hkey:
         value, value_type = winreg.QueryValueEx(hkey, name)
         return value, value_type
 
 
 def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, inst_subpath: str):
-    root = _get_reg_db(config["expected_execution_level"] or "admin")
+    exlvl = (config["expected_execution_level"] or "admin")
+    root = _get_reg_db(exlvl)
 
     instdir = f"{inst_root}"
 
     inpath, unpath = _get_reg_path(inst_subpath)
-    view = _get_reg_view(config["expected_bitwidth"] or "64")
+    access = _get_reg_access(config["expected_bitwidth"] or "64")
 
-    with _reg_open(root, inpath, view): pass
-    with _reg_open(root, outpath, view): pass
+    with _reg_open(root, inpath, access): pass
+    with _reg_open(root, outpath, access): pass
 
-    instdirval, instdirtyp = _reg_value(root, inpath, view, "InstallDir")
-    versionval, versiontyp = _reg_value(root, inpath, view, "Version")
+    instdirval, instdirtyp = _reg_value(root, inpath, access, "InstallDir")
+    versionval, versiontyp = _reg_value(root, inpath, access, "Version")
 
     testcase.assertEqual(instdir, val, f"expected InstallDir to equal install path")
 
