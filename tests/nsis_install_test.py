@@ -202,7 +202,7 @@ if __name__ == "__main__":
     except json.JSONDecodeError as e:
         raise SystemExit(f"Invalid config JSON: {e}\nFile: {sys.argv[2]}\nContent: {content}")
     except:
-        raise SystemExit(f"error parsing json parameter: {sys.argv[2]}")
+        raise SystemExit(f"error parsing json parameter: {sys.argv[2]}\nContent: {content}")
 
     logging.basicConfig(stream=sys.stderr)
     logging.getLogger("NsisInstallerTest.test_installer").setLevel(logging.DEBUG)
