@@ -142,7 +142,7 @@ def _validate_services(testcase, config, install_root):
     expected_services = config.get("expected_services", {})
 
     for key, val in expected_services.items():
-        svc = psutil.win_service.get(key)
+        svc = psutil.win_service_get(key)
 
         testcase.assertEqual(key, svc.name(), f"Unexpected name {svc.name()}, expected {key}. WTF How did this happen?")
 
