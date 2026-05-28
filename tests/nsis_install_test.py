@@ -72,7 +72,7 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, ins
     access = _get_reg_access(config["expected_bitwidth"] or "64")
 
     with _reg_open(root, inpath, access): pass
-    with _reg_open(root, outpath, access): pass
+    with _reg_open(root, unpath, access): pass
 
     instdirval, instdirtyp = _reg_value(root, inpath, access, "InstallDir")
     versionval, versiontyp = _reg_value(root, inpath, access, "Version")
