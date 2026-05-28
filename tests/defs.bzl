@@ -49,7 +49,7 @@ def nsis_installer_test(
         name = name + "_config",
         outs = [f],
         cmd = "printf '%s\\n' {} > \"$@\"".format(
-            shell.quote(json.encode(test_config)),
+            shell.quote(json.encode(test_config).replace("\\", "\\\\")),
         ),
 #        cmd = """
 #cat > "$@" << 'EOF'
