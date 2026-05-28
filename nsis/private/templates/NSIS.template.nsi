@@ -355,11 +355,15 @@ Function AddToRegistry
 FunctionEnd
 
 !macro _ServiceScExec ARGS OUT_RC
-    !insertmacro Log `Executing $SYSDIR\sc.exe: ${ARGS}`
+    !insertmacro Log `Executing: $SYSDIR\sc.exe ${ARGS}`
     ClearErrors
 
+    Push $0
     nsExec::ExecToStack `"$SYSDIR\sc.exe" ${ARGS}`
     Pop ${OUT_RC}
+    Pop $0
+    !insertmacro Log `Output: $0`
+    Pop $0
 
 !macroend
 
