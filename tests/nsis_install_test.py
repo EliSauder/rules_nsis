@@ -162,7 +162,9 @@ def _validate_services(testcase, config, install_root):
         exe = os.path.join(install_root, val["executable"])
         for arg in list(val["args"]):
             exe = exe + " " + arg
-        testcase.assertEqual(exe, svc.binpath(), f"Executable {svc.binpath()} not equal expected {exe}")
+        exe = exe.strip()
+        bin = svc.binpath().strip()
+        testcase.assertEqual(exe, bin, f"Executable '{bin}' not equal expected '{exe}'")
 
         testcase.assertEqual(val["start_type"], svc.start_type(), f"Start type {svc.start_type()} not equal expected {val["start_type"]}")
 
