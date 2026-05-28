@@ -76,8 +76,17 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, ins
 
     instdirval, instdirtyp = _reg_value(root, inpath, access, "InstallDir")
     versionval, versiontyp = _reg_value(root, inpath, access, "Version")
+    _reg_value(root, unpath, access, "DisplayName")
+    unversionval, unversiontyp = _reg_value(root, unpath, access, "DisplayVersion")
+    _reg_value(root, unpath, access, "Publisher")
+    unstr, unstrtyp = _reg_value(root, unpath, access, "UninstallString")
+    _reg_value(root, unpath, access, "NoRepair")
+    _reg_value(root, unpath, access, "NoModify")
+    _reg_value(root, unpath, access, "DisplayIcon")
 
-    testcase.assertEqual(instdir, val, f"expected InstallDir to equal install path")
+    testcase.assertEqual(instdir, instdirval, f"expected InstallDir to equal install path")
+    testcase.assertEqual(f"{instdir}\\Uninstall.exe", unstr, f"expected UninstallString to equal install path + Uninstall.exe")
+    testcase.assertEqual(versionval, unversionval, f"expected install version {versionval} to equal uninstall version {unversionval}")
 
 
 def _get_install_root():
