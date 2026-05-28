@@ -27,6 +27,14 @@ pip.parse(
 )
 use_repo(pip, "pypi")
 
+pip_dev = use_extension("@rules_python//python/extensions:pip.bzl", "pip", dev_dependency = True)
+pip_dev.parse(
+    hub_name = "pypi_dev",
+    python_version = "3.12",
+    requirements_lock = "//tests:requirements_lock_txt",
+)
+use_repo(pip_dev, "pypi_dev")
+
 ############################
 # GET ZLIB
 ############################

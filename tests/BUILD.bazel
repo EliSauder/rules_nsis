@@ -1,5 +1,12 @@
 load("//tests:defs.bzl", "nsis_installer_test")
 load("//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer")
+load("@rules_python//python:pip.bzl", "compile_pip_requirements")
+
+compile_pip_requirements(
+    name = "requirements",
+    src = "requirements.txt",
+    requirements_txt = "requirements_lock_txt",
+)
 
 filegroup(
     name = "nsis_files",
@@ -59,6 +66,26 @@ nsis_installer(
         "Typical",
         "Minimal",
     ],
+)
+
+nsis_installer_test(
+    name = "single_service_test",
+    installer = ":single_service_installer",
+    expected_installer_name = "Single Service Setup.exe",
+    expected_files = [
+        "README.md",
+    ],
+    expected_product_path = "SSI",
+    expected_vendor_path = "Company\\Department",
+    expected_services = {
+        "single_service_component": {
+            "start_type": "auto",
+            "display_name": "README Service",
+            "description": "README Service Description",
+            "executable": "README.md",
+            "args": [],
+        },
+    },
 )
 
 #nsis_component_group(

@@ -1,4 +1,5 @@
 import os
+import psutil
 import json
 import pathlib
 import shutil
@@ -131,6 +132,26 @@ def _validate_files(testcase, config, install_root):
 
         testcase.assertTrue(os.path.exists(path), f"Expected file missing: {path}. Found: {fs}")
 
+def _validate_services(testcase, config, install_root):
+    expected_services = config.get("expected_services", {})
+
+    for key, val in expected_services.items():
+        svc = psutil.win_service.get(key)
+
+        testcase.assertEqual(key, svc.name(), f"Unexpected name {svc.name()}, expected {key}. WTF How did this happen?")
+
+        testcase.assertEqual(val["display_name"], svc.display_name(), f"Display name {svc.display_name()} does not equal expected {val["display_name"]}")
+
+        exe = os.path.join(install_root, val["executable"])
+        for arg in list(val["args"]):
+            exe = exe + " " + arg
+        testcase.assertEqual(exe, svc.binpath(), f"Executable {svc.binpath()} not equal expected {exe}")
+
+        testcase.assertEqual(val["start_type"], svc.start_type(), f"Start type {svc.start_type()} not equal expected {val["start_type"]}")
+
+        testcase.assertEqual(val["description"], svc.description(), f"Description {svc.description()} not equal expected {val["description"]}")
+
+
 class NsisInstallerTest(unittest.TestCase):
     def test_installer(self) -> None:
 
@@ -163,6 +184,7 @@ class NsisInstallerTest(unittest.TestCase):
 
         _validate_files(self, config, install_root)
         _validate_reg(self, config, install_root, install_subpath)
+        _validate_services(self, config, install_root)
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

@@ -201,7 +201,6 @@ nsis_component = rule(
                 "auto",
                 "demand",
                 "disabled",
-                "delayed-auto",
             ],
         ),
         "service_dependencies": attr.string_list(

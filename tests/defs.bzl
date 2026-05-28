@@ -11,7 +11,8 @@ def nsis_installer_test(
     expected_install_path = None,
     expected_bitwidth = "64",
     expected_execution_level = "admin",
-    installer_args = []):
+    installer_args = [],
+    expected_services = {}):
 
     if expected_product_path == None and expected_install_path == None:
         fail("one of product path or install path must not be None")
@@ -22,6 +23,14 @@ def nsis_installer_test(
     if expected_bitwidth != "32" and expected_bitwidth != "64":
         fail("invalid bitwidth, must be 32 or 64")
 
+    for key, val in expected_services.items():
+        st = val["start_type"]
+        if st != "auto" and st != "demand" and st != "disabled":
+            fail("invalid start type '{}' for svc '{}'".format(st, key))
+        exe = val["executable"]
+        if exe == None or len(exe.strip()) == 0:
+            val["executable"] = None
+
     test_config = {
         "installer_args": [str(x) for x in (installer_args or [])],
         "expected_files": [str(x) for x in expected_files],
@@ -31,6 +40,7 @@ def nsis_installer_test(
         "expected_install_path": expected_install_path,
         "expected_bitwidth": str(expected_bitwidth or "64"),
         "expected_execution_level": str(expected_execution_level or "admin"),
+        "expected_services": expected_services,
     }
 
     f = name + "_config.json"
@@ -57,4 +67,5 @@ EOF
         target_compatible_with = ["@platforms//os:windows"],
         timeout = "short",
         visibility = ["//visibility:public"],
+        deps = ["@pypi_dev//psutil"],
     )
