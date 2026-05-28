@@ -197,9 +197,10 @@ if __name__ == "__main__":
 
     try:
         with open(sys.argv[2], "r", encoding="utf-8") as f:
-            CONFIG = json.load(f)
+            content = f.readall()
+            CONFIG = json.loads(content)
     except json.JSONDecodeError as e:
-        raise SystemExit(f"Invalid config JSON: {e}\nValue: {sys.argv[2]}")
+        raise SystemExit(f"Invalid config JSON: {e}\nFile: {sys.argv[2]}\nContent: {content}")
     except:
         raise SystemExit(f"error parsing json parameter: {sys.argv[2]}")
 
