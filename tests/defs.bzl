@@ -49,7 +49,7 @@ def nsis_installer_test(
         name = name + "_config",
         outs = [f],
         cmd = """
-cat > "$@" << EOF
+cat > "$@" << 'EOF'
 {}
 EOF
 """.format(json.encode(test_config)),
