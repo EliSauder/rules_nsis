@@ -196,6 +196,7 @@ if __name__ == "__main__":
 
         raise SystemExit(f"installer '{INSTALLER}' does not exist. Files in dir: '{os.listdir(dir)}'")
 
+    content = ""
     try:
         with open(sys.argv[2], "r", encoding="utf-8") as f:
             content = f.readall()
