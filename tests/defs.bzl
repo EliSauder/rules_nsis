@@ -30,7 +30,7 @@ def nsis_installer_test(
         "expected_vendor_path": str(expected_vendor_path or ""),
         "expected_install_path": expected_install_path,
         "expected_bitwidth": str(expected_bitwidth or "64"),
-        "expected_execution_level": str(expected_execution_level or "admin",
+        "expected_execution_level": str(expected_execution_level or "admin"),
     }
 
     f = name + "_config.json"
