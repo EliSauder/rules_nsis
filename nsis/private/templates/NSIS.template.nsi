@@ -343,10 +343,10 @@ FunctionEnd
         StrCpy $R0 '${Exe} ${Args}'
     ${EndIf}
 
-    ExecWait 'sc.exe config "${SvcName}" binPath="$R0" DisplayName="${DispName}" start=${StartType}' $R1
+    ExecWait '$SYSDIR\sc.exe config "${SvcName}" binPath="$R0" DisplayName="${DispName}" start=${StartType}' $R1
 
     ${If} "${Depends}" != ""
-        ExecWait 'sc.exe config "${SvcName}" depends="${Depends}"' $R1
+        ExecWait '$SYSDIR\sc.exe config "${SvcName}" depends="${Depends}"' $R1
     ${EndIf}
 !macroend
 
@@ -359,37 +359,37 @@ FunctionEnd
         StrCpy $R0 '${Exe} ${Args}'
     ${EndIf}
 
-    ExecWait 'sc.exe create "${SvcName}" binPath="$R0" DisplayName="${DispName}" start=${StartType}' $R1
+    ExecWait '$SYSDIR\sc.exe create "${SvcName}" binPath="$R0" DisplayName="${DispName}" start=${StartType}' $R1
 
     ${If} $R1 != 0
-        DetailPrint "sc.exe create returned $R1 for service ${SvcName}"
+        DetailPrint "$SYSDIR\sc.exe create returned $R1 for service ${SvcName}"
     ${EndIf}
 
     ${If} "${Depends}" != ""
-        ExecWait 'sc.exe config "${SvcName}" depends="${Depends}"' $R1
+        ExecWait '$SYSDIR\sc.exe config "${SvcName}" depends="${Depends}"' $R1
     ${EndIf}
 !macroend
 
 !macro WinSvcSetDesc SERVICE_NAME DESCRIPTION
   ${If} "${DESCRIPTION}" != ""
     DetailPrint "Setting service description: ${SERVICE_NAME}"
-    ExecWait 'sc.exe description "${SERVICE_NAME}" "${DESCRIPTION}"' $R1
+    ExecWait '$SYSDIR\sc.exe description "${SERVICE_NAME}" "${DESCRIPTION}"' $R1
   ${EndIf}
 !macroend
 
 !macro WinSvcDelayedAutoStart SERVICE_NAME
   DetailPrint "Enabling delayed auto-start for service: ${SERVICE_NAME}"
-  ExecWait 'sc.exe config "${SERVICE_NAME}" start= delayed-auto' $R1
+  ExecWait '$SYSDIR\sc.exe config "${SERVICE_NAME}" start= delayed-auto' $R1
 !macroend
 
 !macro WinSvcStart SERVICE_NAME
   DetailPrint "Starting Windows service: ${SERVICE_NAME}"
-  ExecWait 'sc.exe start "${SERVICE_NAME}"' $R1
+  ExecWait '$SYSDIR\sc.exe start "${SERVICE_NAME}"' $R1
 !macroend
 
 !macro WinSvcStop SERVICE_NAME
   DetailPrint "Stopping Windows service: ${SERVICE_NAME}"
-  ExecWait 'sc.exe stop "${SERVICE_NAME}"' $R1
+  ExecWait '$SYSDIR\sc.exe stop "${SERVICE_NAME}"' $R1
 !macroend
 
 
