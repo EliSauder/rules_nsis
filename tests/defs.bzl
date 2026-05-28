@@ -48,11 +48,14 @@ def nsis_installer_test(
     native.genrule(
         name = name + "_config",
         outs = [f],
-        cmd = """
-cat > "$@" << 'EOF'
-{}
-EOF
-""".format(shell.quote(json.encode(test_config))),
+        cmd = "printf '%s\\n' {} > \"$@\"".format(
+            shell.quote(json.encode(test_config)),
+        ),
+#        cmd = """
+#cat > "$@" << 'EOF'
+#{}
+#EOF
+#""".format(shell.quote(json.encode(test_config))),
     )
 
     py_test(
