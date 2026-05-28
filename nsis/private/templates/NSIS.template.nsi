@@ -321,15 +321,17 @@ FunctionEnd
 #  ${EndIf}
 #FunctionEnd
 
-Function ConditionalAddToRegistry
+Function AddToRegistry
+  ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+      SetShellVarContext all
+  ${Else}
+      SetShellVarContext current
+  ${EndIf}
   Pop $0
   Pop $1
-  ${If} "$0" == ""
-    WriteRegStr SHCTX "${UN_REG_KEY}" \
-    "$1" "$0"
-    ;MessageBox MB_OK "Set Registry: '$1' to '$0'"
-    DetailPrint "Set install registry entry: '$1' to '$0'"
-  ${EndIf}
+  WriteRegStr SHCTX "${UN_REG_KEY}" \
+  "$1" "$0"
+  DetailPrint "Set install registry entry: '$1' to '$0'"
 FunctionEnd
 
 !macro WinSvcUpdate SvcName DispName Exe Args StartType Depends
@@ -545,27 +547,31 @@ Section "-Core Installation"
 
     Push "DisplayName"
     Push "${PACKAGE_NAME}"
-    Call ConditionalAddToRegistry
+    Call AddToRegistry
     Push "DisplayVersion"
     Push "${PACKAGE_VERSION}"
-    Call ConditionalAddToRegistry
+    Call AddToRegistry
     Push "Publisher"
     Push "${PACKAGE_VENDOR}"
-    Call ConditionalAddToRegistry
+    Call AddToRegistry
     Push "UninstallString"
     Push "$INSTDIR\Uninstall.exe"
-    Call ConditionalAddToRegistry
+    Call AddToRegistry
     Push "NoRepair"
     Push "1"
-    Call ConditionalAddToRegistry
+    Call AddToRegistry
     Push "NoModify"
     Push "1"
-    Call ConditionalAddToRegistry
+    Call AddToRegistry
 
     ${If} "${ICON_FILE}" != ""
         Push "DisplayIcon"
         Push "$INSTDIR\${ICON_FILE}"
-        Call ConditionalAddToRegistry
+        Call AddToRegistry
+    ${Else}
+        Push "DisplayIcon"
+        Push ""
+        Call AddToRegistry
     ${EndIf}
 
     #${If} "$INSTALL_STARTMENU" == "1"
@@ -575,7 +581,7 @@ Section "-Core Installation"
 
     #    Push "StartMenu"
     #    Push "$StartMenuFolder"
-    #    Call ConditionalAddToRegistry
+    #    Call AddToRegistry
     #!insertmacro MUI_STARTMENU_WRITE_END
     #${EndIf}
 
