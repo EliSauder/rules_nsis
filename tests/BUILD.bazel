@@ -71,7 +71,7 @@ nsis_installer(
 nsis_installer_test(
     name = "single_service_test",
     installer = ":single_service_installer",
-    expected_installer_name = "Company Department Single Service Setup.exe",
+    expected_installer_name = "Company Department Single Service Installer Setup.exe",
     expected_files = [
         "README.md",
     ],
