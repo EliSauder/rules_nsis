@@ -500,15 +500,9 @@ Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     Call WinSvcExists
     Pop $0
     ${If} $0 == 0
-        !insertmacro WinSvcUpdate "{{ .Name }}" \
-                "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "$OUTDIR\{{ .ServiceExecutable.Name }}" \
-                "{{ .ServiceArgs }}" "{{ .ServiceStartType }}" \
-                "{{ .ServiceDependencies }}"
+        !insertmacro WinSvcUpdate "{{ .Name }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "$OUTDIR\{{ .ServiceExecutable.Name }}" "{{ .ServiceArgs }}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}"
     ${Else}
-        !insertmacro WinSvcCreate "{{ .Service }}" \
-                "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceExecutable }}" \
-                "{{ .ServiceArgs }}" "{{ .ServiceStartType }}" \
-                "{{ .ServiceDependencies }}"
+        !insertmacro WinSvcCreate "{{ .Name }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "$OUTDIR\{{ .ServiceExecutable.Name }}" "{{ .ServiceArgs }}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}"
     ${EndIf}
     Pop $0
     {{- end }}
