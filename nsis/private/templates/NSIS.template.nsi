@@ -1,6 +1,5 @@
 !pragma warning disable 6010 ; Because we are using templates, some installers
                              ; don't use everything defined.
-
 Unicode True
 
 !include LogicLib.nsh
@@ -216,6 +215,42 @@ VIAddVersionKey "FileVersion" "${PACKAGE_VERSION}"
   !insertmacro MUI_LANGUAGE "Vietnamese"
   !insertmacro MUI_LANGUAGE "Welsh"
 
+Var StdOutHandle
+
+!macro DefineLogLine FuncName
+Function ${FuncName}
+    Exch $0
+
+    ${If} ${Silent}
+        DetailPrint "$0"
+    ${ElseIf} $StdOutHandle == ""
+        System::Call 'kernel32::AttachConsole(i -1)i.r1'
+        ${If} $1 != 0
+            System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+            StrCpy $StdOutHandle $0
+        ${EndIf}
+    ${EndIf}
+
+    ${If} $StdOutHandle != ""
+        FileWrite $StdOutHandle "$0$\r$\n"
+    ${EndIf}
+
+    Pop $0
+FunctionEnd
+!macroend
+
+!insertmacro DefineLogLine LogLine
+!insertmacro DefineLogLine un.LogLine
+
+!macro Log TEXT
+    Push "${TEXT}"
+    Call LogLine
+!macroend
+
+!macro UnLog TEXT
+    Push "${TEXT}"
+    Call un.LogLine
+!macroend
 
 Var Is64BitInstall
 Var IsArmInstall
@@ -228,7 +263,7 @@ Function .onInit
     ${EndIf}
 {{- if eq (ds "in").Architecture "x86_64" }}
     ${IfNot} ${IsNativeAMD64}
-        DetailPrint "Not AMD64, Aborting"
+        !insertmacro Log "Not AMD64, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 64-bit x86 version of Windows." /SD IDOK
         Abort
     ${EndIf}
@@ -238,7 +273,7 @@ Function .onInit
     StrCpy $IsArmInstall "0"
 {{- else if eq (ds "in").Architecture "x86_32" }}
     ${IfNot} ${IsNativeIA32}
-        DetailPrint "Not IA32, Aborting"
+        !insertmacro Log "Not IA32, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 32-bit x86 version of Windows." /SD IDOK
         Abort
     ${EndIf}
@@ -248,7 +283,7 @@ Function .onInit
     StrCpy $IsArmInstall "0"
 {{- else if eq (ds "in").Architecture "arm64" }}
     ${IfNot} ${IsNativeARM64}
-        DetailPrint "Not ARM64, Aborting"
+        !insertmacro Log "Not ARM64, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 64-bit ARM version of Windows." /SD IDOK
         Abort
     ${EndIf}
@@ -258,7 +293,7 @@ Function .onInit
     StrCpy $IsArmInstall "1"
 {{- else if eq (ds "in").Architecture "arm32" }}
     ${IfNot} ${IsNativeARM32}
-        DetailPrint "Not ARM32, Aborting"
+        !insertmacro Log "Not ARM32, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 32-bit ARM version of Windows." /SD IDOK
         Abort
     ${EndIf}
@@ -295,7 +330,7 @@ Function .onInit
     Pop $R0
     ${If} $R0 != 0
         MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running." /SD IDOK
-        DetailPrint "Another instance is already running, aborting"
+        !insertmacro Log "Another instance is already running, aborting"
         Abort
     ${EndIf}
 FunctionEnd
@@ -331,11 +366,11 @@ Function AddToRegistry
   Pop $1
   WriteRegStr SHCTX "${UN_REG_KEY}" \
   "$1" "$0"
-  DetailPrint "Set install registry entry: '$1' to '$0'"
+  !insertmacro Log "Set install registry entry: '$1' to '$0'"
 FunctionEnd
 
 !macro WinSvcUpdate SvcName DispName Exe Args StartType Depends
-    DetailPrint "Updating windows Service: ${SvcName}"
+    !insertmacro Log "Updating windows Service: ${SvcName}"
 
     ${If} "${Args}" == ""
         StrCpy $R0 "${Exe}"
@@ -351,7 +386,7 @@ FunctionEnd
 !macroend
 
 !macro WinSvcCreate SvcName DispName Exe Args StartType Depends
-    DetailPrint "Creating windows Service: ${SvcName}"
+    !insertmacro Log "Creating windows Service: ${SvcName}"
 
     ${If} "${Args}" == ""
         StrCpy $R0 "${Exe}"
@@ -362,7 +397,7 @@ FunctionEnd
     ExecWait '$SYSDIR\sc.exe create "${SvcName}" binPath="$R0" DisplayName="${DispName}" start=${StartType}' $R1
 
     ${If} $R1 != 0
-        DetailPrint "$SYSDIR\sc.exe create returned $R1 for service ${SvcName}"
+        !insertmacro Log "$SYSDIR\sc.exe create returned $R1 for service ${SvcName}"
     ${EndIf}
 
     ${If} "${Depends}" != ""
@@ -372,18 +407,18 @@ FunctionEnd
 
 !macro WinSvcSetDesc SERVICE_NAME DESCRIPTION
   ${If} "${DESCRIPTION}" != ""
-    DetailPrint "Setting service description: ${SERVICE_NAME}"
+    !insertmacro Log "Setting service description: ${SERVICE_NAME}"
     ExecWait '$SYSDIR\sc.exe description "${SERVICE_NAME}" "${DESCRIPTION}"' $R1
   ${EndIf}
 !macroend
 
 !macro WinSvcDelayedAutoStart SERVICE_NAME
-  DetailPrint "Enabling delayed auto-start for service: ${SERVICE_NAME}"
+  !insertmacro Log "Enabling delayed auto-start for service: ${SERVICE_NAME}"
   ExecWait '$SYSDIR\sc.exe config "${SERVICE_NAME}" start= delayed-auto' $R1
 !macroend
 
 !macro WinSvcStart SERVICE_NAME
-  DetailPrint "Starting Windows service: ${SERVICE_NAME}"
+  !insertmacro Log "Starting Windows service: ${SERVICE_NAME}"
   ExecWait '$SYSDIR\sc.exe start "${SERVICE_NAME}"' $R1
 !macroend
 
@@ -397,7 +432,7 @@ Function WinSvcExists
     Exch $R0
     Push $R1
 
-    DetailPrint "Querying Windows service: $R0"
+    !insertmacro Log "Querying Windows service: $R0"
 
     ExecWait '$SYSDIR\sc.exe query "$R0"' $R1
 
@@ -415,7 +450,7 @@ FunctionEnd
 
 
 !macro WinSvcDelete SERVICE_NAME
-  DetailPrint "Deleting Windows service: ${SERVICE_NAME}"
+  !insertmacro UnLog "Deleting Windows service: ${SERVICE_NAME}"
   ExecWait 'sc.exe delete "${SERVICE_NAME}"' $R1
 !macroend
 
@@ -438,7 +473,7 @@ InstType "{{.}}"
 
 {{define "sectionGroup"}}
 SectionGroup {{if .Expanded}}"/e"{{end}}"{{if .IsBold}}!{{end}}{{.DisplayName}}" "{{.Name}}"
-    DetailPrint "Entering Section Group {{.Name}}-{{.DisplayName}}"
+    !insertmacro Log "Entering Section Group {{.Name}}-{{.DisplayName}}"
 {{- range .Components }}
     {{ template "section" . }}
 {{- end }}
@@ -471,7 +506,7 @@ RMDir /r "{{ .Name }}"
 ; SECTIONS
 {{ define "section" }}
 Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
-    DetailPrint "Entering Section {{.Name}}-{{.DisplayName}}"
+    !insertmacro Log "Entering Section {{.Name}}-{{.DisplayName}}"
     ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
         SetShellVarContext all
     ${Else}
