@@ -47,7 +47,7 @@ def _get_reg_view(bitwidth: str) -> int:
 
 def _get_reg_access(bitwidth: str) -> int:
     access = winreg.KEY_READ
-    access |= getattr(winreg, _get_reg_view(bitwidth), 0)
+    access |= _get_reg_view(bitwidth)
     return access
 
 def _reg_open(root_db: int, path: str, view: int):
