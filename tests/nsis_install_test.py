@@ -9,6 +9,17 @@ import unittest
 import winreg
 import logging
 
+print("cwd=", os.getcwd())
+for dir, dirs, files in os.walk(os.getcwd()):
+    for d in dirs:
+        pt = os.path.relpath(d, dir)
+        lvl = pt.count(os.sep)
+        idnt = ' ' * 4 * (lvl)
+        print("{}{}/".format(idnt, os.path.basename(pt)))
+        subindent = ' ' * 4 * (lvl + 1)
+        for f in files:
+            print('{}{}'.format(subindent, f))
+
 from python.runfiles import runfiles
 
 RUNFILES = runfiles.Create()

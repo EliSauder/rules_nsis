@@ -354,7 +354,10 @@ def _makensis(ctx, toolchain, script, options_file, inputs):
     )
 
     return [
-        DefaultInfo(files = depset([outfile]))
+        DefaultInfo(
+            files = depset([outfile]),
+            runfiles = ctx.runfiles(files = [outfile])
+        )
     ]
 
 def _name_to_displayname(val):
