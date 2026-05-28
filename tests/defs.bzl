@@ -1,5 +1,4 @@
 load("@rules_python//python:defs.bzl", "py_test")
-load("//nsis/private:defs.bzl", "NsisInstallerInfo")
 
 def nsis_installer_test(
     name,
