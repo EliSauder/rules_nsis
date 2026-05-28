@@ -26,11 +26,11 @@ def nsis_installer_test(
         "installer_args": [str(x) for x in (installer_args or [])],
         "expected_files": [str(x) for x in expected_files],
         "expected_installer_name": str(expected_installer_name),
-        "expected_product_path": str(expected_product_path),
+        "expected_product_path": expected_product_path,
         "expected_vendor_path": str(expected_vendor_path or ""),
         "expected_install_path": expected_install_path,
-        "expected_bitwidth": expected_bitwidth,
-        "expected_execution_level": expected_execution_level,
+        "expected_bitwidth": str(expected_bitwidth or "64"),
+        "expected_execution_level": str(expected_execution_level or "admin",
     }
 
     f = name + "_config.json"
