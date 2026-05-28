@@ -157,7 +157,7 @@ def _validate_services(testcase, config, install_root):
 
         testcase.assertEqual(key, svc.name(), f"Unexpected name {svc.name()}, expected {key}. WTF How did this happen?")
 
-        testcase.assertEqual(val["display_name"], svc.display_name(), f"Display name {svc.display_name()} does not equal expected {val["display_name"]}")
+        testcase.assertEqual(val["display_name"], svc.display_name(), f"Display name '{svc.display_name()}' does not equal expected '{val["display_name"]}'")
 
         exe = os.path.join(install_root, val["executable"])
         for arg in list(val["args"]):
