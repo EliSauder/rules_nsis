@@ -1,4 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_test")
+load("@bazel_skylib//lib:shell.bzl", "shell")
 
 def nsis_installer_test(
     name,
@@ -51,7 +52,7 @@ def nsis_installer_test(
 cat > "$@" << 'EOF'
 {}
 EOF
-""".format(json.encode(test_config)),
+""".format(shell.quote(json.encode(test_config))),
     )
 
     py_test(
