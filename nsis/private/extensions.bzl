@@ -16,7 +16,7 @@ dirrule(
 
 genrule(
   name = "nsis_bin",
-  executable = True,
+  executable = False,
   srcs = [
     "@zlib_nsis//:bin",
     ":nsis_src_files_dir",
