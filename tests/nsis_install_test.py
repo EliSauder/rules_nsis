@@ -9,6 +9,12 @@ import unittest
 import winreg
 import logging
 
+from python.runfiles import runfiles
+
+RUNFILES = runfiles.Create()
+if RUNFILES == None:
+    raise SystemExit("runfiles is none")
+
 INSTALLER=None
 CONFIG=None
 
@@ -190,7 +196,8 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         raise SystemError("Expected argv: <installer_path> <config_json>")
 
-    INSTALLER = sys.argv[1]
+    #INSTALLER = sys.argv[1]
+    INSTALLER = RUNFILES.Rlocation(sys.argv[1])
     if not os.path.exists(INSTALLER):
         dir = os.path.dirname(INSTALLER)
 
@@ -198,8 +205,8 @@ if __name__ == "__main__":
 
     content = ""
     try:
-        with open(sys.argv[2], "r", encoding="utf-8") as f:
-            content = f.readall()
+        with open(RUNFILES.Rlocation(sys.argv[2]), "r", encoding="utf-8") as f:
+            content = f.read()
             CONFIG = json.loads(content)
     except json.JSONDecodeError as e:
         raise SystemExit(f"Invalid config JSON: {e}\nFile: {sys.argv[2]}\nContent: {content}")

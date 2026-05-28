@@ -60,11 +60,14 @@ EOF
         main = ":nsis_install_test.py",
         data = [installer, f],
         args = [
-            "$(location {})".format(installer),
-            "$(location {})".format(f),
+            "$(rlocationpath {})".format(installer),
+            "$(rlocationpath {})".format(f),
         ],
         target_compatible_with = ["@platforms//os:windows"],
         timeout = "short",
         visibility = ["//visibility:public"],
-        deps = ["@pypi_dev//psutil"],
+        deps = [
+            "@pypi_dev//psutil",
+            "@rules_python//python/runfiles",
+        ],
     )
