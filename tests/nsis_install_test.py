@@ -165,9 +165,9 @@ class NsisInstallerTest(unittest.TestCase):
         config = CONFIG
 
         exp_inst_name = config.get("expected_installer_name", "")
-        self.assertTrue(
-            os.path.basename(installer) == exp_inst_name,
-            f"Installer {installer} does not match expected name {exp_inst_name}",
+        bn = os.path.basename(installer)
+        self.assertEqual(exp_inst_name, bn,
+            f"Installer {bn} does not match expected name {exp_inst_name}",
         )
 
         install_root = _get_install_root()
