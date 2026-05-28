@@ -192,7 +192,9 @@ if __name__ == "__main__":
 
     INSTALLER = sys.argv[1]
     if not os.path.exists(INSTALLER):
-        raise SystemExit(f"installer '{INSTALLER}' does not exist")
+        dir = os.path.dirname(INSTALLER)
+
+        raise SystemExit(f"installer '{INSTALLER}' does not exist. Files in dir: '{os.listdir(dir)}'")
 
     try:
         with open(sys.argv[2], "r", encoding="utf-8") as f:
