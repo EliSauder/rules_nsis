@@ -216,11 +216,14 @@ VIAddVersionKey "FileVersion" "${PACKAGE_VERSION}"
   !insertmacro MUI_LANGUAGE "Welsh"
 
 Var StdOutHandle
+Var StdOutAttempted
 
 !macro Log TEXT
     ${IfNot} ${Silent}
         DetailPrint `${TEXT}`
-    ${ElseIf} $StdOutHandle == ""
+    ${EndIf}
+    ${If} $StdOutHandle == "" ${AndIf} $StdOutAttempted == ""
+        StrCpy $StdOutAttempted "Yes"
         System::Call 'kernel32::AttachConsole(i -1)i.r1'
         ${If} $1 != 0
             System::Call 'kernel32::GetStdHandle(i -11)i.r0'
