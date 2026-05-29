@@ -439,20 +439,28 @@ SectionGroupEnd
 #Var RootPath
 
 {{ define "sectionDelete" }}
+!insertmacro Log "Removing section {{.Name}}-{{.DisplayName}}"
 {{- if .Service }}
 !insertmacro Service_Stop "{{ .Name }}" $0
 Sleep 2000
 !insertmacro Service_Delete "{{ .Name }}" $0
 Sleep 2000
 {{- end }}
-{{- with $d := .Directory}}
+
+{{- if .Directory }}
 {{- range .Files }}
-Delete "{{$d}}\{{ .Name }}"
+Delete "{{.Directory}}\{{ .Name }}"
+{{- end}}
+{{- else}}
+{{- range .Files }}
+Delete "{{ .Name }}"
 {{- end}}
 {{- end}}
+
 {{- range .Directories }}
 RMDir /r "{{ .Name }}"
 {{- end}}
+
 {{ end }}
 
 ; ------------------------
