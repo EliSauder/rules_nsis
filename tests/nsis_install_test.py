@@ -169,10 +169,12 @@ def _validate_services(testcase, config, install_root):
         expst = ""
         if val["start_type"] == "auto":
             expst = "automatic"
-        if val["start_type"] == "demand":
+        elif val["start_type"] == "demand":
             expst = "manual"
+        else:
+            expst = val["start_type"]
 
-        testcase.assertEqual(val["start_type"], svc.start_type(), f"Start type {svc.start_type()} not equal expected {val["start_type"]}")
+        testcase.assertEqual(expst, svc.start_type(), f"Start type {svc.start_type()} not equal expected {expst}")
 
         testcase.assertEqual(val["description"], svc.description(), f"Description {svc.description()} not equal expected {val["description"]}")
 
