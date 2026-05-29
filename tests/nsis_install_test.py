@@ -171,11 +171,16 @@ def _get_installer_cmd(installer, install_root, config):
     ]
     return cmd
 
-def _validate_removed_files(testcase, config, install_root):
-    if os.path.exists(install_root):
-        testcase.fail("Install directory still exists")
+def _validate_removed_files(testcase: unittest.TestCase, config, install_root):
+    testcase.assertFalse(os.path.exists(path), f"Install directory: '{install_root}' exists after install.")
+    for path in expected_files:
+        if not os.path.isabs(path):
+            continue
 
-def _validate_files(testcase, config, install_root):
+        testcase.assertFalse(os.path.exists(path), f"File: '{path}' exists after uninstall")
+
+
+def _validate_files(testcase: unittest.TestCase, config, install_root):
     expected_files = config.get("expected_files", [])
     expected_files.append("Uninstall.exe")
     for path in expected_files:
