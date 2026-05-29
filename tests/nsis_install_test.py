@@ -14,22 +14,25 @@ from python.runfiles import runfiles
 def _print_directory_tree(indir: str) -> str:
     out = indir + os.path.sep + "\n"
     for dir, dirs, files in os.walk(indir):
+        dirrel = os.path.relpath(dir, inder)
+        if len(dirrel) != 0:
+            out = out + direl + os.path.sep + "\n"
+
+        lvl = dirrel.count(os.sep)
+        idnt = ' ' * 4 * (lvl+1)
+
         for d in dirs:
-            pt = os.path.relpath(d, dir)
-            lvl = pt.count(os.sep)
-            idnt = ' ' * 4 * (lvl+1)
             out = out + "{}{}{}\n".format(idnt, os.path.basename(pt), os.path.sep)
             subindent = ' ' * 4 * (lvl + 2)
             for f in files:
                 out = out + '{}{}\n'.format(subindent, f)
+
         if len(dirs) == 0:
             pt = os.path.relpath(dir, indir)
             lvl = pt.count(os.sep)
             idnt = ' ' * 4 * (lvl+1)
             for f in files:
                 out = out + '{}{}\n'.format(idnt, f)
-
-
 
     return out
 
