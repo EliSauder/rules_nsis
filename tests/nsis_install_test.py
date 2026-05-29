@@ -79,6 +79,33 @@ def _reg_value(root: int, path: str, view: int, name: str):
         value, value_type = winreg.QueryValueEx(hkey, name)
         return value, value_type
 
+def _validate_removed_reg(testcase: unittest.TestCase, config: dict, inst_root: str, inst_subpath: str):
+    exlvl = (config["expected_execution_level"] or "admin")
+    root = _get_reg_db(exlvl)
+
+    instdir = f"{inst_root}"
+
+    inpath, unpath = _get_reg_path(inst_subpath)
+    access = _get_reg_access(config["expected_bitwidth"] or "64")
+
+    try:
+        key = _reg_open(root, inpath, access)
+        try:
+            key.Close()
+        except:
+            pass
+        testcase.fail(f"Registry key {inpath} still exists")
+    except:
+        pass
+    try:
+        key = _reg_open(root, unpath, access)
+        try:
+            key.Close()
+        except:
+            pass
+        testcase.fail(f"Registry key {inpath} still exists")
+    except:
+        pass
 
 def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, inst_subpath: str):
     exlvl = (config["expected_execution_level"] or "admin")
@@ -127,6 +154,13 @@ def _get_install_subpath(config):
     )
     return subpath
 
+def _get_uninstaller_cmd(install_root):
+    cmd = [
+        os.path.join(install_root, "Uninstall.exe"),
+        "/S"
+    ]
+    return cmd
+
 def _get_installer_cmd(installer, install_root, config):
     installer_args = list(config.get("installer_args", []))
     cmd = [
@@ -136,6 +170,10 @@ def _get_installer_cmd(installer, install_root, config):
         f"/D={install_root}"
     ]
     return cmd
+
+def _validate_removed_files(testcase, config, install_root):
+    if os.path.exists(install_root):
+        testcase.fail("Install directory still exists")
 
 def _validate_files(testcase, config, install_root):
     expected_files = config.get("expected_files", [])
@@ -148,6 +186,17 @@ def _validate_files(testcase, config, install_root):
         fs = [x.as_uri() for x in dir.iterdir() if x.is_file()]
 
         testcase.assertTrue(os.path.exists(path), f"Expected file missing: {path}. Found: {fs}")
+
+def _validate_removed_services(testcase, config, install_root):
+    expected_services = config.get("expected_services", {})
+
+    for key, val in expected_services.items():
+        try:
+            svc = psutil.win_service_get(key)
+            testcase.fail(f"Windows service {key}, still exists")
+        except:
+            continue
+
 
 def _validate_services(testcase, config, install_root):
     expected_services = config.get("expected_services", {})
@@ -178,21 +227,7 @@ def _validate_services(testcase, config, install_root):
 
         testcase.assertEqual(val["description"], svc.description(), f"Description '{svc.description()}' not equal expected '{val["description"]}'")
 
-
-class NsisInstallerTest(unittest.TestCase):
-    def test_installer(self) -> None:
-
-        installer = INSTALLER
-        config = CONFIG
-
-        exp_inst_name = config.get("expected_installer_name", "")
-        bn = os.path.basename(installer)
-        self.assertEqual(exp_inst_name, bn,
-            f"Installer {bn} does not match expected name {exp_inst_name}",
-        )
-
-        install_root = _get_install_root()
-        install_subpath = _get_install_subpath(config)
+def _validate_install(unittest, install_root, install_subpath, config, installer):
         installer_cmd = _get_installer_cmd(installer, install_root, config)
 
         proc = subprocess.run(
@@ -209,9 +244,49 @@ class NsisInstallerTest(unittest.TestCase):
         log.debug("nsis stdout=%r", proc.stdout)
         log.debug("nsis stderr=%r", proc.stderr)
 
-        _validate_files(self, config, install_root)
-        _validate_reg(self, config, install_root, install_subpath)
-        _validate_services(self, config, install_root)
+        _validate_files(unittest, config, install_root)
+        _validate_reg(unittest, config, install_root, install_subpath)
+        _validate_services(unittest, config, install_root)
+
+def _validate_uninstall(unittest, install_root, install_subpath, config):
+        uninstaller_cmd = _get_uninstaller_cmd(install_root)
+
+        proc = subprocess.run(
+            installer_cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False
+        )
+
+        self.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+
+        log = logging.getLogger("NsisInstallerTest.test_installer")
+        log.debug("nsis stdout=%r", proc.stdout)
+        log.debug("nsis stderr=%r", proc.stderr)
+
+        _validate_removed_files(unittest, config, install_root)
+        _validate_removed_reg(unittest, config, install_root, install_subpath)
+        _validate_removed_services(unittest, config, install_root)
+
+
+class NsisInstallerTest(unittest.TestCase):
+    def test_installer(self) -> None:
+
+        installer = INSTALLER
+        config = CONFIG
+
+        exp_inst_name = config.get("expected_installer_name", "")
+        bn = os.path.basename(installer)
+        self.assertEqual(exp_inst_name, bn,
+            f"Installer {bn} does not match expected name {exp_inst_name}",
+        )
+
+        install_root = _get_install_root()
+        install_subpath = _get_install_subpath(config)
+
+        _validate_install(self, install_root, install_subpath, config, installer)
+        _validate_uninstall(self, install_root, install_subpath, config)
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
