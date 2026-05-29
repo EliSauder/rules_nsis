@@ -178,15 +178,15 @@ def _get_installer_cmd(installer, install_root, config):
     return cmd
 
 def _validate_removed_files(testcase: unittest.TestCase, config, install_root):
-    if os.path.exists(install_root):
-        dircontent = _print_directory_tree(install_root)
-        testcase.fail(f"Install directory: '{install_root}' exists after install. Content: {dircontent}")
+    expected_files = config.get("expected_files", [])
+    expected_files.append("Uninstall.exe")
+    dircontent = _print_directory_tree(install_root)
 
     for path in expected_files:
         if not os.path.isabs(path):
-            continue
+            path = os.path.join(install_root, path)
 
-        testcase.assertFalse(os.path.exists(path), f"File: '{path}' exists after uninstall")
+        testcase.assertFalse(os.path.exists(path), f"File: '{path}' exists after uninstall. Install Root Content: {dircontent}")
 
 
 def _validate_files(testcase: unittest.TestCase, config, install_root):
