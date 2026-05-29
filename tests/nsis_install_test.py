@@ -227,7 +227,7 @@ def _validate_services(testcase, config, install_root):
 
         testcase.assertEqual(val["description"], svc.description(), f"Description '{svc.description()}' not equal expected '{val["description"]}'")
 
-def _validate_install(unittest, install_root, install_subpath, config, installer):
+def _validate_install(testcase, install_root, install_subpath, config, installer):
         installer_cmd = _get_installer_cmd(installer, install_root, config)
 
         proc = subprocess.run(
@@ -238,7 +238,7 @@ def _validate_install(unittest, install_root, install_subpath, config, installer
             check=False
         )
 
-        self.assertEqual(0, proc.returncode, f"Installer failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+        testcase.assertEqual(0, proc.returncode, f"Installer failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
         log = logging.getLogger("NsisInstallerTest.test_installer")
         log.debug("nsis stdout=%r", proc.stdout)
@@ -248,7 +248,7 @@ def _validate_install(unittest, install_root, install_subpath, config, installer
         _validate_reg(unittest, config, install_root, install_subpath)
         _validate_services(unittest, config, install_root)
 
-def _validate_uninstall(unittest, install_root, install_subpath, config):
+def _validate_uninstall(testcase, install_root, install_subpath, config):
         uninstaller_cmd = _get_uninstaller_cmd(install_root)
 
         proc = subprocess.run(
@@ -259,7 +259,7 @@ def _validate_uninstall(unittest, install_root, install_subpath, config):
             check=False
         )
 
-        self.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+        testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
         log = logging.getLogger("NsisInstallerTest.test_installer")
         log.debug("nsis stdout=%r", proc.stdout)
