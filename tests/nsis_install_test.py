@@ -249,9 +249,9 @@ def _validate_install(testcase, install_root, install_subpath, config, installer
         log.debug("nsis stdout=%r", proc.stdout)
         log.debug("nsis stderr=%r", proc.stderr)
 
-        _validate_files(unittest, config, install_root)
-        _validate_reg(unittest, config, install_root, install_subpath)
-        _validate_services(unittest, config, install_root)
+        _validate_files(testcase, config, install_root)
+        _validate_reg(testcase, config, install_root, install_subpath)
+        _validate_services(testcase, config, install_root)
 
 def _validate_uninstall(testcase, install_root, install_subpath, config):
         uninstaller_cmd = _get_uninstaller_cmd(install_root)
@@ -270,9 +270,9 @@ def _validate_uninstall(testcase, install_root, install_subpath, config):
         log.debug("nsis stdout=%r", proc.stdout)
         log.debug("nsis stderr=%r", proc.stderr)
 
-        _validate_removed_files(unittest, config, install_root)
-        _validate_removed_reg(unittest, config, install_root, install_subpath)
-        _validate_removed_services(unittest, config, install_root)
+        _validate_removed_files(testcase, config, install_root)
+        _validate_removed_reg(testcase, config, install_root, install_subpath)
+        _validate_removed_services(testcase, config, install_root)
 
 
 class NsisInstallerTest(unittest.TestCase):
