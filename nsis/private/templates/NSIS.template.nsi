@@ -468,6 +468,7 @@ Sleep 2000
 
 {{- with $d := .Directory }}
 {{- range .Files }}
+SetFileAttributes "$INSTDIR\{{$d}}\{{ .Name }}" NORMAL
 Delete "$INSTDIR\{{$d}}\{{ .Name }}"
 {{- end}}
 {{- range .Directories }}
@@ -477,6 +478,7 @@ RMDir /r "$INSTDIR\{{$d}}\{{.}}"
 RMDir "$INSTDIR\{{$d}}"
 {{- else}}
 {{- range .Files }}
+SetFileAttributes "$INSTDIR\{{ .Name }}" NORMAL
 Delete "$INSTDIR\{{ .Name }}"
 {{- end}}
 {{- range .Directories }}
@@ -655,6 +657,7 @@ Section "Uninstall"
   !insertmacro RemoveComponents
 
   ;Remove the uninstaller itself.
+  SetFileAttributes "$INSTDIR\${UNINSTALLER_NAME}" NORMAL
   Delete "$INSTDIR\${UNINSTALLER_NAME}"
   DeleteRegKey SHCTX "${UN_REG_KEY}"
 
