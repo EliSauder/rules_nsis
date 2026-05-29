@@ -16,7 +16,7 @@ def _print_directory_tree(indir: str) -> str:
     for dir, dirs, files in os.walk(indir):
         dirrel = os.path.relpath(dir, indir)
         if len(dirrel) != 0:
-            out = out + direl + os.path.sep + "\n"
+            out = out + dirrel + os.path.sep + "\n"
 
         lvl = dirrel.count(os.sep)
         idnt = ' ' * 4 * (lvl+1)
