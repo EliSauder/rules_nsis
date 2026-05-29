@@ -11,9 +11,9 @@ import logging
 
 from python.runfiles import runfiles
 
-def _print_directory_tree(dir: str) -> str:
+def _print_directory_tree(indir: str) -> str:
     out = ""
-    for dir, dirs, files in os.walk(dir):
+    for dir, dirs, files in os.walk(indir):
         for d in dirs:
             pt = os.path.relpath(d, dir)
             lvl = pt.count(os.sep)
