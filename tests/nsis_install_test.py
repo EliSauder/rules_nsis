@@ -9,16 +9,20 @@ import unittest
 import winreg
 import logging
 
+def _print_directory_tree(dir: str): str
+    out = ""
+    for dir, dirs, files in os.walk(dir):
+        for d in dirs:
+            pt = os.path.relpath(d, dir)
+            lvl = pt.count(os.sep)
+            idnt = ' ' * 4 * (lvl)
+            out.join("{}{}/".format(idnt, os.path.basename(pt)))
+            subindent = ' ' * 4 * (lvl + 1)
+            for f in files:
+                out.join('{}{}'.format(subindent, f))
+
 print("cwd=", os.getcwd())
-for dir, dirs, files in os.walk(os.getcwd()):
-    for d in dirs:
-        pt = os.path.relpath(d, dir)
-        lvl = pt.count(os.sep)
-        idnt = ' ' * 4 * (lvl)
-        print("{}{}/".format(idnt, os.path.basename(pt)))
-        subindent = ' ' * 4 * (lvl + 1)
-        for f in files:
-            print('{}{}'.format(subindent, f))
+print("dircontent=", _print_directory_tree(os.getcwd()))
 
 from python.runfiles import runfiles
 
@@ -172,7 +176,10 @@ def _get_installer_cmd(installer, install_root, config):
     return cmd
 
 def _validate_removed_files(testcase: unittest.TestCase, config, install_root):
-    testcase.assertFalse(os.path.exists(install_root), f"Install directory: '{install_root}' exists after install.")
+    if os.path.exists(install_root):
+        dircontent = _print_directory_tree(install_root)
+        testcase.fail(f"Install directory: '{install_root}' exists after install. Content: {dircontent}")
+
     for path in expected_files:
         if not os.path.isabs(path):
             continue
@@ -249,9 +256,12 @@ def _validate_install(testcase, install_root, install_subpath, config, installer
         log.debug("nsis stdout=%r", proc.stdout)
         log.debug("nsis stderr=%r", proc.stderr)
 
-        _validate_files(testcase, config, install_root)
-        _validate_reg(testcase, config, install_root, install_subpath)
-        _validate_services(testcase, config, install_root)
+        with testcase.subTest(msg="Validate Installed Files"):
+            _validate_files(testcase, config, install_root)
+        with testcase.subTest(msg="Validate Installed Registry Keys"):
+            _validate_reg(testcase, config, install_root, install_subpath)
+        with testcase.subTest(msg="Validate Installed Services"):
+            _validate_services(testcase, config, install_root)
 
 def _validate_uninstall(testcase, install_root, install_subpath, config):
         uninstaller_cmd = _get_uninstaller_cmd(install_root)
@@ -267,12 +277,15 @@ def _validate_uninstall(testcase, install_root, install_subpath, config):
         testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {uninstaller_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
         log = logging.getLogger("NsisInstallerTest.test_installer")
-        log.debug("nsis stdout=%r", proc.stdout)
-        log.debug("nsis stderr=%r", proc.stderr)
+        log.debug("nsis uninstall stdout=%r", proc.stdout)
+        log.debug("nsis uninstall stderr=%r", proc.stderr)
 
-        _validate_removed_files(testcase, config, install_root)
-        _validate_removed_reg(testcase, config, install_root, install_subpath)
-        _validate_removed_services(testcase, config, install_root)
+        with testcase.subTest(msg="Validate Removed Files"):
+            _validate_removed_files(testcase, config, install_root)
+        with testcase.subTest(msg="Validate Removed Registry Keys"):
+            _validate_removed_reg(testcase, config, install_root, install_subpath)
+        with testcase.subTest(msg="Validate Removed Services"):
+            _validate_removed_services(testcase, config, install_root)
 
 
 class NsisInstallerTest(unittest.TestCase):
@@ -283,9 +296,10 @@ class NsisInstallerTest(unittest.TestCase):
 
         exp_inst_name = config.get("expected_installer_name", "")
         bn = os.path.basename(installer)
-        self.assertEqual(exp_inst_name, bn,
-            f"Installer {bn} does not match expected name {exp_inst_name}",
-        )
+        self.subTest(msg="Validate Installer Name"):
+            self.assertEqual(exp_inst_name, bn,
+                f"Installer {bn} does not match expected name {exp_inst_name}",
+            )
 
         install_root = _get_install_root()
         install_subpath = _get_install_subpath(config)
