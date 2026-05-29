@@ -9,7 +9,9 @@ import unittest
 import winreg
 import logging
 
-def _print_directory_tree(dir: str): str
+from python.runfiles import runfiles
+
+def _print_directory_tree(dir: str) -> str:
     out = ""
     for dir, dirs, files in os.walk(dir):
         for d in dirs:
@@ -21,10 +23,10 @@ def _print_directory_tree(dir: str): str
             for f in files:
                 out.join('{}{}'.format(subindent, f))
 
+    return out
+
 print("cwd=", os.getcwd())
 print("dircontent=", _print_directory_tree(os.getcwd()))
-
-from python.runfiles import runfiles
 
 RUNFILES = runfiles.Create()
 if RUNFILES == None:
@@ -218,7 +220,7 @@ def _validate_services(testcase, config, install_root):
 
         testcase.assertEqual(key, svc.name(), f"Unexpected name {svc.name()}, expected {key}. WTF How did this happen?")
 
-        testcase.assertEqual(val["display_name"], svc.display_name(), f"Display name '{svc.display_name()}' does not equal expected '{val["display_name"]}'")
+        testcase.assertEqual(val["display_name"], svc.display_name(), f"Display name '{svc.display_name()}' does not equal expected '{val['display_name']}'")
 
         exe = os.path.join(install_root, val["executable"])
         for arg in list(val["args"]):
@@ -237,7 +239,7 @@ def _validate_services(testcase, config, install_root):
 
         testcase.assertEqual(expst, svc.start_type(), f"Start type {svc.start_type()} not equal expected {expst}")
 
-        testcase.assertEqual(val["description"], svc.description(), f"Description '{svc.description()}' not equal expected '{val["description"]}'")
+        testcase.assertEqual(val["description"], svc.description(), f"Description '{svc.description()}' not equal expected '{val['description']}'")
 
 def _validate_install(testcase, install_root, install_subpath, config, installer):
         installer_cmd = _get_installer_cmd(installer, install_root, config)
@@ -296,7 +298,7 @@ class NsisInstallerTest(unittest.TestCase):
 
         exp_inst_name = config.get("expected_installer_name", "")
         bn = os.path.basename(installer)
-        self.subTest(msg="Validate Installer Name"):
+        with self.subTest(msg="Validate Installer Name"):
             self.assertEqual(exp_inst_name, bn,
                 f"Installer {bn} does not match expected name {exp_inst_name}",
             )
