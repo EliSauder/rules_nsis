@@ -222,7 +222,8 @@ Var StdOutAttempted
     ${IfNot} ${Silent}
         DetailPrint `${TEXT}`
     ${EndIf}
-    ${If} $StdOutHandle == "" ${AndIf} $StdOutAttempted == ""
+    ${If} $StdOutHandle == ""
+    ${AndIf} $StdOutAttempted == ""
         StrCpy $StdOutAttempted "Yes"
         System::Call 'kernel32::AttachConsole(i -1)i.r1'
         ${If} $1 != 0
