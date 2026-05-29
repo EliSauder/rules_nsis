@@ -166,6 +166,12 @@ def _validate_services(testcase, config, install_root):
         bin = svc.binpath().strip()
         testcase.assertEqual(exe, bin, f"Executable '{bin}' not equal expected '{exe}'")
 
+        expst = ""
+        if val["start_type"] == "auto":
+            expst = "automatic"
+        if val["start_type"] == "demand":
+            expst = "manual"
+
         testcase.assertEqual(val["start_type"], svc.start_type(), f"Start type {svc.start_type()} not equal expected {val["start_type"]}")
 
         testcase.assertEqual(val["description"], svc.description(), f"Description {svc.description()} not equal expected {val["description"]}")
