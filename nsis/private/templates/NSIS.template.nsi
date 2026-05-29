@@ -630,8 +630,6 @@ Section "Uninstall"
   Delete "$INSTDIR\Uninstall.exe"
   DeleteRegKey SHCTX "${UN_REG_KEY}"
 
-  RMDir /r "$INSTDIR"
-
   ; Remove the registry entries.
   DeleteRegKey SHCTX "${REG_KEY}"
   DeleteRegKey /ifempty SHCTX "${REG_KEY}"
