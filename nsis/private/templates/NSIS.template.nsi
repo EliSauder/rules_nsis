@@ -36,6 +36,8 @@ Unicode True
 !define OUTFILE_NAME "{{ (ds "in").Outfile }}"
 !endif
 
+!define UNINSTALLER_NAME "Uninstall.exe"
+
 {{- if (ds "in").Icon }}
 !define ICON_FILE "{{ (ds "in").Icon }}"
 {{- else}}
@@ -462,20 +464,23 @@ Sleep 2000
 Sleep 2000
 {{- end }}
 
-{{- if .Directory }}
+{{- with $d := .Directory }}
 {{- range .Files }}
-Delete "{{.Directory}}\{{ .Name }}"
+Delete "$INSTDIR\{{$d}}\{{ .Name }}"
 {{- end}}
+{{- range .Directories }}
+RMDir /r "$INSTDIR\{{$d}}\{{.}}"
+{{- end}}
+
+RMDir "$INSTDIR\{{$d}}"
 {{- else}}
 {{- range .Files }}
-Delete "{{ .Name }}"
+Delete "$INSTDIR\{{ .Name }}"
 {{- end}}
-{{- end}}
-
 {{- range .Directories }}
-RMDir /r "{{ .Name }}"
+RMDir /r "$INSTDIR\{{ . }}"
 {{- end}}
-
+{{- end}}
 {{ end }}
 
 ; ------------------------
@@ -546,7 +551,7 @@ Section "-Core Installation"
 
     WriteRegStr SHCTX "${REG_KEY}" "InstallDir" "$INSTDIR"
     WriteRegStr SHCTX "${REG_KEY}" "Version" "${PACKAGE_VERSION}"
-    WriteUninstaller "$INSTDIR\Uninstall.exe"
+    WriteUninstaller "$INSTDIR\${UNINSTALLER_NAME}"
 
     Push "DisplayName"
     Push "${PACKAGE_NAME}"
@@ -558,7 +563,7 @@ Section "-Core Installation"
     Push "${PACKAGE_VENDOR}"
     Call AddToRegistry
     Push "UninstallString"
-    Push "$INSTDIR\Uninstall.exe"
+    Push "$INSTDIR\${UNINSTALLER_NAME}"
     Call AddToRegistry
     Push "NoRepair"
     Push "1"
@@ -636,8 +641,11 @@ Section "Uninstall"
   !insertmacro RemoveComponents
 
   ;Remove the uninstaller itself.
-  Delete "$INSTDIR\Uninstall.exe"
+  Delete "$INSTDIR\${UNINSTALLER_NAME}"
   DeleteRegKey SHCTX "${UN_REG_KEY}"
+
+  ; Remove if empty
+  RMDir "$INSTDIR"
 
   ; Remove the registry entries.
   DeleteRegKey SHCTX "${REG_KEY}"
