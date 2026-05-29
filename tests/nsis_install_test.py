@@ -1,4 +1,5 @@
 import os
+import time
 import psutil
 import json
 import pathlib
@@ -186,17 +187,16 @@ def _get_installer_cmd(installer, install_root, config):
     ]
     return cmd
 
-def _validate_removed_files(testcase: unittest.TestCase, config, install_root):
+def _validate_removed_files(testcase: unittest.TestCase, config: dict, install_root: str):
     expected_files = config.get("expected_files", [])
     expected_files.append("Uninstall.exe")
     dircontent = _print_directory_tree(install_root)
-    lstfiles = os.listdir(install_root)
 
     for path in expected_files:
         if not os.path.isabs(path):
             path = os.path.join(install_root, path)
 
-        testcase.assertFalse(os.path.exists(path), f"File: '{path}' exists after uninstall. Install Root Content: \n{dircontent}\nFiles In Root:\n{lstfiles}")
+        testcase.assertFalse(os.path.exists(path), f"File: '{path}' exists after uninstall. Install Root Content: \n{dircontent}")
 
 
 def _validate_files(testcase: unittest.TestCase, config, install_root):
@@ -252,52 +252,54 @@ def _validate_services(testcase, config, install_root):
         testcase.assertEqual(val["description"], svc.description(), f"Description '{svc.description()}' not equal expected '{val['description']}'")
 
 def _validate_install(testcase, install_root, install_subpath, config, installer):
-        installer_cmd = _get_installer_cmd(installer, install_root, config)
+    installer_cmd = _get_installer_cmd(installer, install_root, config)
 
-        proc = subprocess.run(
-            installer_cmd,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            check=False
-        )
+    proc = subprocess.run(
+        installer_cmd,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False
+    )
 
-        testcase.assertEqual(0, proc.returncode, f"Installer failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+    testcase.assertEqual(0, proc.returncode, f"Installer failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
-        log = logging.getLogger("NsisInstallerTest.test_installer")
-        log.debug("nsis stdout=%r", proc.stdout)
-        log.debug("nsis stderr=%r", proc.stderr)
+    log = logging.getLogger("NsisInstallerTest.test_installer")
+    log.debug("nsis stdout=%r", proc.stdout)
+    log.debug("nsis stderr=%r", proc.stderr)
 
-        with testcase.subTest(msg="Validate Installed Files"):
-            _validate_files(testcase, config, install_root)
-        with testcase.subTest(msg="Validate Installed Registry Keys"):
-            _validate_reg(testcase, config, install_root, install_subpath)
-        with testcase.subTest(msg="Validate Installed Services"):
-            _validate_services(testcase, config, install_root)
+    with testcase.subTest(msg="Validate Installed Files"):
+        _validate_files(testcase, config, install_root)
+    with testcase.subTest(msg="Validate Installed Registry Keys"):
+        _validate_reg(testcase, config, install_root, install_subpath)
+    with testcase.subTest(msg="Validate Installed Services"):
+        _validate_services(testcase, config, install_root)
 
 def _validate_uninstall(testcase, install_root, install_subpath, config):
-        uninstaller_cmd = _get_uninstaller_cmd(install_root)
+    uninstaller_cmd = _get_uninstaller_cmd(install_root)
 
-        proc = subprocess.run(
-            uninstaller_cmd,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            check=False
-        )
+    proc = subprocess.run(
+        uninstaller_cmd,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False
+    )
 
-        testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {uninstaller_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+    time.sleep(5)
 
-        log = logging.getLogger("NsisInstallerTest.test_installer")
-        log.debug("nsis uninstall stdout=%r", proc.stdout)
-        log.debug("nsis uninstall stderr=%r", proc.stderr)
+    testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {uninstaller_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
-        with testcase.subTest(msg="Validate Removed Files"):
-            _validate_removed_files(testcase, config, install_root)
-        with testcase.subTest(msg="Validate Removed Registry Keys"):
-            _validate_removed_reg(testcase, config, install_root, install_subpath)
-        with testcase.subTest(msg="Validate Removed Services"):
-            _validate_removed_services(testcase, config, install_root)
+    log = logging.getLogger("NsisInstallerTest.test_installer")
+    log.debug("nsis uninstall stdout=%r", proc.stdout)
+    log.debug("nsis uninstall stderr=%r", proc.stderr)
+
+    with testcase.subTest(msg="Validate Removed Files"):
+        _validate_removed_files(testcase, config, install_root)
+    with testcase.subTest(msg="Validate Removed Registry Keys"):
+        _validate_removed_reg(testcase, config, install_root, install_subpath)
+    with testcase.subTest(msg="Validate Removed Services"):
+        _validate_removed_services(testcase, config, install_root)
 
 
 class NsisInstallerTest(unittest.TestCase):
