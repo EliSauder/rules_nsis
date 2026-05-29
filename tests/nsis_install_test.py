@@ -14,7 +14,7 @@ from python.runfiles import runfiles
 def _print_directory_tree(indir: str) -> str:
     out = indir + os.path.sep + "\n"
     for dir, dirs, files in os.walk(indir):
-        dirrel = os.path.relpath(dir, inder)
+        dirrel = os.path.relpath(dir, indir)
         if len(dirrel) != 0:
             out = out + direl + os.path.sep + "\n"
 
