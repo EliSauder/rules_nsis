@@ -12,13 +12,13 @@ import logging
 from python.runfiles import runfiles
 
 def _print_directory_tree(indir: str) -> str:
-    out = indir + "/\n"
+    out = indir + os.path.sep + "\n"
     for dir, dirs, files in os.walk(indir):
         for d in dirs:
             pt = os.path.relpath(d, dir)
             lvl = pt.count(os.sep)
             idnt = ' ' * 4 * (lvl+1)
-            out = out + "{}{}/\n".format(idnt, os.path.basename(pt))
+            out = out + "{}{}{}\n".format(idnt, os.path.basename(pt), os.path.sep)
             subindent = ' ' * 4 * (lvl + 2)
             for f in files:
                 out = out + '{}{}\n'.format(subindent, f)
@@ -181,12 +181,13 @@ def _validate_removed_files(testcase: unittest.TestCase, config, install_root):
     expected_files = config.get("expected_files", [])
     expected_files.append("Uninstall.exe")
     dircontent = _print_directory_tree(install_root)
+    lstfiles = os.listdir(install_root)
 
     for path in expected_files:
         if not os.path.isabs(path):
             path = os.path.join(install_root, path)
 
-        testcase.assertFalse(os.path.exists(path), f"File: '{path}' exists after uninstall. Install Root Content: {dircontent}")
+        testcase.assertFalse(os.path.exists(path), f"File: '{path}' exists after uninstall. Install Root Content: \n{dircontent}\nFiles In Root:\n{lstfiles}")
 
 
 def _validate_files(testcase: unittest.TestCase, config, install_root):
