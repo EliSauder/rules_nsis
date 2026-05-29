@@ -18,10 +18,10 @@ def _print_directory_tree(indir: str) -> str:
             pt = os.path.relpath(d, dir)
             lvl = pt.count(os.sep)
             idnt = ' ' * 4 * (lvl)
-            out.join("{}{}/".format(idnt, os.path.basename(pt)))
+            out = out + "{}{}/\n".format(idnt, os.path.basename(pt))
             subindent = ' ' * 4 * (lvl + 1)
             for f in files:
-                out.join('{}{}'.format(subindent, f))
+                out = out + '{}{}\n'.format(subindent, f)
 
     return out
 
