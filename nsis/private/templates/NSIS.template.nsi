@@ -244,12 +244,7 @@ Var StdOutAttempted
 Var Is64BitInstall
 Var IsArmInstall
 
-Function .onInit
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
-        SetShellVarContext all
-    ${Else}
-        SetShellVarContext current
-    ${EndIf}
+!macro SetRegView
 {{- if eq (ds "in").Architecture "x86_64" }}
     ${IfNot} ${IsNativeAMD64}
         !insertmacro Log "Not AMD64, Aborting"
@@ -314,7 +309,9 @@ Function .onInit
         StrCpy $IsArmInstall "0"
     ${EndIf}
 {{- end }}
+!macroend
 
+!macro ValidateMutex
     System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_NAME}InstallerMutex") i .r1 ?e'
     Pop $R0
     ${If} $R0 != 0
@@ -322,6 +319,20 @@ Function .onInit
         !insertmacro Log "Another instance is already running, aborting"
         Abort
     ${EndIf}
+!macroend
+
+!macro SetVarCtx
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
+    ${EndIf}
+!macroend
+
+Function .onInit
+    !insertmacro SetVarCtx
+    !insertmacro SetRegView
+    !insertmacro ValidateMutex
 FunctionEnd
 
 #Function CheckPreviousInstall
@@ -585,11 +596,9 @@ SectionEnd
 #FunctionEnd
 
 Function un.onInit
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
-        SetShellVarContext all
-    ${Else}
-        SetShellVarContext current
-    ${EndIf}
+    !insertmacro SetVarCtx
+    !insertmacro SetRegView
+    !insertmacro ValidateMutex
 FunctionEnd
 
 # TODO: HANDLE DEPENDENCIES
