@@ -198,6 +198,9 @@ def _validate_removed_files(testcase: unittest.TestCase, config: dict, install_r
 
         testcase.assertFalse(os.path.exists(path), f"File: '{path}' exists after uninstall. Install Root Content: \n{dircontent}")
 
+    if os.path.exists(install_root):
+        testcase.fail(f"Install root directory left over {install_root}")
+
 
 def _validate_files(testcase: unittest.TestCase, config, install_root):
     expected_files = config.get("expected_files", [])
