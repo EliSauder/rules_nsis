@@ -51,11 +51,6 @@ def nsis_installer_test(
         cmd = "printf '%s\\n' {} > \"$@\"".format(
             shell.quote(json.encode(test_config).replace("\\", "\\\\")),
         ),
-#        cmd = """
-#cat > "$@" << 'EOF'
-#{}
-#EOF
-#""".format(shell.quote(json.encode(test_config))),
     )
 
     py_test(
