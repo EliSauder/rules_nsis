@@ -12,14 +12,14 @@ import logging
 from python.runfiles import runfiles
 
 def _print_directory_tree(indir: str) -> str:
-    out = ""
+    out = indir + "/\n"
     for dir, dirs, files in os.walk(indir):
         for d in dirs:
             pt = os.path.relpath(d, dir)
             lvl = pt.count(os.sep)
-            idnt = ' ' * 4 * (lvl)
+            idnt = ' ' * 4 * (lvl+1)
             out = out + "{}{}/\n".format(idnt, os.path.basename(pt))
-            subindent = ' ' * 4 * (lvl + 1)
+            subindent = ' ' * 4 * (lvl + 2)
             for f in files:
                 out = out + '{}{}\n'.format(subindent, f)
 
