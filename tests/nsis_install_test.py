@@ -257,14 +257,14 @@ def _validate_uninstall(testcase, install_root, install_subpath, config):
         uninstaller_cmd = _get_uninstaller_cmd(install_root)
 
         proc = subprocess.run(
-            installer_cmd,
+            uninstaller_cmd,
             capture_output=True,
             text=True,
             timeout=120,
             check=False
         )
 
-        testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+        testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {uninstaller_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
         log = logging.getLogger("NsisInstallerTest.test_installer")
         log.debug("nsis stdout=%r", proc.stdout)
