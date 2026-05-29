@@ -57,6 +57,8 @@ Unicode True
 !define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_PATH}"
 !define REG_KEY "Software\${PACKAGE_PATH}"
 
+!define REG_KEY_INSTLOC "InstallDir"
+
 Name "${PACKAGE_NAME}"
 OutFile "${OUTFILE_NAME}"
 InstallDir "${INSTALL_ROOT}\${PACKAGE_PATH}"
@@ -68,10 +70,10 @@ RequestExecutionLevel admin
 {{- end }}
 
 {{- if ne (ds "in").ExecutionLevel "admin"}}
-InstallDirRegKey HKCU "${REG_KEY}" "InstallDir"
+InstallDirRegKey HKCU "${REG_KEY}" "${REG_KEY_INSTLOC}"
 !define IS_ADMIN_EXECUTION_LEVEL 0
 {{- else }}
-InstallDirRegKey HKLM "${REG_KEY}" "InstallDir"
+InstallDirRegKey HKLM "${REG_KEY}" "${REG_KEY_INSTLOC}"
 !define IS_ADMIN_EXECUTION_LEVEL 1
 {{- end}}
 
@@ -549,7 +551,7 @@ Section "-Core Installation"
 
     SetOutPath "$INSTDIR"
 
-    WriteRegStr SHCTX "${REG_KEY}" "InstallDir" "$INSTDIR"
+    WriteRegStr SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}" "$INSTDIR"
     WriteRegStr SHCTX "${REG_KEY}" "Version" "${PACKAGE_VERSION}"
     WriteUninstaller "$INSTDIR\${UNINSTALLER_NAME}"
 
@@ -604,6 +606,18 @@ Function un.onInit
     !insertmacro SetVarCtx
     !insertmacro SetRegView
     !insertmacro ValidateMutex
+
+    Push $R0
+    ReadRegStr $R0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
+    ${If} ${Errors}
+    ${OrIf} $R0 == ""
+        MessageBox MB_ICONSTOP "No previous install exists." /SD IDOK
+        Abort
+    ${EndIf}
+
+    StrCpy $INSTDIR "$R0"
+
+    Pop $R0
 FunctionEnd
 
 # TODO: HANDLE DEPENDENCIES
