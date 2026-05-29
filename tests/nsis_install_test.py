@@ -176,7 +176,7 @@ def _validate_services(testcase, config, install_root):
 
         testcase.assertEqual(expst, svc.start_type(), f"Start type {svc.start_type()} not equal expected {expst}")
 
-        testcase.assertEqual(val["description"], svc.description(), f"Description {svc.description()} not equal expected {val["description"]}")
+        testcase.assertEqual(val["description"], svc.description(), f"Description '{svc.description()}' not equal expected '{val["description"]}'")
 
 
 class NsisInstallerTest(unittest.TestCase):
