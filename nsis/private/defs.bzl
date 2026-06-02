@@ -3,6 +3,13 @@ load("//nsis/private:transitions.bzl", "windows_source_transition")
 
 _NSIS_TOOLCHAIN_TYPE = "//nsis/toolchain:toolchain_type"
 
+_EDGE_PARENT_KEY = "parent"
+_EDGE_CHILD_KEY = "child"
+
+_COMPONENTS_KEY = "Components"
+_COMPONENT_GROUPS_KEY = "ComponentGroups"
+
+
 toolchains = [
     "//nsis/toolchain:toolchain_type"
 ]
@@ -118,10 +125,10 @@ def _nsis_component_group_impl(ctx):
 
     for dep in ctx.attr.components:
         if NsisComponentInfo in dep:
-            edges.append({"parent": {NsisComponentGroupInfo: cmpgrp}, "child": dep})
+            edges.append({_EDGE_PARENT_KEY: {NsisComponentGroupInfo: cmpgrp}, _EDGE_CHILD_KEY: dep})
         elif NsisComponentGroupInfo in dep:
             grp = dep[NsisComponentGroupInfo]
-            edges.append({"parent": {NsisComponentGroupInfo: cmpgrp}, "child": dep})
+            edges.append({_EDGE_PARENT_KEY: {NsisComponentGroupInfo: cmpgrp}, _EDGE_CHILD_KEY: dep})
             edges = edges + grp.components
 
     return cmpgrp
@@ -391,7 +398,7 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
     edges = []
 
     for dep in inst_ctx.attr.components:
-        edges.append({"parent": None, "child": dep})
+        edges.append({_EDGE_PARENT_KEY: None, _EDGE_CHILD_KEY: dep})
         if NsisComponentInfo in dep:
             cmp = dep[NsisComponentInfo]
             verticies[cmp.name] = dep
@@ -408,8 +415,8 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
     next_stack = []
 
     for cmp in edges:
-        child = cmp["child"]
-        parent = cmp["parent"]
+        child = cmp[_EDGE_CHILD_KEY]
+        parent = cmp[_EDGE_PARENT_KEY]
 
         child_name = ""
         if NsisComponentInfo in child:
@@ -464,8 +471,8 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
                 inst_cat,
             )
 
-            gdata["ComponentGroups"] = next_groups
-            gdata["Component"] = next_components
+            gdata[_COMPONENT_GROUPS_KEY] = next_groups
+            gdata[_COMPONENTS_KEY] = next_components
             current_groups_data.append(gdata)
         elif NsisComponentInfo in v:
             current_components_data.append(
@@ -539,8 +546,8 @@ def _get_installer_ds(ctx, toolchain):
             else None
         ),
         "Outfile": str(ctx.attr.outfile),
-        "Components": [],
-        "ComponentGroups": [],
+        _COMPONENTS_KEY: [],
+        _COMPONENT_GROUPS_KEY: [],
     }
 
     return data
@@ -556,8 +563,8 @@ def _get_group_ds(toolchain, group, inst_cat):
         "Description": str(group.description),
         "Expanded": bool(group.expanded),
         "Bold": bool(group.expanded),
-        "Components": [],
-        "ComponentGroups": [],
+        _COMPONENTS_KEY: [],
+        _COMPONENT_GROUPS_KEY: [],
     }
 
 def _get_component_ds(toolchain, component, inst_cat):
@@ -622,8 +629,8 @@ def _build_data_structure(ctx, toolchain):
 
     cmps, grps = _build_recursive_structure(ctx, toolchain, inst_cat)
 
-    inst_data["Components"] = cmps
-    inst_data["ComponentGroups"] = grps
+    inst_data[_COMPONENTS_KEY] = cmps
+    inst_data[_COMPONENT_GROUPS_KEY] = grps
 
     return inst_data
 
@@ -645,7 +652,7 @@ def _all_files_component_list(lst):
 def _all_files_group(group):
     fs = depset()
     for d in group.components:
-        child = d["child"]
+        child = d[_EDGE_CHILD_KEY]
 
         if NsisComponentInfo in child:
             cmp = child[NsisComponentInfo]
