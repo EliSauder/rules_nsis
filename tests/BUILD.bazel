@@ -135,6 +135,65 @@ nsis_installer_test(
     expected_product_path = "Minimal Installer Dir",
 )
 
+nsis_component(
+    name = "ssc_with_group_and_dir_component",
+    directory = "Component",
+    service = True,
+    service_executable = "//tests/testdata:README.md",
+    service_start_type = "auto",
+    selection_mode = "required",
+    display_name = "README Service GrpDir",
+    description = "README Service Description",
+    install_categories = ["Full", "Typical", "Minimal"],
+    srcs = [":nsis_files"],
+)
+
+nsis_component_group(
+    name = "ssc_with_group_and_dir_group",
+    components = [
+        ":ssc_with_group_and_dir_component"
+    ],
+)
+
+nsis_installer(
+    name = "ssc_with_group_and_dir",
+    product = "Single Service Installer GrpDir",
+    product_path = "SSI",
+    vendor = "Company Department",
+    vendor_path = "Company\\Department",
+    description = "Description",
+    version = "0.0.0.1",
+    execution_level = "admin",
+    components = [
+        ":ssc_with_group_and_dir_group",
+    ],
+    install_categories = [
+        "Full",
+        "Typical",
+        "Minimal",
+    ],
+)
+
+nsis_installer_test(
+    name = "ssc_with_group_and_dir_test",
+    installer = ":ssc_with_group_and_dir",
+    expected_installer_name = "Single Service Installer GrpDir Setup.exe",
+    expected_files = [
+        "Component\\README.md",
+    ],
+    expected_product_path = "SSI",
+    expected_vendor_path = "Company\\Department",
+    expected_services = {
+        "single_service_component": {
+            "start_type": "auto",
+            "display_name": "Company Department Single Service Installer GrpDir README Service",
+            "description": "README Service Description",
+            "executable": "Component\\README.md",
+            "args": [],
+        },
+    },
+)
+
 #nsis_component_group(
 #    name = "nsis_group",
 #    description = "",
