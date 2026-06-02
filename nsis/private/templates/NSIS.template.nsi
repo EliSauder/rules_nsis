@@ -435,7 +435,7 @@ InstType "{{.}}"
 {{- end }}
 
 {{define "sectionGroupDelete"}}
-{{- range .SubGroups }}
+{{- range .ComponentGroups }}
     {{ template "sectionGroupDelete" . }}
 {{- end}}
 {{- range .Components }}
@@ -444,12 +444,11 @@ InstType "{{.}}"
 {{ end }}
 
 {{define "sectionGroup"}}
-SectionGroup {{if .Expanded}}"/e"{{end}}"{{if .IsBold}}!{{end}}{{.DisplayName}}" "{{.Name}}"
-    !insertmacro Log "Entering Section Group {{.Name}}-{{.DisplayName}}"
+SectionGroup {{if .Expanded}}"/e"{{end}}"{{if .Bold}}!{{end}}{{.DisplayName}}" "{{.Name}}"
 {{- range .Components }}
     {{ template "section" . }}
 {{- end }}
-{{- range .SubGroups }}
+{{- range .ComponentGroups }}
     {{ template "sectionGroup" . }}
 {{- end}}
 SectionGroupEnd
@@ -467,11 +466,11 @@ Sleep 2000
 {{- end }}
 
 {{- with $d := .Directory }}
-{{- range .Files }}
-SetFileAttributes "$INSTDIR\{{$d}}\{{ .Name }}" NORMAL
-Delete "$INSTDIR\{{$d}}\{{ .Name }}"
+{{- range $.Files }}
+SetFileAttributes "$INSTDIR\{{$d}}\{{ $.Name }}" NORMAL
+Delete "$INSTDIR\{{$d}}\{{ $.Name }}"
 {{- end}}
-{{- range .Directories }}
+{{- range $.Directories }}
 RMDir /r "$INSTDIR\{{$d}}\{{.}}"
 {{- end}}
 
