@@ -184,7 +184,7 @@ nsis_installer_test(
     expected_product_path = "SSI",
     expected_vendor_path = "Company\\Department",
     expected_services = {
-        "single_service_component": {
+        "ssc_with_group_and_dir_component": {
             "start_type": "auto",
             "display_name": "Company Department Single Service Installer GrpDir README Service",
             "description": "README Service Description",
