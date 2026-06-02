@@ -105,14 +105,27 @@ def _nsis_define(args_style, key, value = None):
     return prefix + key + "=" + _quote_nsi_string(value)
 
 def _nsis_component_group_impl(ctx):
-    return NsisComponentGroupInfo(
+    edges=[]
+
+    cmpgrp = NsisComponentGroupInfo(
         name = str(ctx.label.name),
         description = str(ctx.attr.description),
         bold = bool(ctx.attr.bold),
         expanded = bool(ctx.attr.expanded),
         display_name = str(ctx.attr.display_name),
-        components = ctx.attr.components,
+        components = edges
     )
+
+    for dep in ctx.attr.components:
+        if NsisComponentInfo in dep:
+            edges.append({"parent": {NsisComponentGroupInfo: cmpgrp}, "child": dep})
+        elif NsisComponentGroupInfo in dep:
+            grp = dep[NsisComponentGroupInfo]
+            edges.append({"parent": {NsisComponentGroupInfo: cmpgrp}, "child": dep})
+            edges = edges + grp.components
+
+    return cmpgrp
+
 
 nsis_component_group = rule(
     implementation = _nsis_component_group_impl,
@@ -378,28 +391,82 @@ def _build_data_structure_component_group(toolchain, group, inst_cat):
     if dispname == None or len(dispname.strip()) == 0:
         dispname = _name_to_displayname(group.name)
 
-    data = {
-        "Name": str(group.name),
-        "DisplayName": str(dispname),
-        "Description": str(group.description),
-        "Expanded": bool(group.expanded),
-        "Bold": bool(group.expanded),
-        "Components": [],
-        "ComponentGroups": [],
-    }
+    verticies = {}
+    edges = group.components
+    edges_map = {}
 
+    for cmp in edges:
+        child = cmp["child"]
+        parent = cmp["parent"]
 
-    for dep in group.components:
-        if NsisComponentInfo in dep:
-            cmp = dep[NsisComponentInfo]
-            data["Components"].append(_build_data_structure_component(toolchain, cmp, inst_cat))
-        elif NsisComponentGroupInfo in dep:
-            grp = dep[NsisComponentGroupInfo]
-            data["ComponentGroups"].append(_build_data_structure_component_group(toolchain, grp, inst_cat))
+        child_name = ""
+        if NsisComponentInfo in child:
+            child_name = child[NsisComponentInfo].name
+        elif NsisComponentGroupInfo in child:
+            child_name = child[NsisComponentGroupInfo].name
         else:
-            fail("provided dependency is not a component or a component group.")
+            fail("invalid component target")
+        verticies[child_name] = child
 
-    return data
+        parent_name = ""
+        if NsisComponentInfo in parent:
+            parent_name = parent[NsisComponentInfo].name
+        elif NsisComponentGroupInfo in parent:
+            parent_name = parent[NsisComponentGroupInfo].name
+        else:
+            fail("invalid component target")
+        verticies[parent_name] = parent
+
+        if parent_name in edges_map:
+            edges_map[parent_name].add(child_name)
+        else:
+            edges_map[parent_name] = set([child_name])
+
+    n_edges = len(group.components)
+    n_vert = len(verticies)
+
+    data_components = []
+    data_groups = []
+
+    path_stack = []
+    next_stack = [(group.name, data_components, data_groups)]
+
+    for i in range(n_edges * n_vert):
+        if len(next_stack) == 0:
+            break
+
+        current, current_components_data, current_groups_data = next_stack.pop()
+
+        path_stack.append(current)
+        v = verticies[current]
+        es = edges_map[current] if current in edges_map else {}
+
+        next_components = []
+        next_groups = []
+
+        if NsisComponentGroupInfo in v:
+            current_groups_data.append({
+                "Name": str(group.name),
+                "DisplayName": str(dispname),
+                "Description": str(group.description),
+                "Expanded": bool(group.expanded),
+                "Bold": bool(group.expanded),
+                "Components": next_components,
+                "ComponentGroups": next_groups,
+            })
+        elif NsisComponentInfo in v:
+            current_components_data.append(
+                _build_data_structure_component(
+                    toolchain,
+                    v[NsisComponentInfo],
+                    inst_cat,
+                ),
+            )
+
+        for e in es:
+            next_stack.append((e, next_components, next_groups))
+
+    return (data_components, data_groups)
 
 def _disabled_by_default(mode):
     if mode == "optional":
@@ -526,7 +593,9 @@ def _build_data_structure(ctx, toolchain):
             data["Components"].append(_build_data_structure_component(toolchain, cmp, inst_cat))
         elif NsisComponentGroupInfo in dep:
             grp = dep[NsisComponentGroupInfo]
-            data["ComponentGroups"].append(_build_data_structure_component_group(toolchain, grp, inst_cat))
+            cmps, grps = _build_data_structure_component_group(toolchain, grp, inst_cat)
+            data["ComponentGroups"].extend(grps)
+            data["Components"].extend(cmps)
         else:
             fail("provided dependency is not a component or a component group.")
 
@@ -548,7 +617,19 @@ def _all_files_component_list(lst):
 
 
 def _all_files_group(group):
-    return _all_files_component_list(group.components)
+    fs = depset()
+    for d in group.components:
+        child = d["child"]
+
+        if NsisComponentInfo in child:
+            cmp = child[NsisComponentInfo]
+            fs = depset(transitive = [_all_files_component(cmp), fs])
+        elif NsisComponentGroupInfo in child:
+            continue
+        else:
+            fail("provided dep is not a component or a group")
+
+    return fs
 
 def _all_files_component(cmp):
     srcs = depset()
@@ -569,7 +650,6 @@ def _all_files_component(cmp):
     )
     return srcs
 
-
 def _all_files(ctx):
     srcs = depset(
         direct = [x for x in [
@@ -580,7 +660,12 @@ def _all_files(ctx):
         ] if x != None],
     )
 
-    srcs = depset(transitive = [_all_files_component_list(ctx.attr.components), srcs])
+    srcs = depset(
+        transitive = [
+            _all_files_component_list(ctx.attr.components),
+            srcs,
+        ],
+    )
 
     return srcs
 
