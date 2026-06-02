@@ -465,10 +465,11 @@ Sleep 2000
 Sleep 2000
 {{- end }}
 
-{{- with $d := .Directory }}
-{{- range $.Files }}
-SetFileAttributes "$INSTDIR\{{$d}}\{{ $.Name }}" NORMAL
-Delete "$INSTDIR\{{$d}}\{{ $.Name }}"
+{{- if .Directory }}
+{{- $d := .Directory }}
+{{- range .Files }}
+SetFileAttributes "$INSTDIR\{{$d}}\{{ .Name }}" NORMAL
+Delete "$INSTDIR\{{$d}}\{{ .Name }}"
 {{- end}}
 {{- range $.Directories }}
 RMDir /r "$INSTDIR\{{$d}}\{{.}}"
