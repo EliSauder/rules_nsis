@@ -88,6 +88,53 @@ nsis_installer_test(
     },
 )
 
+nsis_component_group(
+    name = "minimal_group",
+    components = [
+        ":minimal_component"
+    ],
+)
+
+nsis_installer(
+    name = "minimal_installer_with_group",
+    components = [":minimal_group"],
+    product = "Minimal Installer Group",
+    product_path = "Minimal Installer Group",
+)
+
+nsis_installer_test(
+    name = "minimal_installer_with_group_test",
+    installer = ":minimal_installer_with_group",
+    expected_installer_name = "Minimal Installer Group Setup.exe",
+    expected_files = [
+        "README.md",
+    ],
+    expected_product_path = "Minimal Installer Group",
+)
+
+nsis_component(
+    name = "minimal_component_with_dir",
+    directory = "Component",
+    srcs = [":nsis_files"],
+)
+
+nsis_installer(
+    name = "minimal_installer_with_dir",
+    components = [":minimal_component_with_dir"],
+    product = "Minimal Installer Dir",
+    product_path = "Minimal Installer Dir",
+)
+
+nsis_installer_test(
+    name = "minimal_installer_with_dir_test",
+    installer = ":minimal_installer_with_dir",
+    expected_installer_name = "Minimal Installer Dir Setup.exe",
+    expected_files = [
+        "Component\\README.md",
+    ],
+    expected_product_path = "Minimal Installer Dir",
+)
+
 #nsis_component_group(
 #    name = "nsis_group",
 #    description = "",
