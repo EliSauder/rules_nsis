@@ -386,14 +386,26 @@ def _name_to_displayname(val):
     return fin
 
 
-def _build_data_structure_component_group(toolchain, group, inst_cat):
-    dispname = group.display_name
-    if dispname == None or len(dispname.strip()) == 0:
-        dispname = _name_to_displayname(group.name)
-
+def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
     verticies = {}
-    edges = group.components
+    edges = []
+
+    for dep in inst_ctx.attr.components:
+        edges.append({"parent": None, "child": dep})
+        if NsisComponentInfo in dep:
+            cmp = dep[NsisComponentInfo]
+            verticies[cmp.name] = dep
+        elif NsisComponentGroupInfo in dep:
+            grp = dep[NsisComponentGroupInfo]
+            edges = edges + grp.components
+        else:
+            fail("invalid providers")
+
+
     edges_map = {}
+    data_components = []
+    data_groups = []
+    next_stack = []
 
     for cmp in edges:
         child = cmp["child"]
@@ -407,6 +419,11 @@ def _build_data_structure_component_group(toolchain, group, inst_cat):
         else:
             fail("invalid component target")
         verticies[child_name] = child
+
+        if parent == None:
+            next_stack.append((child_name, data_components, data_groups))
+            edges_map[child_name] = set()
+            continue
 
         parent_name = ""
         if NsisComponentInfo in parent:
@@ -422,14 +439,10 @@ def _build_data_structure_component_group(toolchain, group, inst_cat):
         else:
             edges_map[parent_name] = set([child_name])
 
-    n_edges = len(group.components)
+    n_edges = len(edges)
     n_vert = len(verticies)
 
-    data_components = []
-    data_groups = []
-
     path_stack = []
-    next_stack = [(group.name, data_components, data_groups)]
 
     for i in range(n_edges * n_vert):
         if len(next_stack) == 0:
@@ -445,18 +458,18 @@ def _build_data_structure_component_group(toolchain, group, inst_cat):
         next_groups = []
 
         if NsisComponentGroupInfo in v:
-            current_groups_data.append({
-                "Name": str(group.name),
-                "DisplayName": str(dispname),
-                "Description": str(group.description),
-                "Expanded": bool(group.expanded),
-                "Bold": bool(group.expanded),
-                "Components": next_components,
-                "ComponentGroups": next_groups,
-            })
+            gdata = _get_group_ds(
+                toolchain,
+                v[NsisComponentGroupInfo],
+                inst_cat,
+            )
+
+            gdata["ComponentGroups"] = next_groups
+            gdata["Component"] = next_components
+            current_groups_data.append(gdata)
         elif NsisComponentInfo in v:
             current_components_data.append(
-                _build_data_structure_component(
+                _get_component_ds(
                     toolchain,
                     v[NsisComponentInfo],
                     inst_cat,
@@ -483,7 +496,71 @@ def _hidden(mode):
         return True
     return False
 
-def _build_data_structure_component(toolchain, component, inst_cat):
+def _get_installer_ds(ctx, toolchain):
+    data = {
+        "Name": str(ctx.attr.name),
+        "Product": str(ctx.attr.product),
+        "ProductPath": str(_always_make_win_path(ctx.attr.product_path)),
+        "Vendor": str(ctx.attr.vendor),
+        "VendorPath": str(_always_make_win_path(_vendor_path(ctx))),
+        "Description": str(ctx.attr.description),
+        "Copyright": str(ctx.attr.copyright),
+        "LicenseFile": (
+            str(_make_win_path(toolchain, ctx.attr.license_file.path))
+            if ctx.attr.license_file != None
+            else None
+        ),
+        "Version": str(ctx.attr.version),
+        "Architecture": str(ctx.attr.arch),
+        "ArchitectureIs64": (
+            True
+            if str(ctx.attr.arch) == "x86_64" or str(ctx.attr.arch) == "arm64"
+            else False
+        ),
+        "InstallRoot": str(_always_make_win_path(ctx.attr.install_root)),
+        "InstallPath": str(_always_make_win_path(ctx.attr.install_path)),
+        "ExecutionLevel": str(ctx.attr.execution_level),
+        "InstallTypes": [str(x) for x in ctx.attr.install_categories],
+        "Compressor": str(ctx.attr.compressor),
+        "CompressorDictSize": int(ctx.attr.compressor_dictsize),
+        "Icon": (
+            str(_make_win_path(toolchain, ctx.attr.icon.path))
+            if ctx.attr.icon != None
+            else None
+        ),
+        "HeaderImage": (
+            str(_make_win_path(toolchain, ctx.attr.header_image.path))
+            if ctx.attr.header_image != None
+            else None
+        ),
+        "MenuImage": (
+            str(_make_win_path(toolchain, ctx.attr.menu_image.path))
+            if ctx.attr.menu_image != None
+            else None
+        ),
+        "Outfile": str(ctx.attr.outfile),
+        "Components": [],
+        "ComponentGroups": [],
+    }
+
+    return data
+
+def _get_group_ds(toolchain, group, inst_cat):
+    dispname = group.display_name
+    if dispname == None or len(dispname.strip()) == 0:
+        dispname = _name_to_displayname(group.name)
+
+    return {
+        "Name": str(group.name),
+        "DisplayName": str(dispname),
+        "Description": str(group.description),
+        "Expanded": bool(group.expanded),
+        "Bold": bool(group.expanded),
+        "Components": [],
+        "ComponentGroups": [],
+    }
+
+def _get_component_ds(toolchain, component, inst_cat):
     dispname = component.display_name
     if dispname == None or len(dispname.strip()) == 0:
         dispname = _name_to_displayname(component.name)
@@ -539,67 +616,16 @@ def _vendor_path(ctx):
     return ctx.attr.vendor_path
 
 def _build_data_structure(ctx, toolchain):
-    data = {
-        "Name": str(ctx.attr.name),
-        "Product": str(ctx.attr.product),
-        "ProductPath": str(_always_make_win_path(ctx.attr.product_path)),
-        "Vendor": str(ctx.attr.vendor),
-        "VendorPath": str(_always_make_win_path(_vendor_path(ctx))),
-        "Description": str(ctx.attr.description),
-        "Copyright": str(ctx.attr.copyright),
-        "LicenseFile": (
-            str(_make_win_path(toolchain, ctx.attr.license_file.path))
-            if ctx.attr.license_file != None
-            else None
-        ),
-        "Version": str(ctx.attr.version),
-        "Architecture": str(ctx.attr.arch),
-        "ArchitectureIs64": (
-            True
-            if str(ctx.attr.arch) == "x86_64" or str(ctx.attr.arch) == "arm64"
-            else False
-        ),
-        "InstallRoot": str(_always_make_win_path(ctx.attr.install_root)),
-        "InstallPath": str(_always_make_win_path(ctx.attr.install_path)),
-        "ExecutionLevel": str(ctx.attr.execution_level),
-        "InstallTypes": [str(x) for x in ctx.attr.install_categories],
-        "Compressor": str(ctx.attr.compressor),
-        "CompressorDictSize": int(ctx.attr.compressor_dictsize),
-        "Icon": (
-            str(_make_win_path(toolchain, ctx.attr.icon.path))
-            if ctx.attr.icon != None
-            else None
-        ),
-        "HeaderImage": (
-            str(_make_win_path(toolchain, ctx.attr.header_image.path))
-            if ctx.attr.header_image != None
-            else None
-        ),
-        "MenuImage": (
-            str(_make_win_path(toolchain, ctx.attr.menu_image.path))
-            if ctx.attr.menu_image != None
-            else None
-        ),
-        "Outfile": str(ctx.attr.outfile),
-        "Components": [],
-        "ComponentGroups": [],
-    }
 
+    inst_data = _get_installer_ds(ctx, toolchain)
     inst_cat = ctx.attr.install_categories
 
-    for dep in ctx.attr.components:
-        if NsisComponentInfo in dep:
-            cmp = dep[NsisComponentInfo]
-            data["Components"].append(_build_data_structure_component(toolchain, cmp, inst_cat))
-        elif NsisComponentGroupInfo in dep:
-            grp = dep[NsisComponentGroupInfo]
-            cmps, grps = _build_data_structure_component_group(toolchain, grp, inst_cat)
-            data["ComponentGroups"].extend(grps)
-            data["Components"].extend(cmps)
-        else:
-            fail("provided dependency is not a component or a component group.")
+    cmps, grps = _build_recursive_structure(ctx, toolchain, inst_cat)
 
-    return data
+    inst_data["Components"] = cmps
+    inst_data["ComponentGroups"] = grps
+
+    return inst_data
 
 def _all_files_component_list(lst):
     srcs = depset()
