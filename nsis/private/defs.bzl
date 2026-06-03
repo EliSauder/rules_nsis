@@ -320,8 +320,6 @@ def _makensis(ctx, toolchain, script, options_file, inputs):
         fail("script can not be None")
     if options_file == None:
         fail("options file can not be None")
-    if inputs == None or None in inputs.to_list():
-        fail("inputs can not be None")
 
     outfile = _get_outfile(ctx)
     args = _make_nsis_args(ctx, toolchain, outfile)
@@ -635,34 +633,34 @@ def _build_data_structure(ctx, toolchain):
     return inst_data
 
 def _all_files_component_list(lst):
-    srcs = depset()
+    transitive = []
     for dep in lst:
         if NsisComponentInfo in dep:
             cmp = dep[NsisComponentInfo]
-            srcs = depset(transitive = [_all_files_component(cmp), srcs])
+            transitive.append(_all_files_component(cmp))
         elif NsisComponentGroupInfo in dep:
             grp = dep[NsisComponentGroupInfo]
-            srcs = depset(transitive = [_all_files_group(grp), srcs])
+            transitive.append(_all_files_group(grp))
         else:
             fail("provided dependency is not a component or a component group.")
 
-    return srcs
+    return depset(transitive = transitive)
 
 
 def _all_files_group(group):
-    fs = depset()
+    transitive = []
     for d in group.components:
         child = d[_EDGE_CHILD_KEY]
 
         if NsisComponentInfo in child:
             cmp = child[NsisComponentInfo]
-            fs = depset(transitive = [_all_files_component(cmp), fs])
+            transitive.append(_all_files_component(cmp))
         elif NsisComponentGroupInfo in child:
             continue
         else:
             fail("provided dep is not a component or a group")
 
-    return fs
+    return depset(transitive = transitive)
 
 def _all_files_component(cmp):
     srcs = depset()
