@@ -17,6 +17,8 @@ bzl_library(
     srcs = ["extensions.bzl"],
     visibility = ["//visibility:public"],
     deps = [
+        "@bazel_tools//tools/build_defs/repo:cache.bzl",
+        "@bazel_tools//tools/build_defs/repo:utils.bzl",
         "@bazel_tools//tools/build_defs/repo:http.bzl",
         "//nsis/private:extensions.bzl",
         "//nsis/private:dirrule.bzl",

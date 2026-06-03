@@ -11,6 +11,14 @@ stardoc_with_diff_test(
     ]
 )
 
+stardoc_with_diff_test(
+    name = "extensions",
+    bzl_library_target = "//nsis:extensions",
+    symbol_names = [
+        "nsis",
+    ]
+)
+
 #stardoc_with_diff_test(
 #    name = "nsis_extensions",
 #    input = "//nsis:extensions.bzl",
