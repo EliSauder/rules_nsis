@@ -18,3 +18,8 @@ Aims to support creating a NSIS installer through bazel; inspired by CPack.
 [ ] Dependency Based Selections (option exits but does nothing)
 [ ] Update Path \[Help Wanted]
 [ ] Set Environment Variables \[Help Wanted]
+
+## Rulesets
+
+[defs](docs/defs.md)
+[extensions](docs/extensions.md)
