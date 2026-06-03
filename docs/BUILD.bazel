@@ -19,6 +19,14 @@ stardoc_with_diff_test(
     ]
 )
 
+stardoc_with_diff_test(
+    name = "toolchain",
+    bzl_library_target = "//nsis:toolchain",
+    symbol_names = [
+        "nsis_toolchain",
+    ]
+)
+
 #stardoc_with_diff_test(
 #    name = "nsis_extensions",
 #    input = "//nsis:extensions.bzl",
