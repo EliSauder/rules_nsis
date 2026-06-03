@@ -1,0 +1,1 @@
+load("@stardoc//stardoc:stardoc.bzl", "stardoc")

@@ -64,7 +64,7 @@ def nsis_installer_test(
         ],
         target_compatible_with = ["@platforms//os:windows"],
         timeout = "short",
-        visibility = ["//visibility:public"],
+        visibility = ["//visibility:private"],
         deps = [
             "@pypi_dev//psutil",
             "@rules_python//python/runfiles",

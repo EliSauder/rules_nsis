@@ -2,6 +2,8 @@ load("//tests:defs.bzl", "nsis_installer_test")
 load("//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 
+package(default_visibility = ["//visibility:private"])
+
 compile_pip_requirements(
     name = "requirements",
     src = "requirements.txt",
