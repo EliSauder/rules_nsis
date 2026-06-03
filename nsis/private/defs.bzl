@@ -8,6 +8,7 @@ _EDGE_CHILD_KEY = "child"
 _COMPONENTS_KEY = "Components"
 _COMPONENT_GROUPS_KEY = "ComponentGroups"
 
+_COMPONENT_DEPS_KEY = "ComponentDependencies"
 
 toolchains = [
     "//nsis/toolchain:toolchain_type"
@@ -122,12 +123,12 @@ def _nsis_component_group_impl(ctx):
         components = edges
     )
 
-    for dep in ctx.attr.components:
-        if NsisComponentInfo in dep:
-            edges.append({_EDGE_PARENT_KEY: {NsisComponentGroupInfo: cmpgrp}, _EDGE_CHILD_KEY: dep})
-        elif NsisComponentGroupInfo in dep:
-            grp = dep[NsisComponentGroupInfo]
-            edges.append({_EDGE_PARENT_KEY: {NsisComponentGroupInfo: cmpgrp}, _EDGE_CHILD_KEY: dep})
+    for child in ctx.attr.components:
+        if NsisComponentInfo in child:
+            edges.append({_EDGE_PARENT_KEY: {NsisComponentGroupInfo: cmpgrp}, _EDGE_CHILD_KEY: child})
+        elif NsisComponentGroupInfo in child:
+            grp = child[NsisComponentGroupInfo]
+            edges.append({_EDGE_PARENT_KEY: {NsisComponentGroupInfo: cmpgrp}, _EDGE_CHILD_KEY: child})
             edges = edges + grp.components
 
     return cmpgrp
@@ -389,6 +390,49 @@ def _name_to_displayname(val):
         fin = fin + " " + v
     return fin
 
+def _add_dep_key(deps, rev_deps, source, dest):
+    if source not in deps:
+        deps[source] = set()
+    if dest not in rev_deps:
+        rev_deps[dest] = set()
+
+    deps[source].add(dest)
+    rev_deps[dest].add(source)
+
+def _build_flat_dependency_list(verticies):
+    deps = {}
+    rev_deps = {}
+
+    for key in verticies:
+        v = verticies[key]
+        if NsisComponentInfo not in v:
+            continue
+
+        cc = v[NsisComponentInfo]
+
+        # Add initial A -> B and B -> A mappings for all (A,B) = (component,
+        # dependency)
+        for dep in cc.dependencies:
+            cc_d = dep[NsisComponentInfo]
+            _add_dep_key(deps, rev_deps, cc.name, cc_d.name)
+
+            cc_d = dep[NsisComponentInfo]
+            if cc_d.name not in deps:
+                continue
+
+            for cc_d_d in deps[cc_d.name]:
+                _add_dep_key(deps, rev_deps, cc.name, cc_d_d)
+
+
+        if cc.name not in rev_deps:
+            continue
+
+        for parent in rev_deps[cc.name]:
+            for curr_deps in deps[cc.name]:
+                _add_dep_key(deps, rev_deps, parent, curr_deps)
+
+    return deps, rev_deps
+
 
 def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
     verticies = {}
@@ -443,6 +487,8 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
         else:
             edges_map[parent_name] = set([child_name])
 
+    dep_lst, rev_dep_lst = _build_flat_dependency_list(verticies)
+
     n_edges = len(edges)
     n_vert = len(verticies)
 
@@ -483,7 +529,16 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
         for e in es:
             next_stack.append((e, next_components, next_groups))
 
-    return (data_components, data_groups)
+    return (
+        data_components,
+        data_groups,
+        [{
+            "Component": k,
+            "Dependencies": dep_lst[k] if k in dep_lst else [],
+            "Dependants": rev_dep_lst[k] if k in rev_dep_lst else [],
+        } for k, v in verticies.items() if NsisComponentInfo in v],
+          #[{"Component": k,"Dependencies": v} for k, v in rev_dep_lst.items()],
+    )
 
 def _disabled_by_default(mode):
     if mode == "optional":
@@ -624,10 +679,11 @@ def _build_data_structure(ctx, toolchain):
     inst_data = _get_installer_ds(ctx, toolchain)
     inst_cat = ctx.attr.install_categories
 
-    cmps, grps = _build_recursive_structure(ctx, toolchain, inst_cat)
+    cmps, grps, deps = _build_recursive_structure(ctx, toolchain, inst_cat)
 
     inst_data[_COMPONENTS_KEY] = cmps
     inst_data[_COMPONENT_GROUPS_KEY] = grps
+    inst_data[_COMPONENT_DEPS_KEY] = deps
 
     return inst_data
 

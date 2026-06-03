@@ -5,6 +5,7 @@ Unicode True
 !include LogicLib.nsh
 !include MUI2.nsh
 !include x64.nsh
+!include Sections.nsh
 
 !define IsNativeARM32 '${IsNativeMachineArchitecture} 448'
 
@@ -333,11 +334,43 @@ Var IsArmInstall
     ${EndIf}
 !macroend
 
-Function .onInit
-    !insertmacro SetVarCtx
-    !insertmacro SetRegView
-    !insertmacro ValidateMutex
-FunctionEnd
+{{define "sectionSelChangeVar"}}
+Var SelectRefCnt_{{.Name}}
+Var SelectedExplicit_{{.Name}}
+Var SectionState_{{.Name}}
+{{end}}
+
+{{define "sectionGroupSelChangeVar"}}
+{{- range .Components }}
+{{template "sectionSelChangeVar" .}}
+{{- end}}
+{{end}}
+
+{{- range (ds "in").Components }}
+{{template "sectionSelChangeVar" .}}
+{{- end}}
+{{- range (ds "in").ComponentGroups }}
+{{template "sectionGroupSelChangeVar" .}}
+{{- end }}
+
+{{define "sectionVarInit"}}
+    StrCpy $SelectRefCnt_{{.Name}} "0"
+    StrCpy $SelectedExplicit_{{.Name}} "0"
+
+    SectionGetFlags {{printf "${%v}" .Name}} $R0
+    IntOp $R0 $R0 & ${SF_SELECTED}
+    StrCpy $SectionState_{{.Name}} $R0
+
+    ${If} $R0 == 1
+        StrCpy $SelectedExplicit_{{.Name}} "1"
+    ${EndIf}
+{{end}}
+
+{{define "sectionGroupVarInit"}}
+{{- range .Components }}
+{{template "sectionVarInit" .}}
+{{- end}}
+{{end}}
 
 #Function CheckPreviousInstall
 #  ReadRegStr $R0 HKLM "${REG_KEY}" "InstallDir"
@@ -604,6 +637,21 @@ SectionEnd
 #  !insertmacro MUI_INSTALLOPTIONS_DISPLAY "NSIS(ds "in").InstallOptions.ini"
 #FunctionEnd
 
+Function .onInit
+    !insertmacro SetVarCtx
+    !insertmacro SetRegView
+    !insertmacro ValidateMutex
+
+    {{- range (ds "in").Components }}
+    {{- template "sectionVarInit" .}}
+    {{- end}}
+
+    {{- range (ds "in").ComponentGroups }}
+    {{- template "sectionGroupVarInit" .}}
+    {{- end}}
+FunctionEnd
+
+
 Function un.onInit
     !insertmacro SetVarCtx
     !insertmacro SetRegView
@@ -622,10 +670,42 @@ Function un.onInit
     Pop $R0
 FunctionEnd
 
-# TODO: HANDLE DEPENDENCIES
-#Function .onSelChange
-#  !insertmacro SectionList MaybeSelectionChanged
-#FunctionEnd
+# TODO: Handle deps
+Function .onSelChange
+    {{- range (ds "in").ComponentDependencies }}
+
+    SectionGetFlags {{printf "${%v}" .Component}} $R0
+    IntOp $R0 $R0 & ${SF_SELECTED}
+    ${If} $R0 != $SectionState_{{.Component}}
+        StrCpy $SectionState_{{.Component}} $R0
+        ${If} $R0 == 1
+            StrCpy $SelectedExplicit_{{.Component}} "1"
+            {{- range .Dependencies }}
+            !insertmacro SelectSection {{.}}
+            IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} + 1
+            {{- end}}
+        ${Else}
+            StrCpy $SelectedExplicit_{{.Component}} "0"
+            {{- range .Dependencies }}
+            ${If} $SelectRefCnt_{{.}} != "0"
+                IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} - 1
+                ${If} $SelectedExplicit_{{.}} == "0"
+                    !insertmacro UnselectSection {{.}}
+                    IntOp $SectionState_{{.}} 0 & ${SF_SELECTED}
+                ${EndIf}
+            ${EndIf}
+            {{- end}}
+
+            {{- range .Dependants }}
+            StrCpy $SelectedExplicit_{{.}} "0"
+            StrCpy $SelectRefCnt_{{.}} "0"
+            IntOp $SectionState_{{.}} 0 & ${SF_SELECTED}
+            !insertmacro UnselectSection {{.}}
+            {{- end}}
+        ${EndIf}
+    ${EndIf}
+    {{- end}}
+FunctionEnd
 
 Section "Uninstall"
   ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1

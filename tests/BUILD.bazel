@@ -29,14 +29,48 @@ nsis_installer(
     product_path = "Minimal Installer",
 )
 
+nsis_component(
+    name = "minimal_component_depsA",
+    srcs = [":nsis_files"],
+)
+
+nsis_component(
+    name = "minimal_component_depsB",
+    srcs = [":nsis_files"],
+    dependencies = [
+        ":minimal_component",
+        ":minimal_component_depsA",
+    ],
+)
+
+nsis_component(
+    name = "minimal_component_depsC",
+    srcs = [":nsis_files"],
+    dependencies = [
+        ":minimal_component_depsB",
+    ],
+)
+
+nsis_installer(
+    name = "minimal_installer_deps",
+    components = [
+        ":minimal_component",
+        ":minimal_component_depsA",
+        ":minimal_component_depsB",
+        ":minimal_component_depsC",
+    ],
+    product = "Minimal Installer Deps",
+    product_path = "Minimal Installer Deps",
+)
+
 nsis_installer_test(
-    name = "minimal_installer_test",
-    installer = ":minimal_installer",
-    expected_installer_name = "Minimal Installer Setup.exe",
+    name = "minimal_installer_test_deps",
+    installer = ":minimal_installer_deps",
+    expected_installer_name = "Minimal Installer Deps Setup.exe",
     expected_files = [
         "README.md",
     ],
-    expected_product_path = "Minimal Installer",
+    expected_product_path = "Minimal Installer Deps",
 )
 
 nsis_component(
