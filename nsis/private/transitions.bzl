@@ -1,4 +1,3 @@
-
 def _windows_source_transition_impl(settings, attr):
     if attr.arch == "x86_32":
         return {

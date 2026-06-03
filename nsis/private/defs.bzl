@@ -1,4 +1,3 @@
-load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//nsis/private:transitions.bzl", "windows_source_transition")
 
 _NSIS_TOOLCHAIN_TYPE = "//nsis/toolchain:toolchain_type"

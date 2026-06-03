@@ -1,7 +1,12 @@
 exports_files([
     "extensions.bzl",
     "defs.bzl",
-])
+], ["//visibility:public"])
+
+exports_files([
+    "transitions.bzl",
+    "dirrule.bzl",
+], ["//nsis:__subpackages__"])
 
 platform(
     name = "windows_x64",

@@ -1,1 +1,8 @@
 load("@stardoc//stardoc:stardoc.bzl", "stardoc")
+
+stardoc(
+    name = "nsis_defs",
+    input = "//nsis:defs.bzl",
+    out = "nsis_defs.md",
+    deps = ["//nsis:defs"]
+)
