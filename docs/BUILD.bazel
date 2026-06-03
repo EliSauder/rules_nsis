@@ -1,8 +1,21 @@
 load("@stardoc//stardoc:stardoc.bzl", "stardoc")
+load("@aspect_bazel_lib//lib:docs.bzl", "stardoc_with_diff_test", "update_docs")
 
-stardoc(
-    name = "nsis_defs",
-    input = "//nsis:defs.bzl",
-    out = "nsis_defs.md",
-    deps = ["//nsis:defs"]
+stardoc_with_diff_test(
+    name = "defs",
+    bzl_library_target = "//nsis:defs",
+    symbol_names = [
+        "nsis_installer",
+        "nsis_component",
+        "nsis_component_group",
+    ]
 )
+
+#stardoc_with_diff_test(
+#    name = "nsis_extensions",
+#    input = "//nsis:extensions.bzl",
+#    out = "nsis_extensions.md",
+#    deps = ["//nsis:extensions"]
+#)
+
+update_docs(name = "update_docs")
