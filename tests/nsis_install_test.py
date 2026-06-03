@@ -1,4 +1,5 @@
 import os
+import uuid
 import time
 import psutil
 import json
@@ -152,7 +153,8 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, ins
 
 def _get_install_root():
     test_tmpdir = os.path.abspath(str(os.environ["TEST_TMPDIR"]))
-    install_root = f"{test_tmpdir}\\nsis-install-root"
+    uid = uuid.uuid4().hex
+    install_root = f"{test_tmpdir}\\{uid}\\nsis-install-root"
 
     pth = pathlib.Path(install_root).resolve()
 
