@@ -177,7 +177,7 @@ nsis_installer(
 nsis_installer_test(
     name = "ssc_with_group_and_dir_test",
     installer = ":ssc_with_group_and_dir",
-    expected_installer_name = "Single Service Installer GrpDir Setup.exe",
+    expected_installer_name = "Compnay Department Single Service Installer GrpDir Setup.exe",
     expected_files = [
         "Component\\README.md",
     ],
@@ -186,7 +186,7 @@ nsis_installer_test(
     expected_services = {
         "ssc_with_group_and_dir_component": {
             "start_type": "auto",
-            "display_name": "Company Department Single Service Installer GrpDir README Service",
+            "display_name": "Company Department Single Service Installer GrpDir README Service GrpDir",
             "description": "README Service Description",
             "executable": "Component\\README.md",
             "args": [],
