@@ -1,11 +1,14 @@
-name: test rules
+name: Test Rules
 
 on:
-  pull_request:
   push:
+  pull_request:
 
 jobs:
   windows-bazel-test:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
     concurrency:
       group: ${{ github.workflow }}-windows-${{ github.ref }}
       cancel-in-progress: true
@@ -17,11 +20,14 @@ jobs:
         uses: bazel-contrib/setup-bazel@0.19.0
         with:
           bazelisk-cache: true
-          disk-cache: false
+          disk-cache: true
           repository-cache: true
       - name: test
         run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed --noenable_runfiles
   linux-bazel-test:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: [ubuntu-latest]
     concurrency:
       group: ${{ github.workflow }}-linux-${{ github.ref }}
@@ -38,6 +44,9 @@ jobs:
       - name: test
         run: bazel test //... --verbose_failures --sandbox_debug
   macos-bazel-test:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: [macos-latest]
     concurrency:
       group: ${{ github.workflow }}-macos-${{ github.ref }}

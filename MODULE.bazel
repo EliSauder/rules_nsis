@@ -1,10 +1,10 @@
 module(
     name = "rules_nsis",
+    version = "",
 )
 
-############################
-# SETUP GOLANG
-############################
+bazel_dep(name = "bazel_lib", version = "3.3.1")
+bazel_dep(name = "package_metadata", version = "0.0.10")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "platforms", version = "1.1.0")
 
@@ -59,9 +59,6 @@ filegroup(
 gomplate_repository = use_repo_rule("//nsis/private:gomplate.bzl", "gomplate_repository")
 gomplate_repository(name = "gomplate")
 
-############################
-# REGISTER CUSTOM TOOLCHAINS
-############################
 nsis_test = use_extension("//nsis:extensions.bzl", "nsis", dev_dependency = True)
 nsis_test.executable(
     name = "test_nsis",
@@ -70,8 +67,6 @@ nsis_test.executable(
 use_repo(nsis_test, "test_nsis_tool", "test_nsis_toolchains")
 
 register_toolchains(
-    "@test_nsis_toolchains//:toolchain",
+    "@test_nsis_toolchains//:nsis",
     dev_dependency = True,
 )
-#nsis = use_extension("//nsis:extensions.bzl", "nsis")
-#nsis.executable(name = "nsis", version = "3.11")

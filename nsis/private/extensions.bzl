@@ -132,7 +132,7 @@ def _nsis_toolchains_repo_impl(repository_ctx):
     repository_ctx.file(
         "BUILD.bazel",
         """
-load("@rules_nsis//nsis:toolchains.bzl", "nsis_toolchain")
+load("@rules_nsis//nsis:toolchain.bzl", "nsis_toolchain")
 
 nsis_toolchain(
     name = "nsis_toolchain_impl",
@@ -144,7 +144,7 @@ nsis_toolchain(
 )
 
 toolchain(
-    name = "toolchain",
+    name = "nsis",
     toolchain = ":nsis_toolchain_impl",
     toolchain_type = "@rules_nsis//nsis/toolchain:toolchain_type",
     target_compatible_with = [

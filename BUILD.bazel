@@ -1,8 +1,18 @@
-#load("@gazelle//:def.bzl", "gazelle", "gazelle_test")
-#
-#gazelle(name = "gazelle")
+load("@package_metadata//licenses/rules:license.bzl", "license")
+load("@package_metadata//purl:purl.bzl", "purl")
+load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
 
-#gazelle_test(
-#    name = "gazelle_test",
-#    workspace = "//:BUILD.bazel",  # a file in the workspace root, where the gazelle will be run
-#)
+package_metadata(
+    name = "package_metadata",
+    purl = purl.bazel(
+        module_name(),
+        module_version(),
+    ),
+    visibility = ["//visibility:public"],
+)
+
+license(
+    name = "license",
+    kind = "@package_metadata//licenses/spdx:MIT",
+    text = "LICENSE",
+)

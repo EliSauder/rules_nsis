@@ -2,6 +2,8 @@ load("//tests:defs.bzl", "nsis_installer_test")
 load("//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 
+package(default_visibility = ["//visibility:private"])
+
 compile_pip_requirements(
     name = "requirements",
     src = "requirements.txt",
@@ -18,6 +20,7 @@ filegroup(
 nsis_component(
     name = "minimal_component",
     srcs = [":nsis_files"],
+    selection_mode = "default",
 )
 
 nsis_installer(
@@ -27,14 +30,51 @@ nsis_installer(
     product_path = "Minimal Installer",
 )
 
+nsis_component(
+    name = "minimal_component_depsA",
+    srcs = [":nsis_files"],
+    selection_mode = "optional",
+)
+
+nsis_component(
+    name = "minimal_component_depsB",
+    srcs = [":nsis_files"],
+    dependencies = [
+        ":minimal_component",
+        ":minimal_component_depsA",
+    ],
+    selection_mode = "optional",
+)
+
+nsis_component(
+    name = "minimal_component_depsC",
+    srcs = [":nsis_files"],
+    dependencies = [
+        ":minimal_component_depsB",
+    ],
+    selection_mode = "optional",
+)
+
+nsis_installer(
+    name = "minimal_installer_deps",
+    components = [
+        ":minimal_component",
+        ":minimal_component_depsA",
+        ":minimal_component_depsB",
+        ":minimal_component_depsC",
+    ],
+    product = "Minimal Installer Deps",
+    product_path = "Minimal Installer Deps",
+)
+
 nsis_installer_test(
-    name = "minimal_installer_test",
-    installer = ":minimal_installer",
-    expected_installer_name = "Minimal Installer Setup.exe",
+    name = "minimal_installer_test_deps",
+    installer = ":minimal_installer_deps",
+    expected_installer_name = "Minimal Installer Deps Setup.exe",
     expected_files = [
         "README.md",
     ],
-    expected_product_path = "Minimal Installer",
+    expected_product_path = "Minimal Installer Deps",
 )
 
 nsis_component(

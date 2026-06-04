@@ -5,6 +5,7 @@ Unicode True
 !include LogicLib.nsh
 !include MUI2.nsh
 !include x64.nsh
+!include Sections.nsh
 
 !define IsNativeARM32 '${IsNativeMachineArchitecture} 448'
 
@@ -116,10 +117,9 @@ VIAddVersionKey "FileVersion" "${PACKAGE_VERSION}"
 #Var Dialog
 #Var StartMenuCheckbox
 #Var StartMenuCheckboxState
+#Var CreateShortcuts
 #
-#Page custom InstallOptionsPage
-#
-#Function InstallOptionsPage
+#Function InstallOptionsPageCreate
 #    nsDialogs::Create 1018
 #    Pop $Dialog
 #    ${If} $Dialog == error
@@ -129,9 +129,14 @@ VIAddVersionKey "FileVersion" "${PACKAGE_VERSION}"
 #    ${NSD_CreateCheckbox} 0 30u 100% 10u "&Create Start Menu Entries"
 #    Pop $StartMenuCheckbox
 #
-#    ${NSD_SetState} $StartMenuCheckboxState
+#    ${NSD_Checked} $StartMenuCheckbox
+#    ${NSD_GetState} $StartMenuCheckbox $StartMenuCheckboxState
 #
 #    nsDialogs::Show
+#FunctionEnd
+#
+#Function InstallOptionsPageLeave
+#    ${NSD_GetState} $StartMenuCheckbox $StartMenuCheckboxState
 #FunctionEnd
 
 !insertmacro MUI_PAGE_DIRECTORY
@@ -142,6 +147,8 @@ VIAddVersionKey "FileVersion" "${PACKAGE_VERSION}"
 #!insertmacro MUI_PAGE_STARTMENU Application $StartMenuFolder
 
 !insertmacro MUI_PAGE_COMPONENTS
+
+#Page custom InstallOptionsPageCreate InstallOptionsPageLeave
 
 !insertmacro MUI_PAGE_INSTFILES
 
@@ -333,11 +340,43 @@ Var IsArmInstall
     ${EndIf}
 !macroend
 
-Function .onInit
-    !insertmacro SetVarCtx
-    !insertmacro SetRegView
-    !insertmacro ValidateMutex
-FunctionEnd
+{{define "sectionSelChangeVar"}}
+Var SelectRefCnt_{{.Name}}
+Var SelectedExplicit_{{.Name}}
+Var SectionSelected_{{.Name}}
+{{end}}
+
+{{define "sectionGroupSelChangeVar"}}
+{{- range .Components }}
+{{template "sectionSelChangeVar" .}}
+{{- end}}
+{{end}}
+
+{{- range (ds "in").Components }}
+{{template "sectionSelChangeVar" .}}
+{{- end}}
+{{- range (ds "in").ComponentGroups }}
+{{template "sectionGroupSelChangeVar" .}}
+{{- end }}
+
+{{define "sectionVarInit"}}
+    IntOp $SelectRefCnt_{{.Name}} 0 & 0
+    IntOp $SelectedExplicit_{{.Name}} 0 & 0
+
+    SectionGetFlags {{printf "${%v}" .Name}} $0
+    IntOp $0 $0 & ${SF_SELECTED}
+    IntOp $SectionSelected_{{.Name}} $0 + 0
+
+    ${If} $0 > 0
+        IntOp $SelectedExplicit_{{.Name}} 1 + 0
+    ${EndIf}
+{{end}}
+
+{{define "sectionGroupVarInit"}}
+{{- range .Components }}
+{{template "sectionVarInit" .}}
+{{- end}}
+{{end}}
 
 #Function CheckPreviousInstall
 #  ReadRegStr $R0 HKLM "${REG_KEY}" "InstallDir"
@@ -361,7 +400,7 @@ FunctionEnd
 #FunctionEnd
 
 Function AddToRegistry
-  ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
       SetShellVarContext all
   ${Else}
       SetShellVarContext current
@@ -490,15 +529,17 @@ RMDir /r "$INSTDIR\{{ . }}"
 ; ------------------------
 ; SECTIONS
 {{ define "section" }}
-Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
+Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
     !insertmacro Log "Entering Section {{.Name}}-{{.DisplayName}}"
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
         SetShellVarContext all
     ${Else}
         SetShellVarContext current
     ${EndIf}
 
+    {{- if or .InstallCategories .Required}}
     SectionIn {{if .Required}}RO {{end}}{{ .InstallCategories}}
+    {{- end}}
     SetOutPath "$INSTDIR\{{.Directory}}"
 
     {{- if .Service }}
@@ -516,7 +557,7 @@ Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
 
     {{- if .Service }}
     !insertmacro Service_Query "{{.Name}}" $0
-    ${If} $0 == 0
+    ${If} $0 = 0
         !insertmacro Service_Update "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
         !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
     ${Else}
@@ -545,7 +586,7 @@ SectionEnd
 !macroend
 
 Section "-Core Installation"
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
         SetShellVarContext all
     ${Else}
         SetShellVarContext current
@@ -604,31 +645,120 @@ SectionEnd
 #  !insertmacro MUI_INSTALLOPTIONS_DISPLAY "NSIS(ds "in").InstallOptions.ini"
 #FunctionEnd
 
+Function .onInit
+    !insertmacro SetVarCtx
+    !insertmacro SetRegView
+    !insertmacro ValidateMutex
+
+    Push $0
+    {{- range (ds "in").Components }}
+    {{- template "sectionVarInit" .}}
+    {{- end}}
+
+    {{- range (ds "in").ComponentGroups }}
+    {{- template "sectionGroupVarInit" .}}
+    {{- end}}
+    Pop $0
+FunctionEnd
+
+
 Function un.onInit
     !insertmacro SetVarCtx
     !insertmacro SetRegView
     !insertmacro ValidateMutex
 
-    Push $R0
-    ReadRegStr $R0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
+    Push $0
+    ReadRegStr $0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
     ${If} ${Errors}
-    ${OrIf} $R0 == ""
+    ${OrIf} $0 == ""
         MessageBox MB_ICONSTOP "No previous install exists." /SD IDOK
         Abort
     ${EndIf}
 
-    StrCpy $INSTDIR "$R0"
+    StrCpy $INSTDIR "$0"
 
-    Pop $R0
+    Pop $0
 FunctionEnd
 
-# TODO: HANDLE DEPENDENCIES
-#Function .onSelChange
-#  !insertmacro SectionList MaybeSelectionChanged
-#FunctionEnd
+Function .onSelChange
+    Push $0
+
+    {{- range (ds "in").ComponentDependencies }}
+    # Check for selection of "{{.Component}}"
+    SectionGetFlags {{printf "${%v}" .Component}} $0
+    IntOp $0 $0 & ${SF_SELECTED}
+    # If the component state is not equal to the current saved state,
+    #   this is the component that triggered onSelChange
+    # Else, skip
+    ${If} $0 <> $SectionSelected_{{.Component}}
+        # If the component is seleceted, select all dependencies
+        ${If} $0 = 1
+            # Set current component's fields
+            IntOp $SectionSelected_{{.Component}} 0 + 1
+            IntOp $SelectedExplicit_{{.Component}} 0 + 1
+
+            # Select all dependencies
+            {{- range .Dependencies }}
+            # Select "{{.}}"
+            IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} + 1
+            IntOp $SectionSelected_{{.}} 1 + 0
+            !insertmacro SelectSection {{printf "${%v}" .}}
+            {{- end}}
+        # If the component is unselected, process unselect logic
+        #   (a) unselect all dependencies that were not explicitly selected
+        #   (b) unselect all dependants
+        ${Else}
+            # Set deselect states
+            IntOp $SectionSelected_{{.Component}} 0 + 0
+            IntOp $SelectedExplicit_{{.Component}} 0 + 0
+
+            # Deselect dependencies
+            {{- range .Dependencies }}
+            # Process deselect for "{{.}}"
+
+            # Reduce ref count for dependencies
+            ${If} $SelectRefCnt_{{.}} > 0
+                IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} - 1
+            ${EndIf}
+
+            # If there are no more references and it isn't explicitly selected
+            #   deselect dependency
+            ${If} $SelectRefCnt_{{.}} <= 0
+            ${AndIF} $SelectedExplicit_{{.}} = 0
+                IntOp $SectionSelected_{{.}} 0 + 0
+                IntOp $SelectRefCnt_{{.}} 0 + 0
+                !insertmacro UnselectSection {{printf "${%v}" .}}
+            ${EndIf}
+            {{- end}}
+
+            {{- range .RemoveRefs }}
+            ${If} $SelectRefCnt_{{.}} > 0
+                IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} - 1
+            ${EndIf}
+            ${If} $SelectRefCnt_{{.}} <= 0
+            ${AndIF} $SelectedExplicit_{{.}} = 0
+                IntOp $SectionSelected_{{.}} 0 + 0
+                IntOp $SelectRefCnt_{{.}} 0 + 0
+                !insertmacro UnselectSection {{printf "${%v}" .}}
+            ${EndIf}
+            {{- end}}
+
+            # Deselect all Dependants
+            {{- range .Dependants }}
+            # Deselect "{{.}}"
+            IntOp $SelectedExplicit_{{.}} 0 + 0
+            IntOp $SelectRefCnt_{{.}} 0 + 0
+            IntOp $SectionSelected_{{.}} 0 + 0
+            !insertmacro UnselectSection {{printf "${%v}" .}}
+            {{- end}}
+        ${EndIf}
+    ${EndIf}
+    {{- end}}
+    Pop $0
+FunctionEnd
 
 Section "Uninstall"
-  ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
       SetShellVarContext all
   ${Else}
       SetShellVarContext current

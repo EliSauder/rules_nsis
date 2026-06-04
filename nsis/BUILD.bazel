@@ -1,17 +1,36 @@
-load(
-    "//nsis/private:defs.bzl",
-    _nsis_component = "nsis_component",
-    _nsis_component_group = "nsis_component_group",
-    _nsis_installer = "nsis_installer",
+load("@bazel_lib//:bzl_library.bzl", "bzl_library")
+
+package(default_visibility = ["//visibility:public"])
+
+bzl_library(
+    name = "defs",
+    srcs = ["defs.bzl"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//nsis/private:defs.bzl",
+        "//nsis/private:transitions.bzl",
+    ],
 )
 
-exports_files([
-    "defs.bzl",
-    "extensions.bzl",
-])
+bzl_library(
+    name = "extensions",
+    srcs = ["extensions.bzl"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@bazel_tools//tools/build_defs/repo:cache.bzl",
+        "@bazel_tools//tools/build_defs/repo:utils.bzl",
+        "@bazel_tools//tools/build_defs/repo:http.bzl",
+        "//nsis/private:extensions.bzl",
+        "//nsis/private:dirrule.bzl",
+        "//nsis:toolchain.bzl",
+    ],
+)
 
-nsis_installer = _nsis_installer
-
-nsis_component = _nsis_component
-
-nsis_component_group = _nsis_component_group
+bzl_library(
+    name = "toolchain",
+    srcs = ["toolchain.bzl"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//nsis/toolchain:toolchains.bzl",
+    ],
+)
