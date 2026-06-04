@@ -684,25 +684,45 @@ Function .onSelChange
     Push $0
 
     {{- range (ds "in").ComponentDependencies }}
+    # Check for selection of "{{.Component}}"
     SectionGetFlags {{printf "${%v}" .Component}} $0
     IntOp $0 $0 & ${SF_SELECTED}
+    # If the component state is not equal to the current saved state,
+    #   this is the component that triggered onSelChange
+    # Else, skip
     ${If} $0 <> $SectionSelected_{{.Component}}
+        # If the component is seleceted, select all dependencies
         ${If} $0 = 1
+            # Set current component's fields
             IntOp $SectionSelected_{{.Component}} 0 + 1
             IntOp $SelectedExplicit_{{.Component}} 0 + 1
+
+            # Select all dependencies
             {{- range .Dependencies }}
+            # Select "{{.}}"
             IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} + 1
             IntOp $SectionSelected_{{.}} 1 + 0
             !insertmacro SelectSection {{printf "${%v}" .}}
             {{- end}}
+        # If the component is unselected, process unselect logic
+        #   (a) unselect all dependencies that were not explicitly selected
+        #   (b) unselect all dependants
         ${Else}
+            # Set deselect states
             IntOp $SectionSelected_{{.Component}} 0 + 0
             IntOp $SelectedExplicit_{{.Component}} 0 + 0
+
+            # Deselect dependencies
             {{- range .Dependencies }}
+            # Process deselect for "{{.}}"
+
+            # Reduce ref count for dependencies
             ${If} $SelectRefCnt_{{.}} > 0
                 IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} - 1
             ${EndIf}
 
+            # If there are no more references and it isn't explicitly selected
+            #   deselect dependency
             ${If} $SelectRefCnt_{{.}} <= 0
             ${AndIF} $SelectedExplicit_{{.}} = 0
                 IntOp $SectionSelected_{{.}} 0 + 0
@@ -711,7 +731,21 @@ Function .onSelChange
             ${EndIf}
             {{- end}}
 
+            {{- range .RemoveRefs }}
+            ${If} $SelectRefCnt_{{.}} > 0
+                IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} - 1
+            ${EndIf}
+            ${If} $SelectRefCnt_{{.}} <= 0
+            ${AndIF} $SelectedExplicit_{{.}} = 0
+                IntOp $SectionSelected_{{.}} 0 + 0
+                IntOp $SelectRefCnt_{{.}} 0 + 0
+                !insertmacro UnselectSection {{printf "${%v}" .}}
+            ${EndIf}
+            {{- end}}
+
+            # Deselect all Dependants
             {{- range .Dependants }}
+            # Deselect "{{.}}"
             IntOp $SelectedExplicit_{{.}} 0 + 0
             IntOp $SelectRefCnt_{{.}} 0 + 0
             IntOp $SectionSelected_{{.}} 0 + 0

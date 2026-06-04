@@ -549,14 +549,34 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
         for e in es:
             next_stack.append((e, next_components, next_groups))
 
+    deps = []
+
+    for k, v in verticies.items():
+        if NsisComponentInfo not in v:
+            continue
+
+        dependencies = set(dep_lst[k] if k in dep_lst else [])
+        dependants = rev_dep_lst[k] if k in rev_dep_lst else []
+        remove_refs = set()
+        for x in dependants:
+            if x not in dep_lst:
+                continue
+            remove_refs.update(dep_lst[x])
+
+        remove_refs = remove_refs.difference(dependencies).difference(dependants)
+        remove_refs.discard(k)
+
+        deps.append({
+            "Component": k,
+            "Dependencies": dependencies,
+            "Dependants": dependants,
+            "RemoveRefs": remove_refs,
+        })
+
     return (
         data_components,
         data_groups,
-        [{
-            "Component": k,
-            "Dependencies": dep_lst[k] if k in dep_lst else [],
-            "Dependants": rev_dep_lst[k] if k in rev_dep_lst else [],
-        } for k, v in verticies.items() if NsisComponentInfo in v],
+        deps,
     )
 
 def _disabled_by_default(mode):
