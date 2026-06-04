@@ -51,6 +51,8 @@ def nsis_installer_test(
         cmd = "printf '%s\\n' {} > \"$@\"".format(
             shell.quote(json.encode(test_config).replace("\\", "\\\\")),
         ),
+        tags = ["no-cache"],
+    )
     )
 
     py_test(
@@ -69,4 +71,5 @@ def nsis_installer_test(
             "@pypi_dev//psutil",
             "@rules_python//python/runfiles",
         ],
+        tags = ["no-cache"],
     )
