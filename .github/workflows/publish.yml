@@ -27,6 +27,7 @@ jobs:
       registry_fork: EliSauder/bazel-central-registry
       # see note on Attestation Support
       attest: true
+      draft: true
     permissions:
       contents: write
       # Necessary if attest:true
