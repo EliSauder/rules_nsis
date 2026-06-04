@@ -537,7 +537,9 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
         SetShellVarContext current
     ${EndIf}
 
+    {{- if or .InstallCategories .Required}}
     SectionIn {{if .Required}}RO {{end}}{{ .InstallCategories}}
+    {{- end}}
     SetOutPath "$INSTDIR\{{.Directory}}"
 
     {{- if .Service }}
@@ -686,7 +688,7 @@ Function .onSelChange
         ${If} $R0 == 1
             StrCpy $SelectedExplicit_{{.Component}} "1"
             {{- range .Dependencies }}
-            !insertmacro SelectSection {{.}}
+            !insertmacro SelectSection {{printf "${%v}" .}}
             IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} + 1
             {{- end}}
         ${Else}
@@ -695,7 +697,7 @@ Function .onSelChange
             ${If} $SelectRefCnt_{{.}} != "0"
                 IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} - 1
                 ${If} $SelectedExplicit_{{.}} == "0"
-                    !insertmacro UnselectSection {{.}}
+                    !insertmacro UnselectSection {{printf "${%v}" .}}
                     IntOp $SectionState_{{.}} 0 & ${SF_SELECTED}
                 ${EndIf}
             ${EndIf}
@@ -705,7 +707,7 @@ Function .onSelChange
             StrCpy $SelectedExplicit_{{.}} "0"
             StrCpy $SelectRefCnt_{{.}} "0"
             IntOp $SectionState_{{.}} 0 & ${SF_SELECTED}
-            !insertmacro UnselectSection {{.}}
+            !insertmacro UnselectSection {{printf "${%v}" .}}
             {{- end}}
         ${EndIf}
     ${EndIf}
