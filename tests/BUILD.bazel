@@ -20,6 +20,7 @@ filegroup(
 nsis_component(
     name = "minimal_component",
     srcs = [":nsis_files"],
+    selection_mode = "default",
 )
 
 nsis_installer(
@@ -32,6 +33,7 @@ nsis_installer(
 nsis_component(
     name = "minimal_component_depsA",
     srcs = [":nsis_files"],
+    selection_mode = "optional",
 )
 
 nsis_component(
@@ -41,6 +43,7 @@ nsis_component(
         ":minimal_component",
         ":minimal_component_depsA",
     ],
+    selection_mode = "optional",
 )
 
 nsis_component(
@@ -49,6 +52,7 @@ nsis_component(
     dependencies = [
         ":minimal_component_depsB",
     ],
+    selection_mode = "optional",
 )
 
 nsis_installer(
