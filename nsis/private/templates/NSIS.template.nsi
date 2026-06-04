@@ -343,7 +343,7 @@ Var IsArmInstall
 {{define "sectionSelChangeVar"}}
 Var SelectRefCnt_{{.Name}}
 Var SelectedExplicit_{{.Name}}
-Var SectionState_{{.Name}}
+Var SectionSelected_{{.Name}}
 {{end}}
 
 {{define "sectionGroupSelChangeVar"}}
@@ -360,14 +360,14 @@ Var SectionState_{{.Name}}
 {{- end }}
 
 {{define "sectionVarInit"}}
-    IntOp $SelectRefCnt_{{.Name}} 0 + 0
-    IntOp $SelectedExplicit_{{.Name}} 0 + 0
+    IntOp $SelectRefCnt_{{.Name}} 0 & 0
+    IntOp $SelectedExplicit_{{.Name}} 0 & 0
 
-    SectionGetFlags {{printf "${%v}" .Name}} $R0
-    IntOp $R0 $R0 & ${SF_SELECTED}
-    IntOp $SectionState_{{.Name}} $R0 + 0
+    SectionGetFlags {{printf "${%v}" .Name}} $0
+    IntOp $0 $0 & ${SF_SELECTED}
+    IntOp $SectionSelected_{{.Name}} $0 + 0
 
-    ${If} $R0 = 1
+    ${If} $0 > 0
         IntOp $SelectedExplicit_{{.Name}} 1 + 0
     ${EndIf}
 {{end}}
@@ -650,6 +650,7 @@ Function .onInit
     !insertmacro SetRegView
     !insertmacro ValidateMutex
 
+    Push $0
     {{- range (ds "in").Components }}
     {{- template "sectionVarInit" .}}
     {{- end}}
@@ -657,6 +658,7 @@ Function .onInit
     {{- range (ds "in").ComponentGroups }}
     {{- template "sectionGroupVarInit" .}}
     {{- end}}
+    Pop $0
 FunctionEnd
 
 
@@ -665,55 +667,60 @@ Function un.onInit
     !insertmacro SetRegView
     !insertmacro ValidateMutex
 
-    Push $R0
-    ReadRegStr $R0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
+    Push $0
+    ReadRegStr $0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
     ${If} ${Errors}
-    ${OrIf} $R0 == ""
+    ${OrIf} $0 == ""
         MessageBox MB_ICONSTOP "No previous install exists." /SD IDOK
         Abort
     ${EndIf}
 
-    StrCpy $INSTDIR "$R0"
+    StrCpy $INSTDIR "$0"
 
-    Pop $R0
+    Pop $0
 FunctionEnd
 
 Function .onSelChange
-    {{- range (ds "in").ComponentDependencies }}
+    Push $0
 
-    SectionGetFlags {{printf "${%v}" .Component}} $R0
-    IntOp $R0 $R0 & ${SF_SELECTED}
-    ${If} $R0 <> $SectionState_{{.Component}}
-        IntOp $SectionState_{{.Component}} $R0 + 0
-        ${If} $R0 = 1
-            StrCpy $SelectedExplicit_{{.Component}} 1
+    {{- range (ds "in").ComponentDependencies }}
+    SectionGetFlags {{printf "${%v}" .Component}} $0
+    IntOp $0 $0 & ${SF_SELECTED}
+    ${If} $0 <> $SectionSelected_{{.Component}}
+        ${If} $0 = 1
+            IntOp $SectionSelected_{{.Component}} 0 + 1
+            IntOp $SelectedExplicit_{{.Component}} 0 + 1
             {{- range .Dependencies }}
-            !insertmacro SelectSection {{printf "${%v}" .}}
             IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} + 1
+            IntOp $SectionSelected_{{.}} 1 + 0
+            !insertmacro SelectSection {{printf "${%v}" .}}
             {{- end}}
         ${Else}
+            IntOp $SectionSelected_{{.Component}} 0 + 0
             IntOp $SelectedExplicit_{{.Component}} 0 + 0
             {{- range .Dependencies }}
             ${If} $SelectRefCnt_{{.}} > 0
                 IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} - 1
             ${EndIf}
 
-            ${If} $SelectRefCnt_{{.}} = 0
+            ${If} $SelectRefCnt_{{.}} <= 0
             ${AndIF} $SelectedExplicit_{{.}} = 0
+                IntOp $SectionSelected_{{.}} 0 + 0
+                IntOp $SelectRefCnt_{{.}} 0 + 0
                 !insertmacro UnselectSection {{printf "${%v}" .}}
-                IntOp $SectionState_{{.}} 0 & ${SF_SELECTED}
             ${EndIf}
             {{- end}}
 
             {{- range .Dependants }}
             IntOp $SelectedExplicit_{{.}} 0 + 0
             IntOp $SelectRefCnt_{{.}} 0 + 0
-            IntOp $SectionState_{{.}} 0 & ${SF_SELECTED}
+            IntOp $SectionSelected_{{.}} 0 + 0
             !insertmacro UnselectSection {{printf "${%v}" .}}
             {{- end}}
         ${EndIf}
     ${EndIf}
     {{- end}}
+    Pop $0
 FunctionEnd
 
 Section "Uninstall"
