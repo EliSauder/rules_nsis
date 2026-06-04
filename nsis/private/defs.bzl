@@ -43,7 +43,6 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "install_categories": "The possible install types to use when selecting components.",
         "defines": "The defines to use for the installer.",
         "verbosity": "The verbosity of outupt.",
-        "no_config": "Whether to pass /NOCONFIG or not",
         "components": "List of root components and component groups.",
         "outfile": "Specify the outfile.",
         "arch": "The architecture to built the installer for.",
@@ -82,21 +81,29 @@ NsisComponentGroupInfo = provider(
     },
 )
 
-def _always_make_win_path(value):
-    v = str(value)
-    if v.startswith("/"):
-        v = "C:{}".format(v)
-    return v.replace("/", "\\")
+def _make_unix_path(value):
+    v = str(value).replace("\\", "/")
+    if len(v) < 2:
+        return v
 
-def _make_win_path(toolchain, value):
+    if v[0].isupper() and v[1] == ':':
+        return "/" + v[2:]
+
+    return v
+
+def _make_win_path(value):
+    v = str(value).replace("/", "\\")
+    if v.startswith("C:"):
+        v = "C:{}".format(v)
+    return v
+
+def _make_sys_path(toolchain, value):
     if toolchain.path_style == "windows":
-        return _always_make_win_path(value)
-    else:
-        return str(value)
+        return _make_win_path(value)
+    return _make_unix_path(value)
 
 def _quote_nsi_string(value):
     return str(value).replace("\\", "\\\\").replace('"', '\\"')
-
 
 def _nsis_flag(args_style, name):
     if args_style == "slash":
@@ -106,7 +113,7 @@ def _nsis_flag(args_style, name):
 def _nsis_define(args_style, key, value = None):
     prefix = "/D" if args_style == "slash" else "-D"
 
-    if value == None or value == "":
+    if not value:
         return prefix + key
 
     return prefix + key + "=" + _quote_nsi_string(value)
@@ -125,17 +132,26 @@ def _nsis_component_group_impl(ctx):
 
     for child in ctx.attr.components:
         if NsisComponentInfo in child:
-            edges.append({_EDGE_PARENT_KEY: {NsisComponentGroupInfo: cmpgrp}, _EDGE_CHILD_KEY: child})
+            edges.append({
+                _EDGE_PARENT_KEY: {NsisComponentGroupInfo: cmpgrp},
+                _EDGE_CHILD_KEY: child,
+            })
         elif NsisComponentGroupInfo in child:
             grp = child[NsisComponentGroupInfo]
-            edges.append({_EDGE_PARENT_KEY: {NsisComponentGroupInfo: cmpgrp}, _EDGE_CHILD_KEY: child})
-            edges = edges + grp.components
+            edges.append({
+                _EDGE_PARENT_KEY: {NsisComponentGroupInfo: cmpgrp},
+                _EDGE_CHILD_KEY: child,
+            })
+            edges.extend(grp.components)
 
     return cmpgrp
 
 
 nsis_component_group = rule(
     implementation = _nsis_component_group_impl,
+    doc = """
+Represents a section group inside of a NSIS section group.
+""",
     attrs = {
         "description": attr.string(
             mandatory = False,
@@ -191,6 +207,9 @@ def _nsis_component_impl(ctx):
 
 nsis_component = rule(
     implementation = _nsis_component_impl,
+    doc = """
+Represents a NSIS installer section.
+""",
     attrs = {
         "directory": attr.string(
             mandatory = False,
@@ -216,7 +235,13 @@ nsis_component = rule(
         "service_start_type": attr.string(
             mandatory = False,
             default = "auto",
-            doc = "Defines the start type to pass into sc.exe start field.",
+            doc = """
+Defines the start type to pass into sc.exe start field.
+
+auto: The service will start on system start.
+demand: The service will be started manually.
+disabled: The service will not be started.
+""",
             values = [
                 "auto",
                 "demand",
@@ -270,7 +295,12 @@ optional: The component is optional but will be deselected by default.
         "dependencies": attr.label_list(
             mandatory = False,
             allow_empty = True,
-            doc = "A list of components this one depends on.",
+            doc = """
+A list of components this one depends on.
+
+NOTE: This is only for deciding what gets installed. This does not create a
+strict install order. Components should be able to be installed in any order.
+""",
             providers = [
                 NsisComponentInfo,
             ],
@@ -278,20 +308,20 @@ optional: The component is optional but will be deselected by default.
         "shortcuts": attr.label_list(
             mandatory = False,
             allow_empty = True,
-            doc = "A list of files that, when installed, will be created as shortcuts if short cuts are enabled.",
+            doc = "(Unused) A list of files that, when installed, will be created as shortcuts if short cuts are enabled.",
             allow_files = True,
         ),
     },
 )
 
 def _get_outfile(ctx):
-    if ctx.attr.product == None or ctx.attr.product == "":
+    if not ctx.attr.product:
         fail("most provide non-empty product attribute")
 
-    if ctx.attr.outfile != None and ctx.attr.outfile != "":
+    if ctx.attr.outfile:
         return ctx.actions.declare_file(ctx.attr.outfile)
 
-    if ctx.attr.vendor == None or ctx.attr.vendor == "":
+    if not ctx.attr.vendor:
         return ctx.actions.declare_file("{} Setup.exe".format(ctx.attr.product))
 
     fileName = "{} {} Setup.exe".format(ctx.attr.vendor, ctx.attr.product)
@@ -302,12 +332,9 @@ def _make_nsis_args(ctx, toolchain, outfile):
 
     args = ctx.actions.args()
 
-    args.add(_nsis_flag(args_style, "V{}".format(ctx.attr.verbosity)))
+    args.add(_nsis_flag(args_style, "V{}".format(ctx.attr._verbosity)))
 
     args.add(_nsis_flag(args_style, "WX"))
-
-    if ctx.attr.no_config:
-        args.add(_nsis_flag(args_style, "NOCONFIG"))
 
     args.add(_nsis_flag(args_style, "NOCD"))
 
@@ -316,9 +343,9 @@ def _make_nsis_args(ctx, toolchain, outfile):
     return args
 
 def _makensis(ctx, toolchain, script, options_file, inputs):
-    if script == None:
+    if not script:
         fail("script can not be None")
-    if options_file == None:
+    if not options_file:
         fail("options file can not be None")
 
     outfile = _get_outfile(ctx)
@@ -327,18 +354,18 @@ def _makensis(ctx, toolchain, script, options_file, inputs):
         _nsis_define(
             toolchain.args_style,
             "INSTALL_OPTIONS_FILE",
-            _quote_nsi_string(_make_win_path(toolchain, options_file.path)),
+            _quote_nsi_string(_make_sys_path(toolchain, options_file.path)),
         ),
     )
-    args.add(_make_win_path(toolchain, script.path))
+    args.add(_make_sys_path(toolchain, script.path))
 
     makensis = toolchain.makensis
-    makensis_dir = toolchain.nsis_dir.files.to_list()
+    makensis_dir = toolchain.nsis_dir.files
     makensis_files = toolchain.nsis_files
 
-    if makensis_dir == None or None in makensis_dir:
+    if makensis_dir == None:
         fail("makensis dir is None")
-    if makensis_files == None or None in makensis_files.to_list():
+    if makensis_files == None:
         fail("makensis files is None")
 
     tools = depset(
@@ -347,8 +374,9 @@ def _makensis(ctx, toolchain, script, options_file, inputs):
     )
 
     inputs = depset(
-        direct = [script, options_file] + makensis_dir,
+        direct = [script, options_file],
         transitive = [
+            makensis_dir,
             inputs,
             makensis_files,
         ]
@@ -363,7 +391,7 @@ def _makensis(ctx, toolchain, script, options_file, inputs):
         tools = tools,
         outputs = [outfile],
         env = {
-            "NSISDIR": _make_win_path(toolchain, makensis_dir[0].path),
+            "NSISDIR": _make_sys_path(toolchain, makensis_dir.to_list()[0].path),
             "LANG": "en_US.UTF-8",
             "LC_ALL": "en_US.UTF-8",
             "LC_CTYPE": "en_US.UTF-8",
@@ -382,9 +410,9 @@ def _name_to_displayname(val):
     fin = ""
     for v in val.split("_"):
         v = v.strip().capitalize()
-        if len(v) == 0:
+        if not v:
             continue
-        if len(fin) == 0:
+        if not fin:
             fin = fin + v
             continue
         fin = fin + " " + v
@@ -410,8 +438,6 @@ def _build_flat_dependency_list(verticies):
 
         cc = v[NsisComponentInfo]
 
-        # Add initial A -> B and B -> A mappings for all (A,B) = (component,
-        # dependency)
         for dep in cc.dependencies:
             cc_d = dep[NsisComponentInfo]
             _add_dep_key(deps, rev_deps, cc.name, cc_d.name)
@@ -445,10 +471,7 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
             verticies[cmp.name] = dep
         elif NsisComponentGroupInfo in dep:
             grp = dep[NsisComponentGroupInfo]
-            edges = edges + grp.components
-        else:
-            fail("invalid providers")
-
+            edges.extend(grp.components)
 
     edges_map = {}
     data_components = []
@@ -464,8 +487,6 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
             child_name = child[NsisComponentInfo].name
         elif NsisComponentGroupInfo in child:
             child_name = child[NsisComponentGroupInfo].name
-        else:
-            fail("invalid component target")
         verticies[child_name] = child
 
         if parent == None:
@@ -478,8 +499,6 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
             parent_name = parent[NsisComponentInfo].name
         elif NsisComponentGroupInfo in parent:
             parent_name = parent[NsisComponentGroupInfo].name
-        else:
-            fail("invalid component target")
         verticies[parent_name] = parent
 
         if parent_name in edges_map:
@@ -492,15 +511,12 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
     n_edges = len(edges)
     n_vert = len(verticies)
 
-    path_stack = []
-
     for i in range(n_edges * n_vert):
         if len(next_stack) == 0:
             break
 
         current, current_components_data, current_groups_data = next_stack.pop()
 
-        path_stack.append(current)
         v = verticies[current]
         es = edges_map[current] if current in edges_map else {}
 
@@ -522,9 +538,7 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
                 _get_component_ds(
                     toolchain,
                     v[NsisComponentInfo],
-                    inst_cat,
-                ),
-            )
+                    inst_cat))
 
         for e in es:
             next_stack.append((e, next_components, next_groups))
@@ -537,35 +551,28 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
             "Dependencies": dep_lst[k] if k in dep_lst else [],
             "Dependants": rev_dep_lst[k] if k in rev_dep_lst else [],
         } for k, v in verticies.items() if NsisComponentInfo in v],
-          #[{"Component": k,"Dependencies": v} for k, v in rev_dep_lst.items()],
     )
 
 def _disabled_by_default(mode):
-    if mode == "optional":
-        return True
-    return False
+    return mode == "optional"
 
 def _required(mode):
-    if mode == "required" or mode == "hidden":
-        return True
-    return False
+    return mode == "required" or mode == "hidden"
 
 def _hidden(mode):
-    if mode == "hidden":
-        return True
-    return False
+    return mode == "hidden"
 
 def _get_installer_ds(ctx, toolchain):
     data = {
         "Name": str(ctx.attr.name),
         "Product": str(ctx.attr.product),
-        "ProductPath": str(_always_make_win_path(ctx.attr.product_path)),
+        "ProductPath": str(_make_win_path(ctx.attr.product_path)),
         "Vendor": str(ctx.attr.vendor),
-        "VendorPath": str(_always_make_win_path(_vendor_path(ctx))),
+        "VendorPath": str(_make_win_path(_vendor_path(ctx))),
         "Description": str(ctx.attr.description),
         "Copyright": str(ctx.attr.copyright),
         "LicenseFile": (
-            str(_make_win_path(toolchain, ctx.attr.license_file.path))
+            str(_make_sys_path(toolchain, ctx.attr.license_file.path))
             if ctx.attr.license_file != None
             else None
         ),
@@ -576,24 +583,24 @@ def _get_installer_ds(ctx, toolchain):
             if str(ctx.attr.arch) == "x86_64" or str(ctx.attr.arch) == "arm64"
             else False
         ),
-        "InstallRoot": str(_always_make_win_path(ctx.attr.install_root)),
-        "InstallPath": str(_always_make_win_path(ctx.attr.install_path)),
+        "InstallRoot": str(_make_win_path(ctx.attr.install_root)),
+        "InstallPath": str(_make_win_path(ctx.attr.install_path)),
         "ExecutionLevel": str(ctx.attr.execution_level),
         "InstallTypes": [str(x) for x in ctx.attr.install_categories],
         "Compressor": str(ctx.attr.compressor),
         "CompressorDictSize": int(ctx.attr.compressor_dictsize),
         "Icon": (
-            str(_make_win_path(toolchain, ctx.attr.icon.path))
+            str(_make_sys_path(toolchain, ctx.attr.icon.path))
             if ctx.attr.icon != None
             else None
         ),
         "HeaderImage": (
-            str(_make_win_path(toolchain, ctx.attr.header_image.path))
+            str(_make_sys_path(toolchain, ctx.attr.header_image.path))
             if ctx.attr.header_image != None
             else None
         ),
         "MenuImage": (
-            str(_make_win_path(toolchain, ctx.attr.menu_image.path))
+            str(_make_sys_path(toolchain, ctx.attr.menu_image.path))
             if ctx.attr.menu_image != None
             else None
         ),
@@ -626,7 +633,7 @@ def _get_component_ds(toolchain, component, inst_cat):
 
     data = {
         "Name": str(component.name),
-        "Directory": str(_always_make_win_path(component.directory)),
+        "Directory": str(_make_win_path(component.directory)),
         "Service": bool(component.service),
         "ServiceArgs": " ".join(component.service_args),
         "ServiceDependencies": "\\".join(component.service_dependencies),
@@ -647,24 +654,24 @@ def _get_component_ds(toolchain, component, inst_cat):
         f = component.service_executable[DefaultInfo].files.to_list()[0]
 
         data["ServiceExecutable"] = {
-            "Name": _always_make_win_path(f.basename),
-            "Source": _make_win_path(toolchain, f.path),
+            "Name": _make_win_path(f.basename),
+            "Source": _make_sys_path(toolchain, f.path),
         }
 
     for file in component.shortcuts:
         data["Shortcuts"].append({
-            "Name": str(_always_make_win_path(toolchain, file.basename)),
-            "Source": str(_make_win_path(toolchain, file.path)),
+            "Name": str(_make_win_path(toolchain, file.basename)),
+            "Source": str(_make_sys_path(toolchain, file.path)),
         })
 
     for file in component.srcs.to_list():
         if file.is_directory:
             data["Directories"].append(
-                str(_make_win_path(toolchain, file.path)))
+                str(_make_sys_path(toolchain, file.path)))
         else:
             data["Files"].append({
-                "Name": str(_always_make_win_path(file.basename)),
-                "Source": str(_make_win_path(toolchain, file.path)),
+                "Name": str(_make_win_path(file.basename)),
+                "Source": str(_make_sys_path(toolchain, file.path)),
             })
 
     return data
@@ -696,8 +703,6 @@ def _all_files_component_list(lst):
         elif NsisComponentGroupInfo in dep:
             grp = dep[NsisComponentGroupInfo]
             transitive.append(_all_files_group(grp))
-        else:
-            fail("provided dependency is not a component or a component group.")
 
     return depset(transitive = transitive)
 
@@ -712,28 +717,20 @@ def _all_files_group(group):
             transitive.append(_all_files_component(cmp))
         elif NsisComponentGroupInfo in child:
             continue
-        else:
-            fail("provided dep is not a component or a group")
 
     return depset(transitive = transitive)
 
 def _all_files_component(cmp):
-    srcs = depset()
+    transitive = [cmp.srcs]
     if cmp.service_executable != None:
         svcexe = cmp.service_executable[DefaultInfo]
-        srcs = depset(
-            transitive = [
-                srcs,
-                svcexe.files,
-            ],
-        )
+        transitive.append(svcexe.files)
+
     srcs = depset(
         direct = [x[DefaultInfo].files for x in cmp.shortcuts],
-        transitive = [
-            cmp.srcs,
-            srcs,
-        ],
+        transitive = transitive,
     )
+
     return srcs
 
 def _all_files(ctx):
@@ -744,12 +741,8 @@ def _all_files(ctx):
             ctx.attr.header_image,
             ctx.attr.menu_image,
         ] if x != None],
-    )
-
-    srcs = depset(
         transitive = [
             _all_files_component_list(ctx.attr.components),
-            srcs,
         ],
     )
 
@@ -800,15 +793,15 @@ def _build_rendered_templates(ctx, toolchain):
     script = _render_file(ctx, ctx.file._template, data)
     option = _render_file(ctx, ctx.file._template_options, data)
 
-    return {"Script": script, "Options": option}
+    return (script, option)
 
 def _nsis_installer_impl(ctx):
     toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
 
     srcs = _all_files(ctx)
-    values = _build_rendered_templates(ctx, toolchain)
+    script, options = _build_rendered_templates(ctx, toolchain)
 
-    return _makensis(ctx, toolchain, values["Script"], values["Options"], srcs) + [
+    return _makensis(ctx, toolchain, script, options, srcs) + [
         NsisInstallerInfo(
             name = ctx.attr.name,
             product = ctx.attr.product,
@@ -829,8 +822,7 @@ def _nsis_installer_impl(ctx):
             menu_image = ctx.attr.menu_image,
             install_categories = ctx.attr.install_categories,
             defines = ctx.attr.defines,
-            verbosity = ctx.attr.verbosity,
-            no_config = ctx.attr.no_config,
+            verbosity = ctx.attr._verbosity,
             components = ctx.attr.components,
             outfile = ctx.attr.outfile,
             arch = ctx.attr.arch,
@@ -840,7 +832,7 @@ def _nsis_installer_impl(ctx):
 nsis_installer = rule(
     implementation = _nsis_installer_impl,
     cfg = windows_source_transition,
-
+    doc = "Builds a windows installer .exe using NSIS.",
     attrs = {
         "product": attr.string(
             mandatory = True,
@@ -848,7 +840,7 @@ nsis_installer = rule(
         ),
         "product_path": attr.string(
             mandatory = True,
-            doc = "The path name of the software being packaged.",
+            doc = "The path safe name of the software being packaged.",
         ),
         "vendor": attr.string(
             mandatory = False,
@@ -859,7 +851,7 @@ nsis_installer = rule(
             mandatory = False,
             default = "",
             doc = """
-The optional path to use below the root by default. E.g. Company\\Vendor.
+The optional path to use below the root by default. E.g. Company\\Department\\{{.ProductPath}}.
 This will default to the provided vendor field.
 """,
         ),
@@ -891,7 +883,7 @@ The root path to install the software into. Defaults to NSIS's built in
 $PROGRAMFILES64 (or $PROGRAMFILES if 32bit) when installed as admin. When
 installed as a user, defaults to $LOCALAPPDATA\\Programs.
 
-The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
+The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}\\{{.ProductPath}.
 """,
         ),
         "install_path": attr.string(
@@ -902,7 +894,12 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "execution_level": attr.string(
             mandatory = False,
             default = "admin",
-            doc = "Set the execution level for the installer.",
+            doc = """
+Set the execution level for the installer.
+
+admin: Install software as admin.
+user: Install software as user.
+""",
             values = ["admin", "user"],
         ),
         "compressor": attr.string(
@@ -941,16 +938,11 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
             default = {},
             doc = "A list of additional defines to include in the installer.",
         ),
-        "verbosity": attr.int(
+        "_verbosity": attr.int(
             mandatory = False,
             default = 2,
             doc = "makensis verbosity: 0 none, 1 errors, 2 warnings, 3 info, 4 all.",
             values = [0, 1, 2, 3, 4],
-        ),
-        "no_config": attr.bool(
-            mandatory = False,
-            default = False,
-            doc = "Pass /NOCONFIG to disable loading nsiconf.nsi",
         ),
         "components": attr.label_list(
             mandatory = False,
@@ -995,5 +987,4 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
     toolchains = [
         _NSIS_TOOLCHAIN_TYPE,
     ],
-    doc = "Builds a windows installer .exe using NSIS.",
 )
