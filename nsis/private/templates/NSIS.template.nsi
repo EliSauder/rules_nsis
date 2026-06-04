@@ -360,15 +360,15 @@ Var SectionState_{{.Name}}
 {{- end }}
 
 {{define "sectionVarInit"}}
-    StrCpy $SelectRefCnt_{{.Name}} "0"
-    StrCpy $SelectedExplicit_{{.Name}} "0"
+    IntOp $SelectRefCnt_{{.Name}} 0 + 0
+    IntOp $SelectedExplicit_{{.Name}} 0 + 0
 
     SectionGetFlags {{printf "${%v}" .Name}} $R0
     IntOp $R0 $R0 & ${SF_SELECTED}
-    StrCpy $SectionState_{{.Name}} $R0
+    IntOp $SectionState_{{.Name}} $R0 + 0
 
-    ${If} $R0 == 1
-        StrCpy $SelectedExplicit_{{.Name}} "1"
+    ${If} $R0 = 1
+        IntOp $SelectedExplicit_{{.Name}} 1 + 0
     ${EndIf}
 {{end}}
 
@@ -400,7 +400,7 @@ Var SectionState_{{.Name}}
 #FunctionEnd
 
 Function AddToRegistry
-  ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
       SetShellVarContext all
   ${Else}
       SetShellVarContext current
@@ -531,7 +531,7 @@ RMDir /r "$INSTDIR\{{ . }}"
 {{ define "section" }}
 Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
     !insertmacro Log "Entering Section {{.Name}}-{{.DisplayName}}"
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
         SetShellVarContext all
     ${Else}
         SetShellVarContext current
@@ -557,7 +557,7 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
 
     {{- if .Service }}
     !insertmacro Service_Query "{{.Name}}" $0
-    ${If} $0 == 0
+    ${If} $0 = 0
         !insertmacro Service_Update "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
         !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
     ${Else}
@@ -586,7 +586,7 @@ SectionEnd
 !macroend
 
 Section "-Core Installation"
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
         SetShellVarContext all
     ${Else}
         SetShellVarContext current
@@ -683,29 +683,31 @@ Function .onSelChange
 
     SectionGetFlags {{printf "${%v}" .Component}} $R0
     IntOp $R0 $R0 & ${SF_SELECTED}
-    ${If} $R0 != $SectionState_{{.Component}}
-        StrCpy $SectionState_{{.Component}} $R0
-        ${If} $R0 == 1
-            StrCpy $SelectedExplicit_{{.Component}} "1"
+    ${If} $R0 <> $SectionState_{{.Component}}
+        IntOp $SectionState_{{.Component}} $R0 + 0
+        ${If} $R0 = 1
+            StrCpy $SelectedExplicit_{{.Component}} 1
             {{- range .Dependencies }}
             !insertmacro SelectSection {{printf "${%v}" .}}
             IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} + 1
             {{- end}}
         ${Else}
-            StrCpy $SelectedExplicit_{{.Component}} "0"
+            IntOp $SelectedExplicit_{{.Component}} 0 + 0
             {{- range .Dependencies }}
-            ${If} $SelectRefCnt_{{.}} != "0"
+            ${If} $SelectRefCnt_{{.}} > 0
                 IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} - 1
-                ${If} $SelectedExplicit_{{.}} == "0"
-                    !insertmacro UnselectSection {{printf "${%v}" .}}
-                    IntOp $SectionState_{{.}} 0 & ${SF_SELECTED}
-                ${EndIf}
+            ${EndIf}
+
+            ${If} $SelectRefCnt_{{.}} = 0
+            ${AndIF} $SelectedExplicit_{{.}} = 0
+                !insertmacro UnselectSection {{printf "${%v}" .}}
+                IntOp $SectionState_{{.}} 0 & ${SF_SELECTED}
             ${EndIf}
             {{- end}}
 
             {{- range .Dependants }}
-            StrCpy $SelectedExplicit_{{.}} "0"
-            StrCpy $SelectRefCnt_{{.}} "0"
+            IntOp $SelectedExplicit_{{.}} 0 + 0
+            IntOp $SelectRefCnt_{{.}} 0 + 0
             IntOp $SectionState_{{.}} 0 & ${SF_SELECTED}
             !insertmacro UnselectSection {{printf "${%v}" .}}
             {{- end}}
@@ -715,7 +717,7 @@ Function .onSelChange
 FunctionEnd
 
 Section "Uninstall"
-  ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
+  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
       SetShellVarContext all
   ${Else}
       SetShellVarContext current
