@@ -670,7 +670,6 @@ Function un.onInit
     Pop $R0
 FunctionEnd
 
-# TODO: Handle deps
 Function .onSelChange
     {{- range (ds "in").ComponentDependencies }}
 
