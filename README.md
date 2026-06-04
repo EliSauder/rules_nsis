@@ -4,22 +4,14 @@
 
 Aims to support creating a NSIS installer through bazel; inspired by CPack.
 
-## Features
+### Features
 
-- Setup NSIS toolchains for cross-platform use.
-- Define basic installer attributes (Version, Product, etc.).
-- Recursively define Components and Component Groups.
-- Install Windows Services using `sc.exe`
-
-### ToDo
-
-[ ] StartMenu Entries
-[ ] Desktop Shortcuts
-[ ] Dependency Based Selections (option exits but does nothing)
+[x] NSIS Toolchain for cross-platform use
+[x] Define installer attributes (version, product, etc.).
+[x] Support Components and Component Groups.
+[x] Install windows Services (uses `sc.exe`).
+[x] Dependency Based Selections (option exits but does nothing)
+[ ] StartMenu Entries \[Help Wanted]
+[ ] Desktop Shortcuts \[Help Wanted]
 [ ] Update Path \[Help Wanted]
 [ ] Set Environment Variables \[Help Wanted]
-
-## Rulesets
-
-[defs](docs/defs.md)
-[extensions](docs/extensions.md)
