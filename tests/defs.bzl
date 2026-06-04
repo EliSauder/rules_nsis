@@ -53,7 +53,6 @@ def nsis_installer_test(
         ),
         tags = ["no-cache"],
     )
-    )
 
     py_test(
         name = name,
