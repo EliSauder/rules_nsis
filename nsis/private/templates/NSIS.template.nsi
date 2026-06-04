@@ -117,10 +117,9 @@ VIAddVersionKey "FileVersion" "${PACKAGE_VERSION}"
 #Var Dialog
 #Var StartMenuCheckbox
 #Var StartMenuCheckboxState
+#Var CreateShortcuts
 #
-#Page custom InstallOptionsPage
-#
-#Function InstallOptionsPage
+#Function InstallOptionsPageCreate
 #    nsDialogs::Create 1018
 #    Pop $Dialog
 #    ${If} $Dialog == error
@@ -130,9 +129,14 @@ VIAddVersionKey "FileVersion" "${PACKAGE_VERSION}"
 #    ${NSD_CreateCheckbox} 0 30u 100% 10u "&Create Start Menu Entries"
 #    Pop $StartMenuCheckbox
 #
-#    ${NSD_SetState} $StartMenuCheckboxState
+#    ${NSD_Checked} $StartMenuCheckbox
+#    ${NSD_GetState} $StartMenuCheckbox $StartMenuCheckboxState
 #
 #    nsDialogs::Show
+#FunctionEnd
+#
+#Function InstallOptionsPageLeave
+#    ${NSD_GetState} $StartMenuCheckbox $StartMenuCheckboxState
 #FunctionEnd
 
 !insertmacro MUI_PAGE_DIRECTORY
@@ -143,6 +147,8 @@ VIAddVersionKey "FileVersion" "${PACKAGE_VERSION}"
 #!insertmacro MUI_PAGE_STARTMENU Application $StartMenuFolder
 
 !insertmacro MUI_PAGE_COMPONENTS
+
+#Page custom InstallOptionsPageCreate InstallOptionsPageLeave
 
 !insertmacro MUI_PAGE_INSTFILES
 
