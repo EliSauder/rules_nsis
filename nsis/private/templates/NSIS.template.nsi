@@ -529,7 +529,7 @@ RMDir /r "$INSTDIR\{{ . }}"
 ; ------------------------
 ; SECTIONS
 {{ define "section" }}
-Section {{if .DisabledByDefault}}\o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
+Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
     !insertmacro Log "Entering Section {{.Name}}-{{.DisplayName}}"
     ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
         SetShellVarContext all
