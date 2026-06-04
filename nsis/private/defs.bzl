@@ -438,6 +438,7 @@ def _build_flat_dependency_list(verticies):
 
         cc = v[NsisComponentInfo]
 
+        # Add direct dependencies
         for dep in cc.dependencies:
             cc_d = dep[NsisComponentInfo]
             _add_dep_key(deps, rev_deps, cc.name, cc_d.name)
@@ -446,6 +447,7 @@ def _build_flat_dependency_list(verticies):
             if cc_d.name not in deps:
                 continue
 
+            # Add transitive dependencies
             for cc_d_d in deps[cc_d.name]:
                 _add_dep_key(deps, rev_deps, cc.name, cc_d_d)
 
@@ -453,6 +455,7 @@ def _build_flat_dependency_list(verticies):
         if cc.name not in rev_deps:
             continue
 
+        # Add dependencies to dependants
         for parent in rev_deps[cc.name]:
             for curr_deps in deps[cc.name]:
                 _add_dep_key(deps, rev_deps, parent, curr_deps)
