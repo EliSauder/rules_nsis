@@ -1,4 +1,4 @@
-name: test rules
+name: Test Rules
 
 on:
   pull_request:
