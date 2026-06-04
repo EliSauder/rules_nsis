@@ -283,8 +283,11 @@ optional: The component is optional but will be deselected by default.
         ),
         "install_categories": attr.string_list(
             mandatory = False,
-            default = [],
-            doc = "The list of install types that the component will be included in.",
+            default = ["Full", "Typical"],
+            doc = """
+The list of install types that the component will be included in.
+Default: ["Full", "Typical"]
+""",
         ),
         "srcs": attr.label_list(
             mandatory = True,
