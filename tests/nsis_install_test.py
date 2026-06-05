@@ -150,11 +150,11 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, ins
     testcase.assertEqual(f"{instdir}\\Uninstall.exe", unstr, f"expected UninstallString to equal install path + Uninstall.exe")
     testcase.assertEqual(versionval, unversionval, f"expected install version {versionval} to equal uninstall version {unversionval}")
 
+CHECKED_ROOT=False
 
 def _get_install_root():
     test_tmpdir = os.path.abspath(str(os.environ["TEST_TMPDIR"]))
-    uid = uuid.uuid4().hex
-    install_root = f"{test_tmpdir}\\{uid}\\nsis-install-root"
+    install_root = f"{test_tmpdir}\\nsis-install-root"
 
     pth = pathlib.Path(install_root).resolve()
 
