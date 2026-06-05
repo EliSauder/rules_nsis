@@ -1,5 +1,4 @@
 import os
-import uuid
 import time
 import psutil
 import json
@@ -12,6 +11,8 @@ import winreg
 import logging
 
 from python.runfiles import runfiles
+
+TEST_TMPDIR = None
 
 def _print_directory_tree(indir: str) -> str:
     out = indir + os.path.sep + "\n"
@@ -150,11 +151,8 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, ins
     testcase.assertEqual(f"{instdir}\\Uninstall.exe", unstr, f"expected UninstallString to equal install path + Uninstall.exe")
     testcase.assertEqual(versionval, unversionval, f"expected install version {versionval} to equal uninstall version {unversionval}")
 
-CHECKED_ROOT=False
-
 def _get_install_root():
-    test_tmpdir = os.path.abspath(str(os.environ["TEST_TMPDIR"]))
-    install_root = f"{test_tmpdir}\\nsis-install-root"
+    install_root = f"{TEST_TMPDIR}\\nsis-install-root"
 
     pth = pathlib.Path(install_root).resolve()
 
@@ -330,7 +328,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         raise SystemError("Expected argv: <installer_path> <config_json>")
 
-    #INSTALLER = sys.argv[1]
+    TEST_TMPDIR = os.path.abspath(str(os.environ["TEST_TMPDIR"]))
     INSTALLER = RUNFILES.Rlocation(sys.argv[1])
     if not os.path.exists(INSTALLER):
         dir = os.path.dirname(INSTALLER)
