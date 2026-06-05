@@ -12,7 +12,8 @@ def nsis_installer_test(
     expected_bitwidth = "64",
     expected_execution_level = "admin",
     installer_args = [],
-    expected_services = {}):
+    expected_services = {},
+    **kwargs):
 
     if expected_product_path == None and expected_install_path == None:
         fail("one of product path or install path must not be None")
@@ -51,7 +52,7 @@ def nsis_installer_test(
         cmd = "printf '%s\\n' {} > \"$@\"".format(
             shell.quote(json.encode(test_config).replace("\\", "\\\\")),
         ),
-        tags = ["no-cache"],
+        **kwargs,
     )
 
     py_test(
@@ -70,5 +71,5 @@ def nsis_installer_test(
             "@pypi_dev//psutil",
             "@rules_python//python/runfiles",
         ],
-        tags = ["no-cache"],
+        **kwargs,
     )
