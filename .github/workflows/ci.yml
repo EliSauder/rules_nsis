@@ -5,60 +5,86 @@ on:
   pull_request:
 
 jobs:
-  windows-bazel-test:
+  build-and-test:
     if: >-
       github.event_name == 'push' ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
-    concurrency:
-      group: ${{ github.workflow }}-windows-${{ github.ref }}
-      cancel-in-progress: true
-    runs-on: [windows-latest]
+    strategy:
+      matrix:
+        bazel_version: ["7.*", "8.*", "9.*"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+    runs-on: ${{ matrix.os }}
+    env:
+      USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
     steps:
-      - name: checkout
+      - name: Checkout
         uses: actions/checkout@v6
-      - name: bazel
+      - name: Bazel Setup
         uses: bazel-contrib/setup-bazel@0.19.0
         with:
           bazelisk-cache: true
-          disk-cache: true
+          disk-cache: ${{ case(matrix.os == 'windows-latest', false, format('{0}-{1}', github.workflow, matrix.os)) }}
           repository-cache: true
-      - name: test
-        run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed --noenable_runfiles
-  linux-bazel-test:
-    if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
-    runs-on: [ubuntu-latest]
-    concurrency:
-      group: ${{ github.workflow }}-linux-${{ github.ref }}
-      cancel-in-progress: true
-    steps:
-      - name: checkout
-        uses: actions/checkout@v6
-      - name: bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}-${{ runner.os }}
-          repository-cache: true
-      - name: test
-        run: bazel test //... --verbose_failures --sandbox_debug
-  macos-bazel-test:
-    if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
-    runs-on: [macos-latest]
-    concurrency:
-      group: ${{ github.workflow }}-macos-${{ github.ref }}
-      cancel-in-progress: true
-    steps:
-      - name: checkout
-        uses: actions/checkout@v6
-      - name: bazel
-        uses: bazel-contrib/setup-bazel@0.19.0
-        with:
-          bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}-${{ runner.os }}
-          repository-cache: true
-      - name: test
-        run: bazel test //... --verbose_failures --sandbox_debug
+          cache-save: ${{ github.event_name != 'pull_request' }}
+      - name: Build
+        run: bazel build //... --verbose_failures --sandbox_debug
+      - name: Test
+        run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed
+
+  #windows-bazel-test:
+  #  if: >-
+  #    github.event_name == 'push' ||
+  #    (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
+  #  concurrency:
+  #    group: ${{ github.workflow }}-windows-${{ github.ref }}
+  #    cancel-in-progress: true
+  #  runs-on: [windows-latest]
+  #  steps:
+  #    - name: checkout
+  #      uses: actions/checkout@v6
+  #    - name: bazel
+  #      uses: bazel-contrib/setup-bazel@0.19.0
+  #      with:
+  #        bazelisk-cache: true
+  #        disk-cache: true
+  #        repository-cache: true
+  #    - name: test
+  #      run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed --noenable_runfiles
+  #linux-bazel-test:
+  #  if: >-
+  #    github.event_name == 'push' ||
+  #    (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
+  #  runs-on: [ubuntu-latest]
+  #  concurrency:
+  #    group: ${{ github.workflow }}-linux-${{ github.ref }}
+  #    cancel-in-progress: true
+  #  steps:
+  #    - name: checkout
+  #      uses: actions/checkout@v6
+  #    - name: bazel
+  #      uses: bazel-contrib/setup-bazel@0.19.0
+  #      with:
+  #        bazelisk-cache: true
+  #        disk-cache: ${{ github.workflow }}-${{ runner.os }}
+  #        repository-cache: true
+  #    - name: test
+  #      run: bazel test //... --verbose_failures --sandbox_debug
+  #macos-bazel-test:
+  #  if: >-
+  #    github.event_name == 'push' ||
+  #    (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
+  #  runs-on: [macos-latest]
+  #  concurrency:
+  #    group: ${{ github.workflow }}-macos-${{ github.ref }}
+  #    cancel-in-progress: true
+  #  steps:
+  #    - name: checkout
+  #      uses: actions/checkout@v6
+  #    - name: bazel
+  #      uses: bazel-contrib/setup-bazel@0.19.0
+  #      with:
+  #        bazelisk-cache: true
+  #        disk-cache: ${{ github.workflow }}-${{ runner.os }}
+  #        repository-cache: true
+  #    - name: test
+  #      run: bazel test //... --verbose_failures --sandbox_debug
