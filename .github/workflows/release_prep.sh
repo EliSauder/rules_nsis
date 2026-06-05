@@ -1,29 +1,20 @@
 #!/usr/bin/env bash
-set -o nounset
-set -o pipefail
-set -o errexit
+set -o errexit -o nounset -o pipefail
 
-set -x
+TAG=$1
 
-CUR_TAG=$1
-if [ -z "$CUR_TAG" ]; then
-    echo "Tag must be set"
-    exit 1
-fi
+PREFIX="rules_nsis-${TAG:1}"
+ARCHIVE="rules_nsis-$TAG.tar.gz"
+ARCHIVE_TMP=$(mktemp)
 
-git checkout "$CUR_TAG"
+git archive --format=tar "--prefix=$PREFIX/" "$TAG" > "$ARCHIVE_TMP"
 
-RELNAME="rules_nsis-$CUR_TAG"
-ARCHIVE="$RELNAME.tar.gz"
+gzip < "$ARCHIVE_TMP" > "$ARCHIVE"
 
-git archive --format=tar "--prefix=$RELNAME/" "$CUR_TAG" | gzip > "$ARCHIVE"
-
-docs="$(mktemp -d)"
-targets="$(mktemp)"
-bazel --output_base="$docs" query --output=label --output_file="$targets" \
-    'kind("starlark_doc_extract rule", //...)'
+# Add generated API docs to the release, see https://github.com/bazelbuild/bazel-central-registry/issues/5593
+docs="$(mktemp -d)"; targets="$(mktemp)"
+bazel --output_base="$docs" query --output=label --output_file="$targets" 'kind("starlark_doc_extract rule", //...)'
 bazel --output_base="$docs" build --target_pattern_file="$targets"
-
 tar --create --auto-compress \
     --directory "$(bazel --output_base="$docs" info bazel-bin)" \
     --file "$GITHUB_WORKSPACE/${ARCHIVE%.tar.gz}.docs.tar.gz" .
