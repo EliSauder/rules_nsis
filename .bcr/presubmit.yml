@@ -1,8 +1,7 @@
 bcr_test_module:
   module_path: "tests"
   matrix:
-    bazel: ["7.*", "8.*", "9.*"]
-    # TODO(#97): add windows
+    bazel: ["8.*", "9.*"]
     platform: ["debian11", "ubuntu2204", "windows", "macos", "macos_arm"]
   tasks:
     smoke_tests:
