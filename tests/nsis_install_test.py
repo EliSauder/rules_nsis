@@ -1,5 +1,4 @@
 import os
-import uuid
 import time
 import psutil
 import json
@@ -12,6 +11,8 @@ import winreg
 import logging
 
 from python.runfiles import runfiles
+
+TEST_TMPDIR = None
 
 def _print_directory_tree(indir: str) -> str:
     out = indir + os.path.sep + "\n"
@@ -114,6 +115,7 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, inst_root: 
         testcase.fail(f"Registry key {inpath} still exists")
     except:
         pass
+
     try:
         key = _reg_open(root, unpath, access)
         try:
@@ -121,6 +123,52 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, inst_root: 
         except:
             pass
         testcase.fail(f"Registry key {inpath} still exists")
+    except:
+        pass
+
+    try:
+        _reg_value(root, inpath, access, "InstallDir")
+        testcase.fail(f"Registry key {inpath} with value InstallDir still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, inpath, access, "Version")
+        testcase.fail(f"Registry key {inpath} with value Version still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "DisplayName")
+        testcase.fail(f"Registry key {unpath} with value DisplayName still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "DisplayVersion")
+        testcase.fail(f"Registry key {unpath} with value DisplayVersion still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "Publisher")
+        testcase.fail(f"Registry key {unpath} with value Publisher still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "UninstallString")
+        testcase.fail(f"Registry key {unpath} with value UninstallString still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "NoRepair")
+        testcase.fail(f"Registry key {unpath} with value NoRepair still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "NoModify")
+        testcase.fail(f"Registry key {unpath} with value NoModify still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "DisplayIcon")
+        testcase.fail(f"Registry key {unpath} with value DisplayIcon still exists")
     except:
         pass
 
@@ -150,11 +198,8 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, ins
     testcase.assertEqual(f"{instdir}\\Uninstall.exe", unstr, f"expected UninstallString to equal install path + Uninstall.exe")
     testcase.assertEqual(versionval, unversionval, f"expected install version {versionval} to equal uninstall version {unversionval}")
 
-
 def _get_install_root():
-    test_tmpdir = os.path.abspath(str(os.environ["TEST_TMPDIR"]))
-    uid = uuid.uuid4().hex
-    install_root = f"{test_tmpdir}\\{uid}\\nsis-install-root"
+    install_root = f"{TEST_TMPDIR}\\nsis-install-root"
 
     pth = pathlib.Path(install_root).resolve()
 
@@ -173,9 +218,13 @@ def _get_install_subpath(config):
     return subpath
 
 def _get_uninstaller_cmd(install_root):
+    base_uninstaller = os.path.join(install_root, "Uninstall.exe")
+    new_uninstaller_path = os.path.join(TEST_TMPDIR, "Uninstall.exe")
+    shutil.copy(base_uninstaller, new_uninstaller_path)
     cmd = [
-        os.path.join(install_root, "Uninstall.exe"),
-        "/S"
+        new_uninstaller_path,
+        "/S",
+        f"_?={install_root}"
     ]
     return cmd
 
@@ -291,8 +340,6 @@ def _validate_uninstall(testcase, install_root, install_subpath, config):
         check=False
     )
 
-    time.sleep(5)
-
     testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {uninstaller_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
     log = logging.getLogger("NsisInstallerTest.test_installer")
@@ -330,7 +377,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         raise SystemError("Expected argv: <installer_path> <config_json>")
 
-    #INSTALLER = sys.argv[1]
+    TEST_TMPDIR = os.path.abspath(str(os.environ["TEST_TMPDIR"]))
     INSTALLER = RUNFILES.Rlocation(sys.argv[1])
     if not os.path.exists(INSTALLER):
         dir = os.path.dirname(INSTALLER)

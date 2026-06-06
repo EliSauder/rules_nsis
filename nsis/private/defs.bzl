@@ -781,7 +781,6 @@ def _render_file(ctx, tmpl, data):
     ctx.actions.write(
         output = datafile,
         content = json.encode(data),
-        mnemonic = "Render Tpl {} - Data File".format(tmpl.short_path),
     )
 
     outname = "nsistmpl-{}.nsi".format(hs)
