@@ -218,9 +218,13 @@ def _get_install_subpath(config):
     return subpath
 
 def _get_uninstaller_cmd(install_root):
+    base_uninstaller = os.path.join(install_root, "Uninstall.exe")
+    new_uninstaller_path = os.path.join(TEST_TMPDIR, "uninstall", "Uninstall.exe")
+    shutil.copy(base_uninstaller, new_uninstaller_path)
     cmd = [
-        os.path.join(install_root, "Uninstall.exe"),
-        "/S"
+        new_uninstaller_path,
+        "/S",
+        f"_?={install_root}"
     ]
     return cmd
 
@@ -335,8 +339,6 @@ def _validate_uninstall(testcase, install_root, install_subpath, config):
         timeout=120,
         check=False
     )
-
-    time.sleep(5)
 
     testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {uninstaller_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
