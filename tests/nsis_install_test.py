@@ -219,7 +219,7 @@ def _get_install_subpath(config):
 
 def _get_uninstaller_cmd(install_root):
     base_uninstaller = os.path.join(install_root, "Uninstall.exe")
-    new_uninstaller_path = os.path.join(TEST_TMPDIR, "uninstall", "Uninstall.exe")
+    new_uninstaller_path = os.path.join(TEST_TMPDIR, "Uninstall.exe")
     shutil.copy(base_uninstaller, new_uninstaller_path)
     cmd = [
         new_uninstaller_path,
