@@ -115,6 +115,7 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, inst_root: 
         testcase.fail(f"Registry key {inpath} still exists")
     except:
         pass
+
     try:
         key = _reg_open(root, unpath, access)
         try:
@@ -122,6 +123,52 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, inst_root: 
         except:
             pass
         testcase.fail(f"Registry key {inpath} still exists")
+    except:
+        pass
+
+    try:
+        _reg_value(root, inpath, access, "InstallDir")
+        testcase.fail(f"Registry key {inpath} with value InstallDir still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, inpath, access, "Version")
+        testcase.fail(f"Registry key {inpath} with value Version still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "DisplayName")
+        testcase.fail(f"Registry key {unpath} with value DisplayName still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "DisplayVersion")
+        testcase.fail(f"Registry key {unpath} with value DisplayVersion still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "Publisher")
+        testcase.fail(f"Registry key {unpath} with value Publisher still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "UninstallString")
+        testcase.fail(f"Registry key {unpath} with value UninstallString still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "NoRepair")
+        testcase.fail(f"Registry key {unpath} with value NoRepair still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "NoModify")
+        testcase.fail(f"Registry key {unpath} with value NoModify still exists")
+    except:
+        pass
+    try:
+        _reg_value(root, unpath, access, "DisplayIcon")
+        testcase.fail(f"Registry key {unpath} with value DisplayIcon still exists")
     except:
         pass
 
