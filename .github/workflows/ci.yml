@@ -2,13 +2,9 @@ name: Test Rules
 
 on:
   push:
-  pull_request:
 
 jobs:
   build-and-test:
-    if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
     strategy:
       matrix:
         bazel_version: ["8.*", "9.*"]
