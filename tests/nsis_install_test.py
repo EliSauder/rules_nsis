@@ -71,7 +71,7 @@ def _get_reg_db(execution_level: str) -> int:
     if execution_level == "user":
         return winreg.HKEY_CURRENT_USER
 
-    raise SystemError(f"unsupported execution_level {execution_level}")
+    raise OSError(f"unsupported execution_level {execution_level}")
 
 def _get_reg_view(bitwidth: str) -> int:
     if bitwidth == "32":
@@ -79,10 +79,10 @@ def _get_reg_view(bitwidth: str) -> int:
     if bitwidth == "64":
         return winreg.KEY_WOW64_64KEY
 
-    raise SystemError(f"unsupported bitwidth {bitwidth}")
+    raise OSError(f"unsupported bitwidth {bitwidth}")
 
 def _get_reg_access(bitwidth: str) -> int:
-    access = winreg.KEY_READ
+    access = winreg.KEY_READ | winreg.KEY_QUERY_VALUE
     access |= _get_reg_view(bitwidth)
     return access
 
@@ -90,7 +90,7 @@ def _reg_open(root_db: int, path: str, view: int):
     try:
         return winreg.OpenKey(root_db, path, 0, view)
     except:
-        raise SystemError(f"error opening key {path}")
+        raise FileNotFoundError(f"error opening key {path}")
 
 def _reg_value(root: int, path: str, view: int, name: str):
     with _reg_open(root, path, view) as hkey:
@@ -107,69 +107,61 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, inst_root: 
     access = _get_reg_access(config["expected_bitwidth"] or "64")
 
     try:
-        key = _reg_open(root, inpath, access)
-        try:
-            key.Close()
-        except:
-            pass
-        testcase.fail(f"Registry key {inpath} still exists")
-    except:
+        with _reg_open(root, inpath, access):
+            testcase.fail(f"Registry key {inpath} still exists")
+    except FileNotFoundError:
         pass
 
     try:
-        key = _reg_open(root, unpath, access)
-        try:
-            key.Close()
-        except:
-            pass
-        testcase.fail(f"Registry key {inpath} still exists")
-    except:
+        with _reg_open(root, unpath, access):
+            testcase.fail(f"Registry key {inpath} still exists")
+    except FileNotFoundError:
         pass
 
     try:
         _reg_value(root, inpath, access, "InstallDir")
         testcase.fail(f"Registry key {inpath} with value InstallDir still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, inpath, access, "Version")
         testcase.fail(f"Registry key {inpath} with value Version still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "DisplayName")
         testcase.fail(f"Registry key {unpath} with value DisplayName still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "DisplayVersion")
         testcase.fail(f"Registry key {unpath} with value DisplayVersion still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "Publisher")
         testcase.fail(f"Registry key {unpath} with value Publisher still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "UninstallString")
         testcase.fail(f"Registry key {unpath} with value UninstallString still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "NoRepair")
         testcase.fail(f"Registry key {unpath} with value NoRepair still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "NoModify")
         testcase.fail(f"Registry key {unpath} with value NoModify still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "DisplayIcon")
         testcase.fail(f"Registry key {unpath} with value DisplayIcon still exists")
-    except:
+    except FileNotFoundError:
         pass
 
 def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, inst_subpath: str):
