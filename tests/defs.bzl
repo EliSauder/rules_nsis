@@ -35,6 +35,7 @@ def _nsis_test_config_impl(ctx):
                         inst.product + " ",
                         cmp.display_name,
                     ),
+                    "description": cmp.description if cmp.description else "",
                     "executable": "{}{}".format(
                         (cmp.directory + "\\" if cmp.directory else ""),
                         cmp.service_executable[DefaultInfo].files.to_list()[0].basename,
