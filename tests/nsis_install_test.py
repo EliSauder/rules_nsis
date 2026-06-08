@@ -194,9 +194,21 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, ins
     _reg_value(root, unpath, access, "NoModify")
     _reg_value(root, unpath, access, "DisplayIcon")
 
-    testcase.assertEqual(instdir, instdirval, f"expected InstallDir to equal install path")
-    testcase.assertEqual(f"{instdir}\\Uninstall.exe", unstr, f"expected UninstallString to equal install path + Uninstall.exe")
-    testcase.assertEqual(versionval, unversionval, f"expected install version {versionval} to equal uninstall version {unversionval}")
+    testcase.assertEqual(
+        instdir,
+        instdirval,
+        f"expected {inpath}\\InstallDir to equal install path",
+    )
+    testcase.assertEqual(
+        f"{instdir}\\Uninstall.exe",
+        unstr,
+        f"expected {unpath}\\UninstallString to equal install path + Uninstall.exe",
+    )
+    testcase.assertEqual(
+        versionval,
+        unversionval,
+        f"expected install version {versionval} to equal uninstall version {unversionval}",
+    )
 
 def _get_install_root():
     install_root = f"{TEST_TMPDIR}\\nsis-install-root"
