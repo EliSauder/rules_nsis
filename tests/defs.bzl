@@ -31,8 +31,8 @@ def _nsis_test_config_impl(ctx):
                 services[cmp.name] = {
                     "start_type": cmp.service_start_type,
                     "display_name": "{}{}{}".format(
-                        inst.vendor if inst.vendor else "",
-                        inst.product if inst.product else "",
+                        inst.vendor + " " if inst.vendor else "",
+                        inst.product + " ",
                         cmp.display_name,
                     ),
                     "executable": "{}{}".format(
