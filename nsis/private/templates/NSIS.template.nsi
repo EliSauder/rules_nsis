@@ -437,7 +437,6 @@ Function AddToRegistry
     StrCpy $3 $TestId
     StrCpy $0 "$0\$3"
     Pop $3
-    WriteRegStr SHCTX "$0" "$2" "$1"
   ${EndIf}
 
   WriteRegStr SHCTX "$0" "$2" "$1"
