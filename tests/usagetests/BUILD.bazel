@@ -1,4 +1,5 @@
 load("@rules_nsis//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer")
+load("@rules_nsis//tests:defs.bzl", "nsis_installer_test")
 
 nsis_component(
     name = "minimal_component",
