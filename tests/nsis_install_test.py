@@ -1,4 +1,5 @@
 import os
+import hashlib
 import time
 import psutil
 import json
@@ -13,6 +14,7 @@ import logging
 from python.runfiles import runfiles
 
 TEST_TMPDIR = None
+TEST_ID = None
 
 def _print_directory_tree(indir: str) -> str:
     out = indir + os.path.sep + "\n"
@@ -63,7 +65,7 @@ def _get_sub_path(product_path, vendor_path, install_path) -> str:
     return subpath
 
 def _get_reg_path(subpath) -> str:
-    return f"Software\\{subpath}", f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{subpath}"
+    return f"Software\\{subpath}\\{TEST_ID}", f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{subpath}\\{TEST_ID}"
 
 def _get_reg_db(execution_level: str) -> int:
     if execution_level == "admin":
@@ -71,7 +73,7 @@ def _get_reg_db(execution_level: str) -> int:
     if execution_level == "user":
         return winreg.HKEY_CURRENT_USER
 
-    raise SystemError(f"unsupported execution_level {execution_level}")
+    raise OSError(f"unsupported execution_level {execution_level}")
 
 def _get_reg_view(bitwidth: str) -> int:
     if bitwidth == "32":
@@ -79,10 +81,10 @@ def _get_reg_view(bitwidth: str) -> int:
     if bitwidth == "64":
         return winreg.KEY_WOW64_64KEY
 
-    raise SystemError(f"unsupported bitwidth {bitwidth}")
+    raise OSError(f"unsupported bitwidth {bitwidth}")
 
 def _get_reg_access(bitwidth: str) -> int:
-    access = winreg.KEY_READ
+    access = winreg.KEY_READ | winreg.KEY_QUERY_VALUE
     access |= _get_reg_view(bitwidth)
     return access
 
@@ -90,7 +92,7 @@ def _reg_open(root_db: int, path: str, view: int):
     try:
         return winreg.OpenKey(root_db, path, 0, view)
     except:
-        raise SystemError(f"error opening key {path}")
+        raise FileNotFoundError(f"error opening key {path}")
 
 def _reg_value(root: int, path: str, view: int, name: str):
     with _reg_open(root, path, view) as hkey:
@@ -107,69 +109,61 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, inst_root: 
     access = _get_reg_access(config["expected_bitwidth"] or "64")
 
     try:
-        key = _reg_open(root, inpath, access)
-        try:
-            key.Close()
-        except:
-            pass
-        testcase.fail(f"Registry key {inpath} still exists")
-    except:
+        with _reg_open(root, inpath, access):
+            testcase.fail(f"Registry key {inpath} still exists")
+    except FileNotFoundError:
         pass
 
     try:
-        key = _reg_open(root, unpath, access)
-        try:
-            key.Close()
-        except:
-            pass
-        testcase.fail(f"Registry key {inpath} still exists")
-    except:
+        with _reg_open(root, unpath, access):
+            testcase.fail(f"Registry key {inpath} still exists")
+    except FileNotFoundError:
         pass
 
     try:
         _reg_value(root, inpath, access, "InstallDir")
         testcase.fail(f"Registry key {inpath} with value InstallDir still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, inpath, access, "Version")
         testcase.fail(f"Registry key {inpath} with value Version still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "DisplayName")
         testcase.fail(f"Registry key {unpath} with value DisplayName still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "DisplayVersion")
         testcase.fail(f"Registry key {unpath} with value DisplayVersion still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "Publisher")
         testcase.fail(f"Registry key {unpath} with value Publisher still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "UninstallString")
         testcase.fail(f"Registry key {unpath} with value UninstallString still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "NoRepair")
         testcase.fail(f"Registry key {unpath} with value NoRepair still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "NoModify")
         testcase.fail(f"Registry key {unpath} with value NoModify still exists")
-    except:
+    except FileNotFoundError:
         pass
     try:
         _reg_value(root, unpath, access, "DisplayIcon")
         testcase.fail(f"Registry key {unpath} with value DisplayIcon still exists")
-    except:
+    except FileNotFoundError:
         pass
 
 def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, inst_subpath: str):
@@ -194,9 +188,21 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, ins
     _reg_value(root, unpath, access, "NoModify")
     _reg_value(root, unpath, access, "DisplayIcon")
 
-    testcase.assertEqual(instdir, instdirval, f"expected InstallDir to equal install path")
-    testcase.assertEqual(f"{instdir}\\Uninstall.exe", unstr, f"expected UninstallString to equal install path + Uninstall.exe")
-    testcase.assertEqual(versionval, unversionval, f"expected install version {versionval} to equal uninstall version {unversionval}")
+    testcase.assertEqual(
+        instdir,
+        instdirval,
+        f"expected {inpath}\\InstallDir to equal install path",
+    )
+    testcase.assertEqual(
+        f"{instdir}\\Uninstall.exe",
+        unstr,
+        f"expected {unpath}\\UninstallString to equal install path + Uninstall.exe",
+    )
+    testcase.assertEqual(
+        versionval,
+        unversionval,
+        f"expected install version {versionval} to equal uninstall version {unversionval}",
+    )
 
 def _get_install_root():
     install_root = f"{TEST_TMPDIR}\\nsis-install-root"
@@ -224,6 +230,7 @@ def _get_uninstaller_cmd(install_root):
     cmd = [
         new_uninstaller_path,
         "/S",
+        f"/TESTID={TEST_ID}",
         f"_?={install_root}"
     ]
     return cmd
@@ -233,6 +240,7 @@ def _get_installer_cmd(installer, install_root, config):
     cmd = [
         str(installer),
         "/S",
+        f"/TESTID={TEST_ID}",
     ] + installer_args + [
         f"/D={install_root}"
     ]
@@ -378,6 +386,11 @@ if __name__ == "__main__":
         raise SystemError("Expected argv: <installer_path> <config_json>")
 
     TEST_TMPDIR = os.path.abspath(str(os.environ["TEST_TMPDIR"]))
+
+    m = hashlib.sha256()
+    m.update(TEST_TMPDIR.encode('utf-8'))
+    TEST_ID = m.hexdigest()
+
     INSTALLER = RUNFILES.Rlocation(sys.argv[1])
     if not os.path.exists(INSTALLER):
         dir = os.path.dirname(INSTALLER)

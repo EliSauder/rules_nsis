@@ -7,6 +7,8 @@ Unicode True
 !include x64.nsh
 !include Sections.nsh
 
+!include FileFunc.nsh
+
 !define IsNativeARM32 '${IsNativeMachineArchitecture} 448'
 
 !define PACKAGE_NAME "{{ (ds "in").Product }}"
@@ -326,8 +328,8 @@ Var IsArmInstall
     System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_NAME}InstallerMutex") i .r1 ?e'
     Pop $R0
     ${If} $R0 != 0
-        MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running." /SD IDOK
         !insertmacro Log "Another instance is already running, aborting"
+        MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running." /SD IDOK
         Abort
     ${EndIf}
 !macroend
@@ -399,6 +401,28 @@ Var SectionSelected_{{.Name}}
 #  ${EndIf}
 #FunctionEnd
 
+Var TestId
+
+Function un.RemoveRegistry
+  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+      SetShellVarContext all
+  ${Else}
+      SetShellVarContext current
+  ${EndIf}
+  Pop $0
+
+  ${If} $TestId == ""
+    !insertmacro Log "Removing registry '$0'"
+    DeleteRegKey SHCTX "$0"
+  ${Else}
+    Push $1
+    StrCpy $1 $TestId
+    !insertmacro Log "Removing registry '$0\$1'"
+    DeleteRegKey SHCTX "$0\$1"
+    Pop $1
+  ${EndIf}
+FunctionEnd
+
 Function AddToRegistry
   ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
       SetShellVarContext all
@@ -407,9 +431,16 @@ Function AddToRegistry
   ${EndIf}
   Pop $0
   Pop $1
-  WriteRegStr SHCTX "${UN_REG_KEY}" \
-  "$1" "$0"
-  !insertmacro Log "Set install registry entry: '$1' to '$0'"
+  Pop $2
+  ${If} $TestId != ""
+    Push $3
+    StrCpy $3 $TestId
+    StrCpy $0 "$0\$3"
+    Pop $3
+  ${EndIf}
+
+  WriteRegStr SHCTX "$0" "$2" "$1"
+  !insertmacro Log "Set install registry entry: '$0' -> '$2' to '$1'"
 FunctionEnd
 
 !macro _ServiceScExec ARGS OUT_RC
@@ -594,36 +625,52 @@ Section "-Core Installation"
 
     SetOutPath "$INSTDIR"
 
-    WriteRegStr SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}" "$INSTDIR"
-    WriteRegStr SHCTX "${REG_KEY}" "Version" "${PACKAGE_VERSION}"
+    Push "${REG_KEY_INSTLOC}"
+    Push "$INSTDIR"
+    Push "${REG_KEY}"
+    Call AddToRegistry
+
+    Push "Version"
+    Push "${PACKAGE_VERSION}"
+    Push "${REG_KEY}"
+    Call AddToRegistry
+
     WriteUninstaller "$INSTDIR\${UNINSTALLER_NAME}"
 
     Push "DisplayName"
     Push "${PACKAGE_NAME}"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "DisplayVersion"
     Push "${PACKAGE_VERSION}"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "Publisher"
     Push "${PACKAGE_VENDOR}"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "UninstallString"
     Push "$INSTDIR\${UNINSTALLER_NAME}"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "NoRepair"
     Push "1"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "NoModify"
     Push "1"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
 
     ${If} "${ICON_FILE}" != ""
         Push "DisplayIcon"
         Push "$INSTDIR\${ICON_FILE}"
+        Push "${UN_REG_KEY}"
         Call AddToRegistry
     ${Else}
         Push "DisplayIcon"
         Push ""
+        Push "${UN_REG_KEY}"
         Call AddToRegistry
     ${EndIf}
 
@@ -646,11 +693,16 @@ SectionEnd
 #FunctionEnd
 
 Function .onInit
+    Push $0
+    ${GetParameters} $0
+    ClearErrors
+    ${GetOptions} $0 "/TESTID=" $TestId
+    ClearErrors
+
     !insertmacro SetVarCtx
     !insertmacro SetRegView
     !insertmacro ValidateMutex
 
-    Push $0
     {{- range (ds "in").Components }}
     {{- template "sectionVarInit" .}}
     {{- end}}
@@ -659,18 +711,31 @@ Function .onInit
     {{- template "sectionGroupVarInit" .}}
     {{- end}}
     Pop $0
+
 FunctionEnd
 
 
 Function un.onInit
+    Push $0
+    ${GetParameters} $0
+    ClearErrors
+    ${GetOptions} $0 "/TESTID=" $TestId
+    ClearErrors
+
     !insertmacro SetVarCtx
     !insertmacro SetRegView
     !insertmacro ValidateMutex
 
-    Push $0
-    ReadRegStr $0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
+    ${If} $TestId == ""
+        ReadRegStr $0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
+    ${Else}
+        StrCpy $0 $TestId
+        ReadRegStr $0 SHCTX "${REG_KEY}\$0" "${REG_KEY_INSTLOC}"
+    ${EndIf}
+
     ${If} ${Errors}
     ${OrIf} $0 == ""
+        !insertmacro Log "No previous install exists."
         MessageBox MB_ICONSTOP "No previous install exists." /SD IDOK
         Abort
     ${EndIf}
@@ -789,13 +854,11 @@ Section "Uninstall"
   ;Remove the uninstaller itself.
   SetFileAttributes "$INSTDIR\${UNINSTALLER_NAME}" NORMAL
   Delete "$INSTDIR\${UNINSTALLER_NAME}"
-  DeleteRegKey SHCTX "${UN_REG_KEY}"
-
   ; Remove if empty
   RMDir "$INSTDIR"
 
-  ; Remove the registry entries.
-  DeleteRegKey SHCTX "${REG_KEY}"
-  DeleteRegKey /ifempty SHCTX "${REG_KEY}"
-
+  Push "${UN_REG_KEY}"
+  Call un.RemoveRegistry
+  Push "${REG_KEY}"
+  Call un.RemoveRegistry
 SectionEnd
