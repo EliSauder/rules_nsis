@@ -67,6 +67,6 @@ nsis_test.executable(
 use_repo(nsis_test, "test_nsis_tool", "test_nsis_toolchains")
 
 register_toolchains(
-    "@test_nsis_toolchains//:nsis",
+    "@test_nsis_toolchains//:all",
     dev_dependency = True,
 )

@@ -15,7 +15,7 @@ toolchains = [
 ]
 
 NsisInstallerInfo = provider(
-    doc = "",
+    doc = "Defines that every installer contains.",
     fields = {
         "name": "The name of the installer",
         "product": "The display name of the software being packaged.",

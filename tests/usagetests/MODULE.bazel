@@ -1,0 +1,17 @@
+module(
+    name = "rules_nsis-usagetest",
+)
+
+bazel_dep(name = "rules_nsis", version = "0.1.0")
+local_path_override(
+    module_name = "rules_nsis",
+    path = "../../",
+)
+
+nsis = use_extension("@rules_nsis//nsis:extensions.bzl", "nsis")
+# Currently 3.11 is the only supported version.
+nsis.executable(name = "nsis", version = "3.11")
+
+use_repo(nsis, "nsis_tool", "nsis_toolchains")
+
+register_toolchains("@nsis_toolchains//:all")

@@ -144,11 +144,45 @@ nsis_toolchain(
 )
 
 toolchain(
-    name = "nsis",
+    name = "nsis_x64",
     toolchain = ":nsis_toolchain_impl",
     toolchain_type = "@rules_nsis//nsis/toolchain:toolchain_type",
     target_compatible_with = [
         "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+toolchain(
+    name = "nsis_x32",
+    toolchain = ":nsis_toolchain_impl",
+    toolchain_type = "@rules_nsis//nsis/toolchain:toolchain_type",
+    target_compatible_with = [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_32",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+toolchain(
+    name = "nsis_arm64",
+    toolchain = ":nsis_toolchain_impl",
+    toolchain_type = "@rules_nsis//nsis/toolchain:toolchain_type",
+    target_compatible_with = [
+        "@platforms//os:windows",
+        "@platforms//cpu:arm64",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+toolchain(
+    name = "nsis_arm32",
+    toolchain = ":nsis_toolchain_impl",
+    toolchain_type = "@rules_nsis//nsis/toolchain:toolchain_type",
+    target_compatible_with = [
+        "@platforms//os:windows",
+        "@platforms//cpu:arm",
     ],
     visibility = ["//visibility:public"],
 )
