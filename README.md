@@ -24,7 +24,7 @@ nsis.executable(name = "nsis", version = "3.11")
 
 use_repo(nsis, "nsis_tool", "nsis_toolchains")
 
-register_toolchains("@nsis_toolchains//:toolchain")
+register_toolchains("@nsis_toolchains//:all")
 ```
 
 #### Define Installer
