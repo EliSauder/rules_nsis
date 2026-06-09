@@ -387,7 +387,7 @@ if __name__ == "__main__":
     TEST_TMPDIR = os.path.abspath(str(os.environ["TEST_TMPDIR"]))
 
     m = hashlib.sha256()
-    m.update(TEST_TMPDIR)
+    m.update(TEST_TMPDIR.encode('utf-8'))
     TEST_ID = m.hexdigest()
 
     INSTALLER = RUNFILES.Rlocation(sys.argv[1])
