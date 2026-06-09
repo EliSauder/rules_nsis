@@ -230,6 +230,7 @@ def _get_uninstaller_cmd(install_root):
     cmd = [
         new_uninstaller_path,
         "/S",
+        f"/TESTID={TEST_ID}",
         f"_?={install_root}"
     ]
     return cmd

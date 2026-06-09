@@ -403,6 +403,24 @@ Var SectionSelected_{{.Name}}
 
 Var TestId
 
+Function un.RemoveRegistry
+  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+      SetShellVarContext all
+  ${Else}
+      SetShellVarContext current
+  ${EndIf}
+  Pop $0
+
+  ${If} $TestId == ""
+    DeleteRegKey SHCTX "$0"
+  ${Else}
+    Push $1
+    StrCpy $1 $TestId
+    DeleteRegKey SHCTX "$0/$1"
+    Pop $1
+  ${EndIf}
+FunctionEnd
+
 Function AddToRegistry
   ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
       SetShellVarContext all
@@ -697,12 +715,23 @@ FunctionEnd
 
 
 Function un.onInit
+    Push $0
+    ${GetParameters} $0
+    ClearErrors
+    ${GetOptions} $0 "/TESTID=" $TestId
+    ClearErrors
+
     !insertmacro SetVarCtx
     !insertmacro SetRegView
     !insertmacro ValidateMutex
 
-    Push $0
-    ReadRegStr $0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
+    ${If} $TestId == ""
+        ReadRegStr $0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
+    ${Else}
+        StrCpy $0 $TestId
+        ReadRegStr $0 SHCTX "${REG_KEY}/$0" "${REG_KEY_INSTLOC}"
+    ${EndIf}
+
     ${If} ${Errors}
     ${OrIf} $0 == ""
         MessageBox MB_ICONSTOP "No previous install exists." /SD IDOK
@@ -823,13 +852,11 @@ Section "Uninstall"
   ;Remove the uninstaller itself.
   SetFileAttributes "$INSTDIR\${UNINSTALLER_NAME}" NORMAL
   Delete "$INSTDIR\${UNINSTALLER_NAME}"
-  DeleteRegKey SHCTX "${UN_REG_KEY}"
-
   ; Remove if empty
   RMDir "$INSTDIR"
 
-  ; Remove the registry entries.
-  DeleteRegKey SHCTX "${REG_KEY}"
-  DeleteRegKey /ifempty SHCTX "${REG_KEY}"
-
+  Push "${UN_REG_KEY}"
+  Call un.RemoveRegistry
+  Push "${REG_KEY}"
+  Call un.RemoveRegistry
 SectionEnd
