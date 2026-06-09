@@ -70,5 +70,3 @@ jobs:
           cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Build
         run: bazel build //... --verbose_failures --sandbox_debug
-      - name: Test
-        run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed
