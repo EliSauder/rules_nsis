@@ -2,6 +2,7 @@ name: Test Rules
 
 on:
   push:
+  workflow_call:
 
 jobs:
   build-and-test:
