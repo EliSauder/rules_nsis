@@ -46,18 +46,20 @@ def _print_environ() -> str:
     out = ""
     for k, v in os.environ.items():
         out = out + "{}={}\n".format(k, v)
+    return out
 
 def _print_args() -> str:
     out = ""
     for a in sys.argv:
         out = "{}\n".format(a)
+    return out
 
 print("cwd=", os.getcwd())
 print("dircontent=\n", _print_directory_tree(os.getcwd()))
 print("environment=\n", _print_environ())
 print("args=\n", _print_args())
 if "RUNFILES_DIR" in os.environ:
-    print("runfilesdir=", os.environ["RUNFILES_DIR"])
+    print("runfilesdir=", _print_directory_tree(os.environ["RUNFILES_DIR"]))
 
 RUNFILES = runfiles.Create()
 if RUNFILES == None:
