@@ -726,7 +726,7 @@ Function un.onInit
     !insertmacro SetRegView
     !insertmacro ValidateMutex
 
-    ${If} $TestId != ""
+    ${If} $TestId == ""
         ReadRegStr $0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
     ${Else}
         StrCpy $0 $TestId
