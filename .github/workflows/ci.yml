@@ -48,10 +48,11 @@ jobs:
         run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed
   test-usage:
     needs: build-and-test
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         bazel_version: ["8.*", "9.*"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+    runs-on: ${{ matrix.os }}
     env:
       USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
     defaults:
