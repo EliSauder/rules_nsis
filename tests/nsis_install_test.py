@@ -39,10 +39,20 @@ def _print_directory_tree(indir: str) -> str:
 
     return out
 
+def _print_environ() -> str:
+    out = ""
+    for k, v in os.environ.items():
+        out = out + "{}={}\n".format(k, v)
+
+def _print_args() -> str:
+    out = ""
+    for a in sys.argv:
+        out = "{}\n".format(a)
+
 print("cwd=", os.getcwd())
 print("dircontent=\n", _print_directory_tree(os.getcwd()))
-print("environment=\n", os.environ)
-print("args=\n", sys.argv)
+print("environment=\n", _print_environ())
+print("args=\n", _print_args())
 
 RUNFILES = runfiles.Create()
 if RUNFILES == None:
