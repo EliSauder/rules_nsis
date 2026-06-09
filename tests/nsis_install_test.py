@@ -1,4 +1,5 @@
 import os
+import hashlib
 import time
 import psutil
 import json
@@ -13,6 +14,7 @@ import logging
 from python.runfiles import runfiles
 
 TEST_TMPDIR = None
+TEST_ID = None
 
 def _print_directory_tree(indir: str) -> str:
     out = indir + os.path.sep + "\n"
@@ -63,7 +65,7 @@ def _get_sub_path(product_path, vendor_path, install_path) -> str:
     return subpath
 
 def _get_reg_path(subpath) -> str:
-    return f"Software\\{subpath}", f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{subpath}"
+    return f"Software\\{subpath}\\{TEST_ID}", f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{subpath}\\{TEST_ID}"
 
 def _get_reg_db(execution_level: str) -> int:
     if execution_level == "admin":
@@ -237,6 +239,7 @@ def _get_installer_cmd(installer, install_root, config):
     cmd = [
         str(installer),
         "/S",
+        f"/TESTID={TEST_ID}",
     ] + installer_args + [
         f"/D={install_root}"
     ]
@@ -382,6 +385,11 @@ if __name__ == "__main__":
         raise SystemError("Expected argv: <installer_path> <config_json>")
 
     TEST_TMPDIR = os.path.abspath(str(os.environ["TEST_TMPDIR"]))
+
+    m = hashlib.sha256()
+    m.update(TEST_TMPDIR)
+    TEST_ID = m.hexdigest()
+
     INSTALLER = RUNFILES.Rlocation(sys.argv[1])
     if not os.path.exists(INSTALLER):
         dir = os.path.dirname(INSTALLER)

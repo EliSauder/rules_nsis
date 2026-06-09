@@ -7,6 +7,8 @@ Unicode True
 !include x64.nsh
 !include Sections.nsh
 
+!include FileFunc.nsh
+
 !define IsNativeARM32 '${IsNativeMachineArchitecture} 448'
 
 !define PACKAGE_NAME "{{ (ds "in").Product }}"
@@ -399,6 +401,8 @@ Var SectionSelected_{{.Name}}
 #  ${EndIf}
 #FunctionEnd
 
+Var TestId
+
 Function AddToRegistry
   ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
       SetShellVarContext all
@@ -407,9 +411,17 @@ Function AddToRegistry
   ${EndIf}
   Pop $0
   Pop $1
-  WriteRegStr SHCTX "${UN_REG_KEY}" \
-  "$1" "$0"
-  !insertmacro Log "Set install registry entry: '$1' to '$0'"
+  Pop $2
+  ${If} $TestId != ""
+    Push $3
+    StrCpy $3 $TestId
+    StrCpy $0 "$0\$3"
+    Pop $3
+    WriteRegStr SHCTX "$0" "$2" "$1"
+  ${EndIf}
+
+  WriteRegStr SHCTX "$0" "$2" "$1"
+  !insertmacro Log "Set install registry entry: '$0' -> '$2' to '$1'"
 FunctionEnd
 
 !macro _ServiceScExec ARGS OUT_RC
@@ -594,36 +606,52 @@ Section "-Core Installation"
 
     SetOutPath "$INSTDIR"
 
-    WriteRegStr SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}" "$INSTDIR"
-    WriteRegStr SHCTX "${REG_KEY}" "Version" "${PACKAGE_VERSION}"
+    Push "${REG_KEY_INSTLOC}"
+    Push "$INSTDIR"
+    Push "${REG_KEY}"
+    Call AddToRegistry
+
+    Push "Version"
+    Push "${PACKAGE_VERSION}"
+    Push "${REG_KEY}"
+    Call AddToRegistry
+
     WriteUninstaller "$INSTDIR\${UNINSTALLER_NAME}"
 
     Push "DisplayName"
     Push "${PACKAGE_NAME}"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "DisplayVersion"
     Push "${PACKAGE_VERSION}"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "Publisher"
     Push "${PACKAGE_VENDOR}"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "UninstallString"
     Push "$INSTDIR\${UNINSTALLER_NAME}"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "NoRepair"
     Push "1"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "NoModify"
     Push "1"
+    Push "${UN_REG_KEY}"
     Call AddToRegistry
 
     ${If} "${ICON_FILE}" != ""
         Push "DisplayIcon"
         Push "$INSTDIR\${ICON_FILE}"
+        Push "${UN_REG_KEY}"
         Call AddToRegistry
     ${Else}
         Push "DisplayIcon"
         Push ""
+        Push "${UN_REG_KEY}"
         Call AddToRegistry
     ${EndIf}
 
@@ -646,11 +674,16 @@ SectionEnd
 #FunctionEnd
 
 Function .onInit
+    Push $0
+    ${GetParameters} $0
+    ClearErrors
+    ${GetOptions} $0 "/TESTID=" $TestId
+    ClearErrors
+
     !insertmacro SetVarCtx
     !insertmacro SetRegView
     !insertmacro ValidateMutex
 
-    Push $0
     {{- range (ds "in").Components }}
     {{- template "sectionVarInit" .}}
     {{- end}}
@@ -659,6 +692,7 @@ Function .onInit
     {{- template "sectionGroupVarInit" .}}
     {{- end}}
     Pop $0
+
 FunctionEnd
 
 
