@@ -417,8 +417,8 @@ Function un.RemoveRegistry
   ${Else}
     Push $1
     StrCpy $1 $TestId
-    DeleteRegKey SHCTX "$0/$1"
     !insertmacro Log "Removing registry '$0\$1'"
+    DeleteRegKey SHCTX "$0\$1"
     Pop $1
   ${EndIf}
 FunctionEnd
