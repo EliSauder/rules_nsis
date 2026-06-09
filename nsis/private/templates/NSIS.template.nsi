@@ -730,7 +730,7 @@ Function un.onInit
         ReadRegStr $0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
     ${Else}
         StrCpy $0 $TestId
-        ReadRegStr $0 SHCTX "${REG_KEY}/$0" "${REG_KEY_INSTLOC}"
+        ReadRegStr $0 SHCTX "${REG_KEY}\$0" "${REG_KEY_INSTLOC}"
     ${EndIf}
 
     ${If} ${Errors}
