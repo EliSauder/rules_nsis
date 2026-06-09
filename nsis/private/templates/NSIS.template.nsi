@@ -328,8 +328,8 @@ Var IsArmInstall
     System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_NAME}InstallerMutex") i .r1 ?e'
     Pop $R0
     ${If} $R0 != 0
-        MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running." /SD IDOK
         !insertmacro Log "Another instance is already running, aborting"
+        MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running." /SD IDOK
         Abort
     ${EndIf}
 !macroend
@@ -412,11 +412,13 @@ Function un.RemoveRegistry
   Pop $0
 
   ${If} $TestId == ""
+    !insertmacro Log "Removing registry '$0'"
     DeleteRegKey SHCTX "$0"
   ${Else}
     Push $1
     StrCpy $1 $TestId
     DeleteRegKey SHCTX "$0/$1"
+    !insertmacro Log "Removing registry '$0\$1'"
     Pop $1
   ${EndIf}
 FunctionEnd
@@ -734,6 +736,7 @@ Function un.onInit
 
     ${If} ${Errors}
     ${OrIf} $0 == ""
+        !insertmacro Log "No previous install exists."
         MessageBox MB_ICONSTOP "No previous install exists." /SD IDOK
         Abort
     ${EndIf}
