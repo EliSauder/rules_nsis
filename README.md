@@ -38,6 +38,8 @@ register_toolchains("@nsis_toolchains//:toolchain")
 
 For a full list of options, see: https://registry.bazel.build/docs/rules_nsis
 
+For installer examples, see the tests: [./tests/BUILD.bazel](./tests/BUILD.bazel).
+
 ```bzl
 load("//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer")
 
