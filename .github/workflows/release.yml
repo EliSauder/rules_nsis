@@ -16,7 +16,10 @@ permissions:
   attestations: write
   contents: write
 jobs:
+  build-and-test:
+    uses: ./.github/workflows/ci.yml
   release:
+    needs: build-and-test
     uses: bazel-contrib/.github/.github/workflows/release_ruleset.yaml@v7.6.0
     with:
       release_files: |

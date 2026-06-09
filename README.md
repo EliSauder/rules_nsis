@@ -14,13 +14,6 @@ This project was originally inspired by CPack, but design and approach has
 since started to diverged.
 
 ### Usage
-#### Bzlmod
-
-```bzl
-bazel_dep(name = "rules_nsis", version = "<version>")
-```
-
-#### Bzlmod With Toolchain
 
 ```bzl
 bazel_dep(name = "rules_nsis", version = "<version>")
