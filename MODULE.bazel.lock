@@ -199,7 +199,7 @@
   "moduleExtensions": {
     "//nsis:extensions.bzl%nsis": {
       "general": {
-        "bzlTransitiveDigest": "zJcxrZYF1zPjvL03PZSR2amBziW+LE1se/Mq+8g5B8k=",
+        "bzlTransitiveDigest": "x0Yntb2O1wGlvD9vTFUfOrC8xbOuV8atSvTyYs/A+1k=",
         "usagesDigest": "tuflfUzWBosQsT/MFMrsvIUw6oEOgja+dw2W9p7GIOs=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_tools bazel_tools"
