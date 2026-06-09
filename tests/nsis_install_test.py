@@ -23,12 +23,15 @@ def _print_directory_tree(indir: str) -> str:
         lvl = dirrel.count(os.sep)
         idnt = ' ' * 4 * (lvl+1)
 
-        if len(dirrel) != 0 and dirrel != "./" and dirrel != ".\\":
-            out = out + "{}{}{}\n".format(idnt, os.path.basename(dirrel), os.path.sep)
+        dirpt = os.path.basename(dirrel)
+
+        if len(dirrel) != 0 and dirpt != "./" and dirpt != ".\\":
+            out = out + "{}{}{}\n".format(idnt, dirpt, os.path.sep)
 
         for d in dirs:
             pt = os.path.relpath(d, dir)
-            out = out + "{}{}{}\n".format(idnt, os.path.basename(pt), os.path.sep)
+            if pt != dirpt:
+                out = out + "{}{}{}\n".format(idnt, os.path.basename(pt), os.path.sep)
             subindent = ' ' * 4 * (lvl + 2)
             for f in files:
                 out = out + '{}{}\n'.format(subindent, f)
@@ -53,6 +56,8 @@ print("cwd=", os.getcwd())
 print("dircontent=\n", _print_directory_tree(os.getcwd()))
 print("environment=\n", _print_environ())
 print("args=\n", _print_args())
+if "RUNFILES_DIR" in os.environ:
+    print("runfilesdir=", os.environ["RUNFILES_DIR"])
 
 RUNFILES = runfiles.Create()
 if RUNFILES == None:
