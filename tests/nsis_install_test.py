@@ -58,8 +58,6 @@ print("cwd=", os.getcwd())
 print("dircontent=\n", _print_directory_tree(os.getcwd()))
 print("environment=\n", _print_environ())
 print("args=\n", _print_args())
-if "RUNFILES_DIR" in os.environ:
-    print("runfilesdir=", _print_directory_tree(os.environ["RUNFILES_DIR"]))
 
 RUNFILES = runfiles.Create()
 if RUNFILES == None:
