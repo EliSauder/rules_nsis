@@ -8,10 +8,8 @@ jobs:
   build-and-test:
     strategy:
       matrix:
-        bazel_version: ["8.*"]
-        os: ["windows-latest"]
-        #bazel_version: ["8.*", "9.*"]
-        #os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        bazel_version: ["8.*", "9.*"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
     runs-on: ${{ matrix.os }}
     env:
       USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
@@ -27,14 +25,13 @@ jobs:
           cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Build
         run: bazel build //... --verbose_failures --sandbox_debug
-      #- name: Test
-      #  run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed
+      - name: Test
+        run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed --runs_per_test=3
   test-with-cache:
     needs: build-and-test
     strategy:
       matrix:
-        bazel_version: ["8.*"]
-        #bazel_version: ["8.*", "9.*"]
+        bazel_version: ["8.*", "9.*"]
         os: ["windows-latest"]
     runs-on: ${{ matrix.os }}
     env:
@@ -50,7 +47,7 @@ jobs:
           repository-cache: true
           cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Test
-        run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed
+        run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed --runs_per_test=3 --cache_test_results=no
   #test-usage:
   #  needs: build-and-test
   #  strategy:
