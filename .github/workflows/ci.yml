@@ -29,10 +29,11 @@ jobs:
         run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed
   test-with-cache:
     needs: build-and-test
-    runs-on: windows-latest
     strategy:
       matrix:
         bazel_version: ["8.*", "9.*"]
+        os: ["windows-latest"]
+    runs-on: ${{ matrix.os }}
     env:
       USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
     steps:
