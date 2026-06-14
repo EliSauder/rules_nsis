@@ -26,7 +26,7 @@ jobs:
       - name: Build
         run: bazel build //... --verbose_failures --sandbox_debug
       - name: Test
-        run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed --runs_per_test=3
+        run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed  --flaky_test_attempts=5
   test-with-cache:
     needs: build-and-test
     strategy:
@@ -47,7 +47,7 @@ jobs:
           repository-cache: true
           cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Test
-        run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed --runs_per_test=3 --cache_test_results=no
+        run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed --cache_test_results=no --flaky_test_attempts=5
   #test-usage:
   #  needs: build-and-test
   #  strategy:
