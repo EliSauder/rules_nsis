@@ -254,61 +254,6 @@
         }
       }
     },
-    "@@rules_nsis+//nsis:extensions.bzl%nsis": {
-      "general": {
-        "bzlTransitiveDigest": "x0Yntb2O1wGlvD9vTFUfOrC8xbOuV8atSvTyYs/A+1k=",
-        "usagesDigest": "ryOHP6IZDr3JcDb0vJmBoWzx43U5uoJNvsqY5v5vlvY=",
-        "recordedInputs": [
-          "REPO_MAPPING:rules_nsis+,bazel_tools bazel_tools"
-        ],
-        "generatedRepoSpecs": {
-          "nsis_win": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "urls": [
-                "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.11/nsis-3.11.zip"
-              ],
-              "strip_prefix": "nsis-3.11",
-              "sha256": "c7d27f780ddb6cffb4730138cd1591e841f4b7edb155856901cdf5f214394fa1",
-              "build_file_content": "\nload(\"@rules_nsis//nsis/private:dirrule.bzl\", \"dirrule\")\n\nexports_files(\n  [\"Bin/makensis.exe\"],\n  visibility = [\"//visibility:public\"],\n)\n\nfilegroup(\n  name = \"nsis_files\",\n  srcs = glob([\"**\"]),\n  visibility = [\"//visibility:public\"],\n)\n\ndirrule(\n  name = \"nsis_files_dir\",\n  srcs = [\":nsis_files\"],\n  visibility = [\"//visibility:public\"],\n)\n\nalias(\n  name = \"makensis\",\n  actual = \"Bin/makensis.exe\",\n  visibility = [\"//visibility:public\"],\n)\n"
-            }
-          },
-          "nsis_src": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "urls": [
-                "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.11/nsis-3.11-src.tar.bz2"
-              ],
-              "strip_prefix": "nsis-3.11-src",
-              "sha256": "19e72062676ebdc67c11dc032ba80b979cdbffd3886c60b04bb442cdd401ff4b",
-              "build_file_content": "\nload(\"@rules_nsis//nsis/private:dirrule.bzl\", \"dirrule\")\n\nfilegroup(\n  name = \"nsis_src_files\",\n  srcs = glob([\"**\"]),\n)\n\ndirrule(\n    name = \"nsis_src_files_dir\",\n    srcs = [\":nsis_src_files\"],\n    visibility = [\"//visibility:public\"],\n)\n\ngenrule(\n  name = \"nsis_bin\",\n  executable = False,\n  srcs = [\n    \"@zlib_nsis//:bin\",\n    \":nsis_src_files_dir\",\n  ],\n  cmd = \"\"\"\nls external\nprefix=\"$$(realpath \"$$(dirname \"$(OUTS)\")\")\"\n$(execpath @rules_nsis//nsis/toolchain:scons_bin) SKIPSTUBS=all SKIPPLUGINS=all SKIPUTILS=all SKIPMISC=all   NSIS_CONFIG_CONST_DATA_PATH=no PREFIX=\"$$prefix\" -C \"$(location :nsis_src_files_dir)\"   VERSION=\"3.11\" install-compiler\n\n\"\"\",\n  outs = [\"bin/makensis\"],\n  toolchains = [\n    \"@bazel_tools//tools/cpp:toolchain_type\",\n    \"@rules_python//python:current_py_toolchain\",\n  ],\n  tools = [\n    \"@rules_nsis//nsis/toolchain:scons_bin\",\n  ],\n  visibility = [\"//visibility:public\"],\n)\n\nalias(\n    name = \"makensis\",\n    actual = \"bin/makensis\",\n    visibility = [\"//visibility:public\"],\n)\n"
-            }
-          },
-          "nsis_tool": {
-            "repoRuleId": "@@rules_nsis+//nsis/private:extensions.bzl%_nsis_tool_alias_repo",
-            "attributes": {
-              "nsis_src_repo": "nsis_src",
-              "nsis_win_repo": "nsis_win"
-            }
-          },
-          "nsis_toolchains": {
-            "repoRuleId": "@@rules_nsis+//nsis/private:extensions.bzl%_nsis_toolchains_repo",
-            "attributes": {
-              "tool_repo": "nsis_tool"
-            }
-          }
-        },
-        "moduleExtensionMetadata": {
-          "explicitRootModuleDirectDeps": [
-            "nsis_tool",
-            "nsis_toolchains"
-          ],
-          "explicitRootModuleDirectDevDeps": [],
-          "useAllRepos": "NO",
-          "reproducible": false
-        }
-      }
-    },
     "@@rules_python+//python/uv:uv.bzl%uv": {
       "general": {
         "bzlTransitiveDigest": "I8FPZMevE2oI/peSpMBRVIN++WOtfjtJVjbPsBZQ87A=",

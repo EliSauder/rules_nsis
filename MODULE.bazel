@@ -59,14 +59,13 @@ filegroup(
 gomplate_repository = use_repo_rule("//nsis/private:gomplate.bzl", "gomplate_repository")
 gomplate_repository(name = "gomplate")
 
-nsis_test = use_extension("//nsis:extensions.bzl", "nsis", dev_dependency = True)
-nsis_test.executable(
-    name = "test_nsis",
+nsis = use_extension("//nsis:extensions.bzl", "nsis")
+nsis.executable(
+    name = "nsis",
     version = "3.11",
 )
-use_repo(nsis_test, "test_nsis_tool", "test_nsis_toolchains")
+use_repo(nsis, "nsis_tool", "nsis_toolchains")
 
 register_toolchains(
-    "@test_nsis_toolchains//:all",
-    dev_dependency = True,
+    "@nsis_toolchains//:all",
 )
