@@ -11,7 +11,7 @@ import unittest
 import winreg
 import logging
 
-from python.runfiles import runfiles
+from python.runfiles import Runfiles
 
 TEST_TMPDIR = None
 TEST_ID = None
@@ -59,7 +59,7 @@ print("dircontent=\n", _print_directory_tree(os.getcwd()))
 print("environment=\n", _print_environ())
 print("args=\n", _print_args())
 
-RUNFILES = runfiles.Create()
+RUNFILES = Runfiles.Create()
 if RUNFILES == None:
     raise SystemExit("runfiles is none")
 
