@@ -63,6 +63,9 @@ RUNFILES = Runfiles.Create()
 if RUNFILES == None:
     raise SystemExit("runfiles is none")
 
+env = os.environ.copy()
+env.update(RUNFILES.EnvVars())
+
 INSTALLER=None
 CONFIG=None
 
@@ -338,7 +341,8 @@ def _validate_install(testcase, install_root, install_subpath, config, installer
         capture_output=True,
         text=True,
         timeout=120,
-        check=False
+        check=False,
+        env=env,
     )
 
     testcase.assertEqual(0, proc.returncode, f"Installer failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
@@ -362,7 +366,8 @@ def _validate_uninstall(testcase, install_root, install_subpath, config):
         capture_output=True,
         text=True,
         timeout=120,
-        check=False
+        check=False,
+        env=env,
     )
 
     testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {uninstaller_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
