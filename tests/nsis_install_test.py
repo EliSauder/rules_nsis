@@ -418,6 +418,15 @@ if __name__ == "__main__":
     print("installer base path=", os.path.dirname(INSTALLER))
     print("installer base path content=", _print_directory_tree(os.path.dirname(INSTALLER)))
 
+    print("installer repr=", repr(INSTALLER))
+    print("installer exists=", os.path.exists(INSTALLER))
+    print("installer lexists=", os.path.lexists(INSTALLER))
+    print("installer is link=", os.path.islink(INSTALLER))
+    try:
+        print("installer readlink=", os.readlink(INSTALLER))
+    except Exception as e:
+        print("installer readlink failed=",e)
+
     if not os.path.exists(INSTALLER):
         dir = os.path.dirname(INSTALLER)
 
