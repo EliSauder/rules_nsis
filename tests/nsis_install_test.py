@@ -409,6 +409,10 @@ if __name__ == "__main__":
     TEST_ID = m.hexdigest()
 
     INSTALLER = RUNFILES.Rlocation(sys.argv[1])
+    print("installer path=", INSTALLER)
+    print("installer base path=", os.path.dirname(INSTALLER))
+    _print_directory_tree(os.path.dirname(INSTALLER))
+
     if not os.path.exists(INSTALLER):
         dir = os.path.dirname(INSTALLER)
 
