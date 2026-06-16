@@ -51,7 +51,7 @@ def _print_environ() -> str:
 def _print_args() -> str:
     out = ""
     for a in sys.argv:
-        out = "{}\n".format(a)
+        out = out + "{}\n".format(a)
     return out
 
 print("cwd=", os.getcwd())
