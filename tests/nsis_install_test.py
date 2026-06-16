@@ -411,7 +411,7 @@ if __name__ == "__main__":
     INSTALLER = RUNFILES.Rlocation(sys.argv[1])
     print("installer path=", INSTALLER)
     print("installer base path=", os.path.dirname(INSTALLER))
-    _print_directory_tree(os.path.dirname(INSTALLER))
+    print("installer base path content=", _print_directory_tree(os.path.dirname(INSTALLER)))
 
     if not os.path.exists(INSTALLER):
         dir = os.path.dirname(INSTALLER)
