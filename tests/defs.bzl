@@ -130,7 +130,7 @@ def _nsis_installer_test_impl(name, visibility, installer, **kwargs):
         target_compatible_with = ["@platforms//os:windows"],
         timeout = "short",
         visibility = visibility,
-        tags = ["exclusive", "local"] + tags,
+        tags = tags,
         deps = [
             "@pypi_dev//psutil",
             "@rules_python//python/runfiles",
