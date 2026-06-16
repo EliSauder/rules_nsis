@@ -1,2 +1,5 @@
+startup --windows_enable_symlinks
+build --enable_runfiles
+
 common --enable_bzlmod
 common --incompatible_enable_proto_toolchain_resolution

@@ -1,5 +1,7 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
+_DEFAULT_TOOLCHAIN_NAME = "nsis"
+
 _NSIS_SRC_BUILD_FILE = """
 load("@rules_nsis//nsis/private:dirrule.bzl", "dirrule")
 
@@ -286,20 +288,38 @@ def _nsis_extension_impl(module_ctx):
 
   for mod in module_ctx.modules:
     for toolchain in mod.tags.executable:
-      tc_defined = True
-      if toolchain.name in seen:
-        _fail_duplicate("toolchain", toolchain.name, seen[toolchain.name], mod.name)
-      seen[toolchain.name] = mod.name
+        tc_defined = True
+        if toolchain.name != _DEFAULT_TOOLCHAIN_NAME and not mod.is_root:
+            fail("""\
+            Only the root module may override the default name for the mylang toolchain.
+            This prevents conflicting registrations in the global namespace of external repos.
+            """)
+        if toolchain.name not in seen.keys():
+            seen[toolchain.name] = []
+        seen[toolchain.name].append(toolchain.version)
 
-      nsis_version = toolchain.version
+  for name, versions in seen.items():
+    if len(versions) > 1:
+        selected = sorted(versions, reverse = True)[0]
+        print("NOTE: mylang toolchain {} has multiple versions {}, selected {}".format(name, versions, selected))
+    else:
+        selected = versions[0]
 
-      _create_nsis_repositories(
-          module_ctx = module_ctx,
-          mod = mod,
-          toolchain = toolchain,
-          deps = deps,
-          dev_deps = dev_deps,
-      )
+    nsis_version = toolchain.version
+
+    toolchain = struct(
+        name = name,
+        version = selected,
+    )
+
+    _create_nsis_repositories(
+        module_ctx = module_ctx,
+        mod = None,
+        toolchain = toolchain,
+        deps = deps,
+        dev_deps = dev_deps,
+    )
+
   if not tc_defined:
       default_toolchain = struct(
           name = "nsis",
@@ -316,13 +336,14 @@ def _nsis_extension_impl(module_ctx):
 
   return module_ctx.extension_metadata(
     root_module_direct_dev_deps = dev_deps,
-    root_module_direct_deps = deps
+    root_module_direct_deps = deps,
+    reproducible = True,
   )
 
 _nsis_toolchain_tag = tag_class(
   attrs = {
     "name": attr.string(
-      default = "nsis",
+      default = _DEFAULT_TOOLCHAIN_NAME,
       doc = "Generating host-dispatching repository exposing :makensis and :nsis_files.",
     ),
     "version": attr.string(

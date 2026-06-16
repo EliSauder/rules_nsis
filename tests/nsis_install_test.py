@@ -11,34 +11,20 @@ import unittest
 import winreg
 import logging
 
-from python.runfiles import runfiles
+from python.runfiles import Runfiles
 
 TEST_TMPDIR = None
 TEST_ID = None
 
 def _print_directory_tree(indir: str) -> str:
     out = indir + os.path.sep + "\n"
-    for dir, dirs, files in os.walk(indir):
-        dirrel = os.path.relpath(dir, indir)
-        lvl = dirrel.count(os.sep)
-        idnt = ' ' * 4 * (lvl+1)
-
-        dirpt = os.path.basename(dirrel)
-
-        if len(dirrel) != 0 and dirpt != "./" and dirpt != ".\\":
-            out = out + "{}{}{}\n".format(idnt, dirpt, os.path.sep)
-
-        for d in dirs:
-            pt = os.path.relpath(d, dir)
-            if pt != dirpt:
-                out = out + "{}{}{}\n".format(idnt, os.path.basename(pt), os.path.sep)
-            subindent = ' ' * 4 * (lvl + 2)
-            for f in files:
-                out = out + '{}{}\n'.format(subindent, f)
-
-        if len(dirs) == 0:
-            for f in files:
-                out = out + '{}{}\n'.format(idnt, f)
+    for root, dirs, files in os.walk(indir):
+        level = root.replace(indir, '').count(os.sep)
+        indent = ' ' * 4 * (level + 1)
+        out = out + '{}{}{}\n'.format(indent, os.path.basename(root), os.path.sep)
+        subindent = ' ' * 4 * (level + 2)
+        for f in files:
+            out = out + '{}{}\n'.format(subindent, f)
 
     return out
 
@@ -51,19 +37,20 @@ def _print_environ() -> str:
 def _print_args() -> str:
     out = ""
     for a in sys.argv:
-        out = "{}\n".format(a)
+        out = out + "{}\n".format(a)
     return out
 
 print("cwd=", os.getcwd())
 print("dircontent=\n", _print_directory_tree(os.getcwd()))
 print("environment=\n", _print_environ())
 print("args=\n", _print_args())
-if "RUNFILES_DIR" in os.environ:
-    print("runfilesdir=", _print_directory_tree(os.environ["RUNFILES_DIR"]))
 
-RUNFILES = runfiles.Create()
+RUNFILES = Runfiles.Create()
 if RUNFILES == None:
     raise SystemExit("runfiles is none")
+
+env = os.environ.copy()
+env.update(RUNFILES.EnvVars())
 
 INSTALLER=None
 CONFIG=None
@@ -340,7 +327,8 @@ def _validate_install(testcase, install_root, install_subpath, config, installer
         capture_output=True,
         text=True,
         timeout=120,
-        check=False
+        check=False,
+        env=env,
     )
 
     testcase.assertEqual(0, proc.returncode, f"Installer failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
@@ -364,7 +352,8 @@ def _validate_uninstall(testcase, install_root, install_subpath, config):
         capture_output=True,
         text=True,
         timeout=120,
-        check=False
+        check=False,
+        env=env,
     )
 
     testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {uninstaller_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
@@ -411,6 +400,19 @@ if __name__ == "__main__":
     TEST_ID = m.hexdigest()
 
     INSTALLER = RUNFILES.Rlocation(sys.argv[1])
+    print("installer path=", INSTALLER)
+    print("installer base path=", os.path.dirname(INSTALLER))
+    print("installer base path content=", _print_directory_tree(os.path.dirname(INSTALLER)))
+
+    print("installer repr=", repr(INSTALLER))
+    print("installer exists=", os.path.exists(INSTALLER))
+    print("installer lexists=", os.path.lexists(INSTALLER))
+    print("installer is link=", os.path.islink(INSTALLER))
+    try:
+        print("installer readlink=", os.readlink(INSTALLER))
+    except Exception as e:
+        print("installer readlink failed=",e)
+
     if not os.path.exists(INSTALLER):
         dir = os.path.dirname(INSTALLER)
 
