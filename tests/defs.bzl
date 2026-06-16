@@ -1,5 +1,4 @@
-#load("@rules_python//python:py_test.bzl", "py_test")
-load("@aspect_rules_py//py:defs.bzl", "py_test")
+load("@rules_python//python:py_test.bzl", "py_test")
 load("@bazel_skylib//lib:shell.bzl", "shell")
 load(
     "//nsis/private:defs.bzl",
