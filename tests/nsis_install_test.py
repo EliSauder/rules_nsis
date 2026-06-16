@@ -18,8 +18,8 @@ TEST_ID = None
 
 def _print_directory_tree(indir: str) -> str:
     out = indir + os.path.sep + "\n"
-    for root, dirs, files in os.walk(startpath):
-        level = root.replace(startpath, '').count(os.sep)
+    for root, dirs, files in os.walk(indir):
+        level = root.replace(indir, '').count(os.sep)
         indent = ' ' * 4 * (level + 1)
         out = out + '{}{}{}\n'.format(indent, os.path.basename(root), os.path.sep)
         subindent = ' ' * 4 * (level + 2)
