@@ -18,27 +18,13 @@ TEST_ID = None
 
 def _print_directory_tree(indir: str) -> str:
     out = indir + os.path.sep + "\n"
-    for dir, dirs, files in os.walk(indir):
-        dirrel = os.path.relpath(dir, indir)
-        lvl = dirrel.count(os.sep)
-        idnt = ' ' * 4 * (lvl+1)
-
-        dirpt = os.path.basename(dirrel)
-
-        if len(dirrel) != 0 and dirpt != "./" and dirpt != ".\\":
-            out = out + "{}{}{}\n".format(idnt, dirpt, os.path.sep)
-
-        for d in dirs:
-            pt = os.path.relpath(d, dir)
-            if pt != dirpt:
-                out = out + "{}{}{}\n".format(idnt, os.path.basename(pt), os.path.sep)
-            subindent = ' ' * 4 * (lvl + 2)
-            for f in files:
-                out = out + '{}{}\n'.format(subindent, f)
-
-        if len(dirs) == 0:
-            for f in files:
-                out = out + '{}{}\n'.format(idnt, f)
+    for root, dirs, files in os.walk(startpath):
+        level = root.replace(startpath, '').count(os.sep)
+        indent = ' ' * 4 * (level + 1)
+        out = out + '{}{}{}\n'.format(indent, os.path.basename(root), os.path.sep)
+        subindent = ' ' * 4 * (level + 2)
+        for f in files:
+            out = out + '{}{}\n'.format(subindent, f)
 
     return out
 
