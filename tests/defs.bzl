@@ -116,6 +116,8 @@ def _nsis_installer_test_impl(name, visibility, installer, **kwargs):
 
     f = ":{}_config".format(name)
 
+    tags = kwargs.pop("tags", [])
+
     py_test(
         name = name,
         srcs = [":nsis_install_test.py"],
@@ -128,6 +130,7 @@ def _nsis_installer_test_impl(name, visibility, installer, **kwargs):
         target_compatible_with = ["@platforms//os:windows"],
         timeout = "short",
         visibility = visibility,
+        tags = ["exclusive", "local"] + tags,
         deps = [
             "@pypi_dev//psutil",
             "@rules_python//python/runfiles",
