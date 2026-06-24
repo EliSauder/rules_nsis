@@ -110,6 +110,14 @@ nsis_installer(
   stamping.
 - If build or installer is not stamped, stamp templates will be substituted using
   `stamp_defaults` if provided, otherwise, will default to the empty string.
+- Vendor and Product *can* be stamped, but it is not recommended since it can
+  result in odd or broken behavior (however, its behavior is well defined below).
+    - Output file name will not include stamped information unless
+      `stamp_defaults` has a value for it. Because information gets removed,
+      it can lead to unintentional file name clashes.
+    - If you need these fields to be configurable, or want to follow DRY (Don't
+      Repeat Yourself), it is recommended to use [variables](https://bazel.build/build/share-variables)
+      or [configurable attributes](https://bazel.build/docs/configurable-attributes).
 
 ### Component Dependencies
 
