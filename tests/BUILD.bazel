@@ -224,10 +224,19 @@ nsis_installer_test(
 )
 
 nsis_installer(
+    name = "minimal_installer_with_nostamp_vendor",
+    components = [":minimal_component"],
+    product = "Minimal Installer NoStamp Vendor",
+    product_path = "Minimal Installer NoStamp Vendor",
+    vendor = "{STABLE_VENDOR}",
+    stamp = 0,
+)
+
+nsis_installer(
     name = "minimal_installer_with_stamp_vendor",
     components = [":minimal_component"],
     product = "Minimal Installer Vendor",
     product_path = "Minimal Installer Vendor",
-    vendor = "{STABLE_VENDOR}",
-    stamp = 0,
+    vendor = "{STABLE_TEST_VENDOR}",
+    stamp = 1,
 )
