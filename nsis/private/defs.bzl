@@ -1,4 +1,5 @@
 load("//nsis/private:transitions.bzl", "windows_source_transition")
+load("@bazel_lib//lib:stamping.bzl", "STAMP_ATTRS", "maybe_stamp")
 
 _NSIS_TOOLCHAIN_TYPE = "//nsis/toolchain:toolchain_type"
 
@@ -775,15 +776,8 @@ def _all_files(ctx):
 
     return srcs
 
-def _render_file(ctx, tmpl, data):
-    hs = "{}{}".format(hash(ctx.attr.name), hash(tmpl.path))
-    datafile = ctx.actions.declare_file("data-{}.json".format(hs))
-
-    ctx.actions.write(
-        output = datafile,
-        content = json.encode(data),
-    )
-
+def _render_file(ctx, tmpl, datafile):
+    hs = "{}-{}".format(hash(ctx.attr.name), hash(tmpl.path))
     outname = "nsistmpl-{}.nsi".format(hs)
 
     renderedtmpl = ctx.actions.declare_file(str(outname))
@@ -813,13 +807,69 @@ def _render_file(ctx, tmpl, data):
 
     return renderedtmpl
 
+def _handle_stamping(ctx, data):
+    hs = "{}".format(hash(ctx.attr.name))
+    stamp = maybe_stamp(ctx)
+
+    datafile = ctx.actions.declare_file("data-{}.json".format(hs))
+    ctx.actions.write(
+        output = datafile,
+        content = json.encode(data),
+    )
+
+    defaultsfile = ctx.actions.declare_file("default-sub-{}.json".format(hs))
+    ctx.actions.write(
+        output = defaultsfile,
+        content = json.encode(ctx.attr.stamp_defaults),
+    )
+
+    outname = "data-sub-{}.json".format(hs)
+    outfile = ctx.actions.declare_file(outname)
+
+    inputs = [datafile, defaultsfile, ctx.executable._render_script]
+    if stamp:
+        inputs = inputs + [stamp.stable_status_file, stamp.volatile_status_file]
+
+    args = [
+        datafile.path,
+        outfile.path,
+    ]
+    if stamp:
+        args = args + [
+            stamp.stable_status_file.path,
+            stamp.volatile_status_file.path,
+        ]
+    else:
+        args = args + ["", ""]
+
+    args = args + [defaultsfile.path]
+
+    ctx.actions.run(
+        mnemonic = "HandleStamping",
+        outputs = [outfile],
+        inputs =  inputs,
+        executable = ctx.executable._render_script,
+        tools = [ctx.executable._render_script],
+        arguments = args,
+    )
+
+    return outfile
+
+
 def _build_rendered_templates(ctx, toolchain):
     data = _build_data_structure(ctx, toolchain)
 
-    script = _render_file(ctx, ctx.file._template, data)
-    option = _render_file(ctx, ctx.file._template_options, data)
+    datafile = _handle_stamping(ctx, data)
+
+    script = _render_file(ctx, ctx.file._template, datafile)
+    option = _render_file(ctx, ctx.file._template_options, datafile)
 
     return (script, option)
+
+def _read_stamp_values(ctx, stamp):
+    if not stamp:
+        return None
+
 
 def _nsis_installer_impl(ctx):
     toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
@@ -859,7 +909,7 @@ nsis_installer = rule(
     implementation = _nsis_installer_impl,
     cfg = windows_source_transition,
     doc = "Builds a windows installer .exe using NSIS.",
-    attrs = {
+    attrs = dict({
         "product": attr.string(
             mandatory = True,
             doc = "The display name of the software being packaged.",
@@ -979,6 +1029,11 @@ user: Install software as user.
                 [NsisComponentGroupInfo],
             ],
         ),
+        "stamp_defaults": attr.string_dict(
+            mandatory = False,
+            doc = "A list of default values to use when not stamping.",
+            default = {},
+        ),
         "outfile": attr.string(
             mandatory = False,
             default = "",
@@ -995,6 +1050,11 @@ user: Install software as user.
                 "arm32",
             ],
         ),
+        "_render_script": attr.label(
+            default = Label("//nsis/private/render:stamp_data"),
+            executable = True,
+            cfg = "exec",
+        ),
         "_template": attr.label(
             default = Label("//nsis/private/templates:NSIS.template.nsi"),
             allow_single_file = True,
@@ -1009,7 +1069,7 @@ user: Install software as user.
             executable = True,
             cfg = "exec",
         ),
-    },
+    }, **STAMP_ATTRS),
     toolchains = [
         _NSIS_TOOLCHAIN_TYPE,
     ],

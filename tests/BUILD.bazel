@@ -192,3 +192,33 @@ nsis_installer_test(
     name = "ssc_with_group_and_dir_test",
     installer = ":ssc_with_group_and_dir",
 )
+
+nsis_installer(
+    name = "minimal_installer_with_nostamp",
+    components = [":minimal_component"],
+    product = "Minimal Installer STAMP",
+    stamp = 0,
+    product_path = "Minimal Installer STAMP",
+    version = "{STABLE_VERSION}"
+)
+
+nsis_installer_test(
+    name = "minimal_installer_with_nostamp_test",
+    installer = ":minimal_installer_with_nostamp",
+)
+
+nsis_installer(
+    name = "minimal_installer_with_stamp_default",
+    components = [":minimal_component"],
+    product = "Minimal Installer STAMP2",
+    product_path = "Minimal Installer STAMP2",
+    version = "{STABLE_VERSION}",
+    stamp_defaults = {
+        "STABLE_VERSION": "3.2.1.0",
+    },
+)
+
+nsis_installer_test(
+    name = "minimal_installer_with_stamp_default_test",
+    installer = ":minimal_installer_with_stamp_default",
+)
