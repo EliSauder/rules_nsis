@@ -67,6 +67,7 @@ nsis_installer(
 - [x] Support Components and Component Groups.
 - [x] Install windows Services (uses `sc.exe`).
 - [x] Dependency Based Selections.
+- [x] Handle Stamping Installers
 - [ ] StartMenu Entries. \[Help Wanted]
 - [ ] Desktop Shortcuts. \[Help Wanted]
 - [ ] Update Path. \[Help Wanted]
@@ -102,6 +103,21 @@ nsis_installer(
     - All component files are updated before the service is updated or created.
 - When `/TESTID={{.TestId}}` is passed, will append TestId to the registry
   keys it uses. This is to handle race conditions while testing installers.
+- If version is not provided, will default to `0.0.0.0`.
+
+### Stamping
+- Stamp values will be substituted with their workspace avlues when built with
+  stamping.
+- If build or installer is not stamped, stamp templates will be substituted using
+  `stamp_defaults` if provided, otherwise, will default to the empty string.
+- Vendor and Product *can* be stamped, but it is not recommended since it can
+  result in odd or broken behavior (however, its behavior is well defined below).
+    - Output file name will not include stamped information unless
+      `stamp_defaults` has a value for it. Because information gets removed,
+      it can lead to unintentional file name clashes.
+    - If you need these fields to be configurable, or want to follow DRY (Don't
+      Repeat Yourself), it is recommended to use [variables](https://bazel.build/build/share-variables)
+      or [configurable attributes](https://bazel.build/docs/configurable-attributes).
 
 ### Component Dependencies
 

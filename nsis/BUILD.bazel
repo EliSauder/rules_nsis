@@ -7,6 +7,7 @@ bzl_library(
     srcs = ["defs.bzl"],
     visibility = ["//visibility:public"],
     deps = [
+        "@bazel_lib//lib:stamping",
         "//nsis/private:defs.bzl",
         "//nsis/private:transitions.bzl",
     ],

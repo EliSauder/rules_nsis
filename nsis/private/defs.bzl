@@ -1,4 +1,5 @@
 load("//nsis/private:transitions.bzl", "windows_source_transition")
+load("@bazel_lib//lib:stamping.bzl", "STAMP_ATTRS", "maybe_stamp")
 
 _NSIS_TOOLCHAIN_TYPE = "//nsis/toolchain:toolchain_type"
 
@@ -317,17 +318,48 @@ strict install order. Components should be able to be installed in any order.
     },
 )
 
+def _remove_stamp_templates(instr):
+    outstr = ""
+    tmp = ""
+
+    intmp=False
+
+    for i in range(len(instr)):
+        ch = instr[i]
+        if ch == '{':
+            intmp = True
+            outstr = outstr + tmp
+            continue
+        elif ch == '}':
+            intmp = False
+            tmp = ""
+            continue
+
+        if intmp:
+            tmp = tmp + ch
+        else:
+            outstr = outstr + ch
+
+    return outstr
+
 def _get_outfile(ctx):
     if not ctx.attr.product:
         fail("most provide non-empty product attribute")
 
     if ctx.attr.outfile:
-        return ctx.actions.declare_file(ctx.attr.outfile)
+        fileName =  ctx.actions.declare_file(ctx.attr.outfile)
+    elif not ctx.attr.vendor:
+        fileName = "{} Setup.exe".format(ctx.attr.product)
+    else:
+        fileName = "{} {} Setup.exe".format(ctx.attr.vendor, ctx.attr.product)
 
-    if not ctx.attr.vendor:
-        return ctx.actions.declare_file("{} Setup.exe".format(ctx.attr.product))
+    for key, val in ctx.attr.stamp_defaults.items():
+        stmptmpl = "{" + key + "}"
+        if stmptmpl in fileName:
+            fileName = fileName.replace(stmptmpl, val)
 
-    fileName = "{} {} Setup.exe".format(ctx.attr.vendor, ctx.attr.product)
+    fileName = _remove_stamp_templates(fileName).strip()
+
     return ctx.actions.declare_file(fileName)
 
 def _make_nsis_args(ctx, toolchain, outfile):
@@ -775,15 +807,8 @@ def _all_files(ctx):
 
     return srcs
 
-def _render_file(ctx, tmpl, data):
-    hs = "{}{}".format(hash(ctx.attr.name), hash(tmpl.path))
-    datafile = ctx.actions.declare_file("data-{}.json".format(hs))
-
-    ctx.actions.write(
-        output = datafile,
-        content = json.encode(data),
-    )
-
+def _render_file(ctx, tmpl, datafile):
+    hs = "{}-{}".format(hash(ctx.attr.name), hash(tmpl.path))
     outname = "nsistmpl-{}.nsi".format(hs)
 
     renderedtmpl = ctx.actions.declare_file(str(outname))
@@ -813,13 +838,69 @@ def _render_file(ctx, tmpl, data):
 
     return renderedtmpl
 
+def _handle_stamping(ctx, data):
+    hs = "{}".format(hash(ctx.attr.name))
+    stamp = maybe_stamp(ctx)
+
+    datafile = ctx.actions.declare_file("data-{}.json".format(hs))
+    ctx.actions.write(
+        output = datafile,
+        content = json.encode(data),
+    )
+
+    defaultsfile = ctx.actions.declare_file("default-sub-{}.json".format(hs))
+    ctx.actions.write(
+        output = defaultsfile,
+        content = json.encode(ctx.attr.stamp_defaults),
+    )
+
+    outname = "data-sub-{}.json".format(hs)
+    outfile = ctx.actions.declare_file(outname)
+
+    inputs = [datafile, defaultsfile, ctx.executable._render_script]
+    if stamp:
+        inputs = inputs + [stamp.stable_status_file, stamp.volatile_status_file]
+
+    args = [
+        datafile.path,
+        outfile.path,
+    ]
+    if stamp:
+        args = args + [
+            stamp.stable_status_file.path,
+            stamp.volatile_status_file.path,
+        ]
+    else:
+        args = args + ["", ""]
+
+    args = args + [defaultsfile.path]
+
+    ctx.actions.run(
+        mnemonic = "HandleStamping",
+        outputs = [outfile],
+        inputs =  inputs,
+        executable = ctx.executable._render_script,
+        tools = [ctx.executable._render_script],
+        arguments = args,
+    )
+
+    return outfile
+
+
 def _build_rendered_templates(ctx, toolchain):
     data = _build_data_structure(ctx, toolchain)
 
-    script = _render_file(ctx, ctx.file._template, data)
-    option = _render_file(ctx, ctx.file._template_options, data)
+    datafile = _handle_stamping(ctx, data)
+
+    script = _render_file(ctx, ctx.file._template, datafile)
+    option = _render_file(ctx, ctx.file._template_options, datafile)
 
     return (script, option)
+
+def _read_stamp_values(ctx, stamp):
+    if not stamp:
+        return None
+
 
 def _nsis_installer_impl(ctx):
     toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
@@ -859,7 +940,7 @@ nsis_installer = rule(
     implementation = _nsis_installer_impl,
     cfg = windows_source_transition,
     doc = "Builds a windows installer .exe using NSIS.",
-    attrs = {
+    attrs = dict({
         "product": attr.string(
             mandatory = True,
             doc = "The display name of the software being packaged.",
@@ -979,6 +1060,11 @@ user: Install software as user.
                 [NsisComponentGroupInfo],
             ],
         ),
+        "stamp_defaults": attr.string_dict(
+            mandatory = False,
+            doc = "A list of default values to use when not stamping.",
+            default = {},
+        ),
         "outfile": attr.string(
             mandatory = False,
             default = "",
@@ -995,6 +1081,11 @@ user: Install software as user.
                 "arm32",
             ],
         ),
+        "_render_script": attr.label(
+            default = Label("//nsis/private/render:stamp_data"),
+            executable = True,
+            cfg = "exec",
+        ),
         "_template": attr.label(
             default = Label("//nsis/private/templates:NSIS.template.nsi"),
             allow_single_file = True,
@@ -1009,7 +1100,7 @@ user: Install software as user.
             executable = True,
             cfg = "exec",
         ),
-    },
+    }, **STAMP_ATTRS),
     toolchains = [
         _NSIS_TOOLCHAIN_TYPE,
     ],

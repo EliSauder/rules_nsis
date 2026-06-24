@@ -15,7 +15,11 @@ Unicode True
 !define PACKAGE_PATH_NAME "{{ (ds "in").ProductPath }}"
 !define PACKAGE_VENDOR "{{ (ds "in").Vendor }}"
 !define PACKAGE_VENDOR_PATH "{{ (ds "in").VendorPath }}"
+{{- if (ds "in").Version }}
 !define PACKAGE_VERSION "{{ (ds "in").Version }}"
+{{- else }}
+!define PACKAGE_VERSION "0.0.0.0"
+{{- end }}
 !define PACKAGE_DESCRIPTION "{{ (ds "in").Description }}"
 !define PACKAGE_COPYRIGHT "{{ (ds "in").Copyright }}"
 
