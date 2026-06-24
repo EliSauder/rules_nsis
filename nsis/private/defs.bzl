@@ -318,18 +318,48 @@ strict install order. Components should be able to be installed in any order.
     },
 )
 
-# TODO: Handle outfile when not stamped
+def _remove_stamp_templates(instr):
+    outstr = ""
+    tmp = ""
+
+    intmp=False
+
+    for i in range(len(instr)):
+        ch = instr[i]
+        if ch == '{':
+            intmp = True
+            outstr = outstr + tmp
+            continue
+        elif ch == '}':
+            intmp = False
+            tmp = ""
+            continue
+
+        if intmp:
+            tmp = tmp + ch
+        else:
+            outstr = outstr + ch
+
+    return outstr
+
 def _get_outfile(ctx):
     if not ctx.attr.product:
         fail("most provide non-empty product attribute")
 
     if ctx.attr.outfile:
-        return ctx.actions.declare_file(ctx.attr.outfile)
+        fileName =  ctx.actions.declare_file(ctx.attr.outfile)
+    elif not ctx.attr.vendor:
+        fileName = "{} Setup.exe".format(ctx.attr.product)
+    else:
+        fileName = "{} {} Setup.exe".format(ctx.attr.vendor, ctx.attr.product)
 
-    if not ctx.attr.vendor:
-        return ctx.actions.declare_file("{} Setup.exe".format(ctx.attr.product))
+    for key, val in ctx.attr.stamp_defaults.items():
+        stmptmpl = "{" + key + "}"
+        if stmptmpl in fileName:
+            fileName = fileName.replace(stmptmpl, val)
 
-    fileName = "{} {} Setup.exe".format(ctx.attr.vendor, ctx.attr.product)
+    fileName = _remove_stamp_templates(fileName).strip()
+
     return ctx.actions.declare_file(fileName)
 
 def _make_nsis_args(ctx, toolchain, outfile):
