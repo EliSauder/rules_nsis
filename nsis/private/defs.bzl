@@ -318,6 +318,7 @@ strict install order. Components should be able to be installed in any order.
     },
 )
 
+# TODO: Handle outfile when not stamped
 def _get_outfile(ctx):
     if not ctx.attr.product:
         fail("most provide non-empty product attribute")

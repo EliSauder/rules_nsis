@@ -222,3 +222,12 @@ nsis_installer_test(
     name = "minimal_installer_with_stamp_default_test",
     installer = ":minimal_installer_with_stamp_default",
 )
+
+nsis_installer(
+    name = "minimal_installer_with_stamp_vendor",
+    components = [":minimal_component"],
+    product = "Minimal Installer Vendor",
+    product_path = "Minimal Installer Vendor",
+    vendor = "{STABLE_VENDOR}",
+    stamp = 0,
+)

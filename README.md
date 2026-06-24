@@ -67,6 +67,7 @@ nsis_installer(
 - [x] Support Components and Component Groups.
 - [x] Install windows Services (uses `sc.exe`).
 - [x] Dependency Based Selections.
+- [x] Handle Stamping Installers
 - [ ] StartMenu Entries. \[Help Wanted]
 - [ ] Desktop Shortcuts. \[Help Wanted]
 - [ ] Update Path. \[Help Wanted]
@@ -102,6 +103,11 @@ nsis_installer(
     - All component files are updated before the service is updated or created.
 - When `/TESTID={{.TestId}}` is passed, will append TestId to the registry
   keys it uses. This is to handle race conditions while testing installers.
+- If version is not provided, will default to `0.0.0.0`.
+- Stamp values will be substituted with their workspace avlues when built with
+  stamping.
+- If build or installer is not stamped, stamp templates will be substituted using
+  `stamp_defaults` if provided, otherwise, will default to the empty string.
 
 ### Component Dependencies
 
