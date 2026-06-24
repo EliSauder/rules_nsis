@@ -104,6 +104,8 @@ nsis_installer(
 - When `/TESTID={{.TestId}}` is passed, will append TestId to the registry
   keys it uses. This is to handle race conditions while testing installers.
 - If version is not provided, will default to `0.0.0.0`.
+
+### Stamping
 - Stamp values will be substituted with their workspace avlues when built with
   stamping.
 - If build or installer is not stamped, stamp templates will be substituted using
