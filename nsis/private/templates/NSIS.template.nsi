@@ -452,11 +452,19 @@ FunctionEnd
     ClearErrors
 
     Push $0
+    Push $1
+
     nsExec::ExecToStack `"$SYSDIR\sc.exe" ${ARGS}`
+    Pop $0
+    Pop $1
+    !insertmacro Log `Code: $0, Output: $1`
+    Pop $1
+
+    Push $0
+    Exch
+    Pop $0
+
     Pop ${OUT_RC}
-    Pop $0
-    !insertmacro Log `Output: $0`
-    Pop $0
 
 !macroend
 
