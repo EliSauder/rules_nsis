@@ -61,7 +61,7 @@ Unicode True
 {{- end}}
 {{- end}}
 
-!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_PATH}"
+!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_PATH_NAME}"
 !define REG_KEY "Software\${PACKAGE_PATH}"
 
 !define REG_KEY_INSTLOC "InstallDir"
