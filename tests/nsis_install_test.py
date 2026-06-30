@@ -111,7 +111,7 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, inst_root: 
 
     instdir = f"{inst_root}"
 
-    inpath, unpath = _get_reg_path(inst_subpath, pkgnm)
+    inpath, unpath = _get_reg_path(inst_subpath, un_reg_subpath)
     access = _get_reg_access(config["expected_bitwidth"] or "64")
 
     try:
