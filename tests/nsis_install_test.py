@@ -172,13 +172,13 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, inst_root: 
     except FileNotFoundError:
         pass
 
-def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, inst_subpath: str):
+def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, inst_subpath: str, un_reg_subpath):
     exlvl = (config["expected_execution_level"] or "admin")
     root = _get_reg_db(exlvl)
 
     instdir = f"{inst_root}"
 
-    inpath, unpath = _get_reg_path(inst_subpath)
+    inpath, unpath = _get_reg_path(inst_subpath, un_reg_subpath)
     access = _get_reg_access(config["expected_bitwidth"] or "64")
 
     with _reg_open(root, inpath, access): pass
@@ -319,7 +319,7 @@ def _validate_services(testcase, config, install_root):
 
         testcase.assertEqual(val["description"], svc.description(), f"Description '{svc.description()}' not equal expected '{val['description']}'")
 
-def _validate_install(testcase, install_root, install_subpath, config, installer):
+def _validate_install(testcase, install_root, install_subpath, un_reg_subpath, config, installer):
     installer_cmd = _get_installer_cmd(installer, install_root, config)
 
     proc = subprocess.run(
@@ -340,7 +340,7 @@ def _validate_install(testcase, install_root, install_subpath, config, installer
     with testcase.subTest(msg="Validate Installed Files"):
         _validate_files(testcase, config, install_root)
     with testcase.subTest(msg="Validate Installed Registry Keys"):
-        _validate_reg(testcase, config, install_root, install_subpath)
+        _validate_reg(testcase, config, install_root, install_subpath, un_reg_subpath)
     with testcase.subTest(msg="Validate Installed Services"):
         _validate_services(testcase, config, install_root)
 
@@ -386,7 +386,7 @@ class NsisInstallerTest(unittest.TestCase):
         install_root = _get_install_root()
         install_subpath, un_reg_subpath = _get_subpaths(config)
 
-        _validate_install(self, install_root, install_subpath, config, installer)
+        _validate_install(self, install_root, install_subpath, un_reg_subpath, config, installer)
         _validate_uninstall(self, install_root, install_subpath, un_reg_subpath, config)
 
 if __name__ == "__main__":
