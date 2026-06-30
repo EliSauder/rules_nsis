@@ -61,7 +61,7 @@ Unicode True
 {{- end}}
 {{- end}}
 
-!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_PATH}"
+!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_PATH_NAME}"
 !define REG_KEY "Software\${PACKAGE_PATH}"
 
 !define REG_KEY_INSTLOC "InstallDir"
@@ -242,11 +242,15 @@ Var StdOutAttempted
     ${If} $StdOutHandle == ""
     ${AndIf} $StdOutAttempted == ""
         StrCpy $StdOutAttempted "Yes"
+        Push $0
+        Push $1
         System::Call 'kernel32::AttachConsole(i -1)i.r1'
         ${If} $1 != 0
             System::Call 'kernel32::GetStdHandle(i -11)i.r0'
             StrCpy $StdOutHandle $0
         ${EndIf}
+        Pop $1
+        Pop $0
     ${EndIf}
 
     ${If} $StdOutHandle != ""
@@ -329,6 +333,7 @@ Var IsArmInstall
 !macroend
 
 !macro ValidateMutex
+    Push $R0
     System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_NAME}InstallerMutex") i .r1 ?e'
     Pop $R0
     ${If} $R0 != 0
@@ -336,6 +341,7 @@ Var IsArmInstall
         MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running." /SD IDOK
         Abort
     ${EndIf}
+    Pop $R0
 !macroend
 
 !macro SetVarCtx
@@ -413,7 +419,7 @@ Function un.RemoveRegistry
   ${Else}
       SetShellVarContext current
   ${EndIf}
-  Pop $0
+  Pop $0 # Pop Param 1
 
   ${If} $TestId == ""
     !insertmacro Log "Removing registry '$0'"
@@ -433,9 +439,9 @@ Function AddToRegistry
   ${Else}
       SetShellVarContext current
   ${EndIf}
-  Pop $0
-  Pop $1
-  Pop $2
+  Pop $0 # Pop Param 1
+  Pop $1 # Pop Param 2
+  Pop $2 # Pop Param 3
   ${If} $TestId != ""
     Push $3
     StrCpy $3 $TestId
@@ -452,11 +458,19 @@ FunctionEnd
     ClearErrors
 
     Push $0
+    Push $1
+
     nsExec::ExecToStack `"$SYSDIR\sc.exe" ${ARGS}`
+    Pop $0
+    Pop $1
+    !insertmacro Log `Code: $0, Output: $1`
+    Pop $1
+
+    Push $0
+    Exch
+    Pop $0
+
     Pop ${OUT_RC}
-    Pop $0
-    !insertmacro Log `Output: $0`
-    Pop $0
 
 !macroend
 
