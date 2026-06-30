@@ -55,6 +55,7 @@ def _nsis_test_config_impl(ctx):
                     continue
 
                 cmp = chld[NsisComponentInfo]
+                numcomp = numcomp + 1
 
                 for f in cmp.srcs.to_list():
                     if cmp.directory:
@@ -62,7 +63,7 @@ def _nsis_test_config_impl(ctx):
                     else:
                         files.add("{}".format(f.basename))
         else:
-            fail("not component or group")
+            fail("not component or group", dep)
 
     if numcomp == 0:
         fail("no components defined")
