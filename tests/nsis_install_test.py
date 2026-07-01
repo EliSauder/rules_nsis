@@ -433,7 +433,7 @@ def _validate_uninstall(testcase, install_root, appkey, config):
     with testcase.subTest(msg="Validate Removed Files"):
         _validate_removed_files(testcase, config, install_root)
     with testcase.subTest(msg="Validate Removed Registry Keys"):
-        _validate_removed_reg(testcase, config, install_root, appkey)
+        _validate_removed_reg(testcase, config, appkey)
     with testcase.subTest(msg="Validate Removed Services"):
         _validate_removed_services(testcase, config, install_root)
     with testcase.subTest(msg="Validate Removed EventLog Reg"):
