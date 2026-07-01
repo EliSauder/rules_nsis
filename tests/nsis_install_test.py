@@ -179,6 +179,9 @@ def _get_eventlog_registry_path(appkey: str) -> str:
 def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
     if not config["expected_eventlog"]:
         return
+    exlvl = (config["expected_execution_level"] or "admin")
+    if exlvl != "admin":
+        return
 
     root = _get_reg_db("admin") # Event log registry is always against local machine
 
@@ -209,6 +212,9 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
 
 def _validate_removed_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
     if not config["expected_eventlog"]:
+        return
+    exlvl = (config["expected_execution_level"] or "admin")
+    if exlvl != "admin":
         return
 
     root = _get_reg_db("admin") # Event log registry is always against local machine

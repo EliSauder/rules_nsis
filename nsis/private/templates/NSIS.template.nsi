@@ -13,8 +13,10 @@ Unicode True
 
 !define PACKAGE_NAME "{{ (ds "in").Product }}"
 !define PACKAGE_PATH_NAME "{{ (ds "in").ProductPath }}"
+!define PACKAGE_PATH_KEY "{{ (ds "in").ProductPath | strings.ReplaceAll "\\" " " }}"
 !define PACKAGE_VENDOR "{{ (ds "in").Vendor }}"
 !define PACKAGE_VENDOR_PATH "{{ (ds "in").VendorPath }}"
+!define PACKAGE_VENDOR_KEY "{{ (ds "in").VendorPath | strings.ReplaceAll "\\" " " }}"
 {{- if (ds "in").Version }}
 !define PACKAGE_VERSION "{{ (ds "in").Version }}"
 {{- else }}
@@ -53,18 +55,30 @@ Unicode True
 
 {{- if (ds "in").InstallPath}}
 !define PACKAGE_PATH "{{(ds "in").InstallPath}}"
+{{- if (ds "in").VendorPath}}
+!define PACKAGE_KEY "${PACKAGE_VENDOR_KEY} ${PACKAGE_PATH_KEY}"
+{{- else}}
+!define PACKAGE_KEY "${PACKAGE_PATH_KEY}"
+{{- end}}
 {{- else}}
 {{- if (ds "in").VendorPath}}
 !define PACKAGE_PATH "${PACKAGE_VENDOR_PATH}\${PACKAGE_PATH_NAME}"
+!define PACKAGE_KEY "${PACKAGE_VENDOR_KEY} ${PACKAGE_PATH_KEY}"
 {{- else}}
 !define PACKAGE_PATH "${PACKAGE_PATH_NAME}"
+!define PACKAGE_KEY "${PACKAGE_PATH_KEY}"
 {{- end}}
 {{- end}}
 
-!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_PATH_NAME}"
+!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_KEY}"
 !define REG_KEY "Software\${PACKAGE_PATH}"
 
 !define REG_KEY_INSTLOC "InstallDir"
+
+!define EVENTLOG_KEY "SYSTEM\CurrentControlSet\Services\EventLog\Application\${PACKAGE_KEY}"
+!define EVENTLOG_FILE "%SystemRoot%\System32\EventCreate.exe"
+!define EVENTLOG_SRC 1
+!define EVENTLOG_TYPS 7
 
 Name "${PACKAGE_NAME}"
 OutFile "${OUTFILE_NAME}"
@@ -680,6 +694,25 @@ Section "-Core Installation"
     Push "${UN_REG_KEY}"
     Call AddToRegistry
 
+    {{- if (ds "in").EventLog }}
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+        Push "CustomSource"
+        Push ${EVENTLOG_SRC}
+        Push "${EVENTLOG_KEY}"
+        Call AddToRegistry
+
+        Push "TypesSupported"
+        Push ${EVENTLOG_TYPS}
+        Push "${EVENTLOG_KEY}"
+        Call AddToRegistry
+
+        Push "EventMessageFile"
+        Push "${EVENTLOG_FILE}"
+        Push "${EVENTLOG_KEY}"
+        Call AddToRegistry
+    ${EndIf}
+    {{- end}}
+
     ${If} "${ICON_FILE}" != ""
         Push "DisplayIcon"
         Push "$INSTDIR\${ICON_FILE}"
@@ -879,4 +912,11 @@ Section "Uninstall"
   Call un.RemoveRegistry
   Push "${REG_KEY}"
   Call un.RemoveRegistry
+
+  {{- if (ds "in").EventLog }}
+  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+    Push "${EVENTLOG_KEY}"
+    Call un.RemoveRegistry
+  ${EndIf}
+  {{- end}}
 SectionEnd
