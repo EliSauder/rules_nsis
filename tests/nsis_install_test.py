@@ -72,8 +72,8 @@ def _get_sub_path(product_path, vendor_path, install_path) -> str:
 
 def _get_reg_paths(appkey) -> (str, str):
     return (
-        f"Software\\{sftsubpath}\\{TEST_ID}",
-        f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{unsubpath}\\{TEST_ID}"
+        f"Software\\{appkey}\\{TEST_ID}",
+        f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{appkey}\\{TEST_ID}"
     )
 
 def _get_reg_db(execution_level: str) -> int:
