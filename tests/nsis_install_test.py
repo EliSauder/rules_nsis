@@ -174,7 +174,7 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, subpath: st
         pass
 
 def _get_eventlog_registry_path(appkey: str) -> str:
-    return f"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\{appkey}"
+    return f"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\{appkey}\\{TEST_ID}"
 
 def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
     if not config["expected_eventlog"]:
