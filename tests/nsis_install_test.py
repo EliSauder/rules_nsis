@@ -68,10 +68,13 @@ def _get_sub_path(product_path, vendor_path, install_path) -> str:
     else:
         subpath = str(product_path)
 
-    return (subpath, f"{str(product_path)}")
+    return subpath
 
-def _get_reg_path(sftsubpath, unsubpath) -> str:
-    return f"Software\\{sftsubpath}\\{TEST_ID}", f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{unsubpath}\\{TEST_ID}"
+def _get_reg_paths(appkey) -> (str, str):
+    return (
+        f"Software\\{sftsubpath}\\{TEST_ID}",
+        f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{unsubpath}\\{TEST_ID}"
+    )
 
 def _get_reg_db(execution_level: str) -> int:
     if execution_level == "admin":
@@ -105,13 +108,11 @@ def _reg_value(root: int, path: str, view: int, name: str):
         value, value_type = winreg.QueryValueEx(hkey, name)
         return value, value_type
 
-def _validate_removed_reg(testcase: unittest.TestCase, config: dict, inst_root: str, inst_subpath: str, un_reg_subpath: str):
+def _validate_removed_reg(testcase: unittest.TestCase, config: dict, appkey: str):
     exlvl = (config["expected_execution_level"] or "admin")
     root = _get_reg_db(exlvl)
 
-    instdir = f"{inst_root}"
-
-    inpath, unpath = _get_reg_path(inst_subpath, un_reg_subpath)
+    inpath, unpath = _get_reg_paths(appkey)
     access = _get_reg_access(config["expected_bitwidth"] or "64")
 
     try:
@@ -172,13 +173,89 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, inst_root: 
     except FileNotFoundError:
         pass
 
-def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, inst_subpath: str, un_reg_subpath):
+def _get_eventlog_registry_path(appkey: str) -> str:
+    return f"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\{appkey}"
+
+def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
+    root = _get_reg_db("admin") # Event log registry is always against local machine
+
+    for key, val in config["expected_eventlog"].items():
+        if not val:
+            continue
+
+        comp_dir = key
+        compkey = appkey
+        if comp_dir && comp_dir != "\\":
+            compkey = compkey + " " + comp_dir
+
+        reg_path = _get_eventlog_registry_path(compkey)
+        access = winreg.KEY_READ | winreg.KEY_QUERY_VALUE
+
+        with _reg_open(root, reg_path, access): pass
+
+        valCs, typCs = _reg_value(root, reg_path, access, "CustomSource")
+        valEmh, typEmh = _reg_value(root, reg_path, access, "EventMessageFile")
+        valTs, typTs = _reg_value(root, reg_path, access, "TypesSupported")
+
+        testcase.assertEqual(
+            valCs,
+            1,
+            f"CustomSource {valCs} != 1"
+        )
+        testcase.assertEqual(
+            valEmh,
+            "%SystemRoot%\\System32\\EventCreate.exe",
+            f"EventMessageFile {valEmh} != '%SystemRoot%\\System32\\EventCreate.exe'"
+        )
+        testcase.assertEqual(
+            valTs,
+            7,
+            f"TypesSupported {valTs} != 7 (1 | 2 | 4 [Info | Warn | Error])"
+        )
+
+def _validate_removed_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
+    root = _get_reg_db("admin") # Event log registry is always against local machine
+
+    for key, val in config["expected_eventlog"].items():
+        if not val:
+            continue
+
+        comp_dir = key
+        compkey = appkey
+        if comp_dir && comp_dir != "\\":
+            compkey = compkey + " " + comp_dir
+
+        reg_path = _get_eventlog_registry_path(compkey)
+        access = winreg.KEY_READ | winreg.KEY_QUERY_VALUE
+
+        try:
+            with _reg_open(root, reg_path, access):
+                testcase.fail(f"Registry key {reg_path} still exists")
+        except FileNotFoundError:
+            pass
+
+        try:
+            _reg_value(root, reg_path, access, "CustomSource")
+            testcase.fail(f"Registry key {reg_path} with value CustomSource still exists")
+        except FileNotFoundError:
+            pass
+        try:
+            _reg_value(root, reg_path, access, "EventMessageFile")
+            testcase.fail(f"Registry key {reg_path} with value EventMessageFile still exists")
+        except FileNotFoundError:
+            pass
+        try:
+            _reg_value(root, reg_path, access, "TypesSupported")
+            testcase.fail(f"Registry key {reg_path} with value TypesSupported still exists")
+        except FileNotFoundError:
+            pass
+
+
+def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, appkey: str):
     exlvl = (config["expected_execution_level"] or "admin")
     root = _get_reg_db(exlvl)
 
-    instdir = f"{inst_root}"
-
-    inpath, unpath = _get_reg_path(inst_subpath, un_reg_subpath)
+    inpath, unpath = _get_reg_paths(appkey)
     access = _get_reg_access(config["expected_bitwidth"] or "64")
 
     with _reg_open(root, inpath, access): pass
@@ -195,12 +272,12 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, ins
     _reg_value(root, unpath, access, "DisplayIcon")
 
     testcase.assertEqual(
-        instdir,
+        inst_root,
         instdirval,
         f"expected {inpath}\\InstallDir to equal install path",
     )
     testcase.assertEqual(
-        f"{instdir}\\Uninstall.exe",
+        f"{inst_dir}\\Uninstall.exe",
         unstr,
         f"expected {unpath}\\UninstallString to equal install path + Uninstall.exe",
     )
@@ -221,13 +298,14 @@ def _get_install_root():
 
     return install_root
 
-def _get_subpaths(config):
-    subpath, un_reg_subpath = _get_sub_path(
+def _get_app_key(config: dict) -> str:
+    subpath = _get_sub_path(
         config["expected_product_path"] or None,
         config["expected_vendor_path"] or None,
         config["expected_install_path"] or None,
     )
-    return (subpath, un_reg_subpath)
+    return subpth.replace("\\", " ")
+
 
 def _get_uninstaller_cmd(install_root):
     base_uninstaller = os.path.join(install_root, "Uninstall.exe")
@@ -319,7 +397,7 @@ def _validate_services(testcase, config, install_root):
 
         testcase.assertEqual(val["description"], svc.description(), f"Description '{svc.description()}' not equal expected '{val['description']}'")
 
-def _validate_install(testcase, install_root, install_subpath, un_reg_subpath, config, installer):
+def _validate_install(testcase, install_root, appkey, config, installer):
     installer_cmd = _get_installer_cmd(installer, install_root, config)
 
     proc = subprocess.run(
@@ -340,11 +418,13 @@ def _validate_install(testcase, install_root, install_subpath, un_reg_subpath, c
     with testcase.subTest(msg="Validate Installed Files"):
         _validate_files(testcase, config, install_root)
     with testcase.subTest(msg="Validate Installed Registry Keys"):
-        _validate_reg(testcase, config, install_root, install_subpath, un_reg_subpath)
+        _validate_reg(testcase, config, install_root, appkey)
     with testcase.subTest(msg="Validate Installed Services"):
         _validate_services(testcase, config, install_root)
+    with testcase.subTest(msg="Validate EventLog Registry"):
+        _validate_eventlog(testcase, config, appkey)
 
-def _validate_uninstall(testcase, install_root, install_subpath, un_reg_subpath, config):
+def _validate_uninstall(testcase, install_root, appkey, config):
     uninstaller_cmd = _get_uninstaller_cmd(install_root)
 
     proc = subprocess.run(
@@ -365,9 +445,11 @@ def _validate_uninstall(testcase, install_root, install_subpath, un_reg_subpath,
     with testcase.subTest(msg="Validate Removed Files"):
         _validate_removed_files(testcase, config, install_root)
     with testcase.subTest(msg="Validate Removed Registry Keys"):
-        _validate_removed_reg(testcase, config, install_root, install_subpath, un_reg_subpath)
+        _validate_removed_reg(testcase, config, install_root, appkey)
     with testcase.subTest(msg="Validate Removed Services"):
         _validate_removed_services(testcase, config, install_root)
+    with testcase.subTest(msg="Validate Removed EventLog Reg"):
+        _validate_removed_eventlog(testcase, config, appkey)
 
 
 class NsisInstallerTest(unittest.TestCase):
@@ -384,10 +466,10 @@ class NsisInstallerTest(unittest.TestCase):
             )
 
         install_root = _get_install_root()
-        install_subpath, un_reg_subpath = _get_subpaths(config)
+        appkey = _get_app_key(config)
 
-        _validate_install(self, install_root, install_subpath, un_reg_subpath, config, installer)
-        _validate_uninstall(self, install_root, install_subpath, un_reg_subpath, config)
+        _validate_install(self, install_root, appkey, config, installer)
+        _validate_uninstall(self, install_root, appkey, config)
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

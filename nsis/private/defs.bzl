@@ -67,6 +67,7 @@ NsisComponentInfo = provider(
         "srcs": "The file sources of the component.",
         "dependencies": "The components this one depends on.",
         "shortcuts": "A list of shortcuts to make.",
+        "eventlog": "Whether or not to create eventlog entries.",
     },
 )
 
@@ -204,6 +205,7 @@ def _nsis_component_impl(ctx):
         shortcuts = ctx.attr.shortcuts,
         srcs = files,
         dependencies = ctx.attr.dependencies,
+        eventlog = ctx.attr.eventlog,
     )
 
 nsis_component = rule(
@@ -212,6 +214,11 @@ nsis_component = rule(
 Represents a NSIS installer section.
 """,
     attrs = {
+        "eventlog": attr.bool(
+            mandatory = False,
+            default = False,
+            doc = "Whether the installer should setup windows event log logging for the application.",
+        ),
         "directory": attr.string(
             mandatory = False,
             default = "",
@@ -708,6 +715,7 @@ def _get_component_ds(toolchain, component, inst_cat):
         "Directories": [],
         "Dependencies": [str(x[NsisComponentInfo].name) for x in component.dependencies],
         "Shortcuts": [],
+        "EventLog": bool(component.eventlog),
     }
     if component.service_executable != None:
         f = component.service_executable[DefaultInfo].files.to_list()[0]

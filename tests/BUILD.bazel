@@ -83,6 +83,7 @@ nsis_component(
     service_start_type = "auto",
     selection_mode = "required",
     display_name = "README Service",
+    eventlog = True,
     description = "README Service Description",
     install_categories = ["Full", "Typical", "Minimal"],
     srcs = [":nsis_files"],
