@@ -177,78 +177,66 @@ def _get_eventlog_registry_path(appkey: str) -> str:
     return f"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\{appkey}"
 
 def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
+    if not config["expected_eventlog"]:
+        return
+
     root = _get_reg_db("admin") # Event log registry is always against local machine
 
-    for key, val in config["expected_eventlog"].items():
-        if not val:
-            continue
+    reg_path = _get_eventlog_registry_path(appkey)
+    access = winreg.KEY_READ | winreg.KEY_QUERY_VALUE
 
-        comp_dir = key
-        compkey = appkey
-        if comp_dir && comp_dir != "\\":
-            compkey = compkey + " " + comp_dir
+    with _reg_open(root, reg_path, access): pass
 
-        reg_path = _get_eventlog_registry_path(compkey)
-        access = winreg.KEY_READ | winreg.KEY_QUERY_VALUE
+    valCs, typCs = _reg_value(root, reg_path, access, "CustomSource")
+    valEmh, typEmh = _reg_value(root, reg_path, access, "EventMessageFile")
+    valTs, typTs = _reg_value(root, reg_path, access, "TypesSupported")
 
-        with _reg_open(root, reg_path, access): pass
-
-        valCs, typCs = _reg_value(root, reg_path, access, "CustomSource")
-        valEmh, typEmh = _reg_value(root, reg_path, access, "EventMessageFile")
-        valTs, typTs = _reg_value(root, reg_path, access, "TypesSupported")
-
-        testcase.assertEqual(
-            valCs,
-            1,
-            f"CustomSource {valCs} != 1"
-        )
-        testcase.assertEqual(
-            valEmh,
-            "%SystemRoot%\\System32\\EventCreate.exe",
-            f"EventMessageFile {valEmh} != '%SystemRoot%\\System32\\EventCreate.exe'"
-        )
-        testcase.assertEqual(
-            valTs,
-            7,
-            f"TypesSupported {valTs} != 7 (1 | 2 | 4 [Info | Warn | Error])"
-        )
+    testcase.assertEqual(
+        valCs,
+        1,
+        f"CustomSource {valCs} != 1"
+    )
+    testcase.assertEqual(
+        valEmh,
+        "%SystemRoot%\\System32\\EventCreate.exe",
+        f"EventMessageFile {valEmh} != '%SystemRoot%\\System32\\EventCreate.exe'"
+    )
+    testcase.assertEqual(
+        valTs,
+        7,
+        f"TypesSupported {valTs} != 7 (1 | 2 | 4 [Info | Warn | Error])"
+    )
 
 def _validate_removed_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
+    if not config["expected_eventlog"]:
+        return
+
     root = _get_reg_db("admin") # Event log registry is always against local machine
 
-    for key, val in config["expected_eventlog"].items():
-        if not val:
-            continue
+    reg_path = _get_eventlog_registry_path(appkey)
+    access = winreg.KEY_READ | winreg.KEY_QUERY_VALUE
 
-        comp_dir = key
-        compkey = appkey
-        if comp_dir && comp_dir != "\\":
-            compkey = compkey + " " + comp_dir
+    try:
+        with _reg_open(root, reg_path, access):
+            testcase.fail(f"Registry key {reg_path} still exists")
+    except FileNotFoundError:
+        pass
 
-        reg_path = _get_eventlog_registry_path(compkey)
-        access = winreg.KEY_READ | winreg.KEY_QUERY_VALUE
-
-        try:
-            with _reg_open(root, reg_path, access):
-                testcase.fail(f"Registry key {reg_path} still exists")
-        except FileNotFoundError:
-            pass
-
-        try:
-            _reg_value(root, reg_path, access, "CustomSource")
-            testcase.fail(f"Registry key {reg_path} with value CustomSource still exists")
-        except FileNotFoundError:
-            pass
-        try:
-            _reg_value(root, reg_path, access, "EventMessageFile")
-            testcase.fail(f"Registry key {reg_path} with value EventMessageFile still exists")
-        except FileNotFoundError:
-            pass
-        try:
-            _reg_value(root, reg_path, access, "TypesSupported")
-            testcase.fail(f"Registry key {reg_path} with value TypesSupported still exists")
-        except FileNotFoundError:
-            pass
+    try:
+        _reg_value(root, reg_path, access, "CustomSource")
+        testcase.fail(f"Registry key {reg_path} with value CustomSource still exists")
+    except FileNotFoundError:
+        pass
+    try:
+        _reg_value(root, reg_path, access, "EventMessageFile")
+        testcase.fail(f"Registry key {reg_path} with value EventMessageFile still exists")
+    except FileNotFoundError:
+        pass
+    try:
+        _reg_value(root, reg_path, access, "TypesSupported")
+        testcase.fail(f"Registry key {reg_path} with value TypesSupported still exists")
+    except FileNotFoundError:
+        pass
 
 
 def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, appkey: str):

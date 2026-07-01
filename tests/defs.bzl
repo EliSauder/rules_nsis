@@ -18,7 +18,6 @@ def _nsis_test_config_impl(ctx):
 
     files = set()
     services = dict()
-    eventlog = dict()
 
     numcomp = 0
 
@@ -31,7 +30,6 @@ def _nsis_test_config_impl(ctx):
                     files.add("{}\\{}".format(cmp.directory, f.basename))
                 else:
                     files.add("{}".format(f.basename))
-            eventlog[cmp.directory] = cmp.eventlog
             if cmp.service:
                 services[cmp.name] = {
                     "start_type": cmp.service_start_type,
@@ -59,7 +57,6 @@ def _nsis_test_config_impl(ctx):
                 cmp = chld[NsisComponentInfo]
                 numcomp = numcomp + 1
 
-                eventlog[cmp.directory] = cmp.eventlog
 
                 for f in cmp.srcs.to_list():
                     if cmp.directory:
@@ -88,7 +85,7 @@ def _nsis_test_config_impl(ctx):
         "expected_bitwidth": arch,
         "expected_execution_level": inst.execution_level,
         "expected_services": services,
-        "expected_eventlog": inst
+        "expected_eventlog": inst.eventlog,
     }
 
     outf = ctx.actions.declare_file(ctx.attr.name + ".json")
