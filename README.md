@@ -68,6 +68,7 @@ nsis_installer(
 - [x] Install windows Services (uses `sc.exe`).
 - [x] Dependency Based Selections.
 - [x] Handle Stamping Installers
+- [x] EventLog Registry Entries
 - [ ] StartMenu Entries. \[Help Wanted]
 - [ ] Desktop Shortcuts. \[Help Wanted]
 - [ ] Update Path. \[Help Wanted]
