@@ -271,7 +271,7 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, sub
         f"expected {inpath}\\InstallDir to equal install path",
     )
     testcase.assertEqual(
-        f"{inst_dir}\\Uninstall.exe",
+        f"{inst_root}\\Uninstall.exe",
         unstr,
         f"expected {unpath}\\UninstallString to equal install path + Uninstall.exe",
     )
