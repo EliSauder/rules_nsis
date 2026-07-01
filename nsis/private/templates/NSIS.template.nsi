@@ -90,12 +90,12 @@ RequestExecutionLevel {{ (ds "in").ExecutionLevel }}
 RequestExecutionLevel admin
 {{- end }}
 
-{{- if ne (ds "in").ExecutionLevel "admin"}}
-InstallDirRegKey HKCU "${REG_KEY}" "${REG_KEY_INSTLOC}"
-!define IS_ADMIN_EXECUTION_LEVEL 0
-{{- else }}
+{{- if eq (ds "in").ExecutionLevel "admin"}}
 InstallDirRegKey HKLM "${REG_KEY}" "${REG_KEY_INSTLOC}"
 !define IS_ADMIN_EXECUTION_LEVEL 1
+{{- else }}
+InstallDirRegKey HKCU "${REG_KEY}" "${REG_KEY_INSTLOC}"
+!define IS_ADMIN_EXECUTION_LEVEL 0
 {{- end}}
 
 SetCompressor {{ (ds "in").Compressor }}
@@ -902,12 +902,6 @@ Section "Uninstall"
 
   !insertmacro RemoveComponents
 
-  ;Remove the uninstaller itself.
-  SetFileAttributes "$INSTDIR\${UNINSTALLER_NAME}" NORMAL
-  Delete "$INSTDIR\${UNINSTALLER_NAME}"
-  ; Remove if empty
-  RMDir "$INSTDIR"
-
   Push "${UN_REG_KEY}"
   Call un.RemoveRegistry
   Push "${REG_KEY}"
@@ -919,4 +913,11 @@ Section "Uninstall"
     Call un.RemoveRegistry
   ${EndIf}
   {{- end}}
+
+  ;Remove the uninstaller itself.
+  SetFileAttributes "$INSTDIR\${UNINSTALLER_NAME}" NORMAL
+  Delete "$INSTDIR\${UNINSTALLER_NAME}"
+  ; Remove if empty
+  RMDir "$INSTDIR"
+
 SectionEnd
