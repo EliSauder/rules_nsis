@@ -196,7 +196,7 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
 
     testcase.assertEqual(
         valCs,
-        1,
+        "1",
         f"CustomSource {valCs} != 1"
     )
     testcase.assertEqual(
@@ -206,7 +206,7 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
     )
     testcase.assertEqual(
         valTs,
-        7,
+        "7",
         f"TypesSupported {valTs} != 7 (1 | 2 | 4 [Info | Warn | Error])"
     )
 
