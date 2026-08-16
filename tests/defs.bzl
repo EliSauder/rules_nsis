@@ -141,7 +141,7 @@ def _nsis_installer_test_impl(name, visibility, installer, **kwargs):
         visibility = visibility,
         tags = tags,
         deps = [
-            "@pypi_dev//psutil",
+            "@rules_nsis_pypi_dev//psutil",
             "@rules_python//python/runfiles",
         ],
         **kwargs,
