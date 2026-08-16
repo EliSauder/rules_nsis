@@ -75,6 +75,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_test_deps",
     installer = ":minimal_installer_deps",
+    must_have_paths = ["README.md"],
 )
 
 nsis_component(
@@ -112,6 +113,7 @@ nsis_installer(
 nsis_installer_test(
     name = "single_service_test",
     installer = ":single_service_installer",
+    must_have_paths = ["README.md"],
 )
 
 nsis_component_group(
@@ -131,6 +133,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_group_test",
     installer = ":minimal_installer_with_group",
+    must_have_paths = ["README.md"],
 )
 
 nsis_component(
@@ -149,6 +152,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_dir_test",
     installer = ":minimal_installer_with_dir",
+    must_have_paths = ["README.md"],
 )
 
 nsis_component(
@@ -193,6 +197,7 @@ nsis_installer(
 nsis_installer_test(
     name = "ssc_with_group_and_dir_test",
     installer = ":ssc_with_group_and_dir",
+    must_have_paths = ["README.md"],
 )
 
 nsis_installer(
@@ -207,6 +212,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_nostamp_test",
     installer = ":minimal_installer_with_nostamp",
+    must_have_paths = ["README.md"],
 )
 
 nsis_installer(
@@ -223,6 +229,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_stamp_default_test",
     installer = ":minimal_installer_with_stamp_default",
+    must_have_paths = ["README.md"],
 )
 
 nsis_installer(
