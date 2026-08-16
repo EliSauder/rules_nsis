@@ -787,9 +787,9 @@ def _all_files_group(group):
 
 def _all_files_component(cmp):
     transitive = [cmp.srcs]
-    if cmp.service_executable != None:
-        svcexe = cmp.service_executable[DefaultInfo]
-        transitive.append(svcexe.files)
+    #if cmp.service_executable != None:
+    #    svcexe = cmp.service_executable[DefaultInfo]
+    #    transitive.append(svcexe.files)
 
     srcs = depset(
         direct = [x[DefaultInfo].files for x in cmp.shortcuts],
