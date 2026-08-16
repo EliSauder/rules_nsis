@@ -3,6 +3,7 @@ load("//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installe
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 
 exports_files([
+    "__init__.py",
     "nsis_install_test.py",
 ], ["//visibility:private"])
 
