@@ -9,7 +9,7 @@ compile_pip_requirements(
 
 py_console_script_binary(
     name = "scons_bin",
-    pkg = "@pypi//scons",
+    pkg = "@rules_nsis_pypi//scons",
     python_version = "3.12",
     script = "scons",
     visibility = ["//visibility:public"],

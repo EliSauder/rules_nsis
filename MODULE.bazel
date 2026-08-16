@@ -11,7 +11,10 @@ bazel_dep(name = "platforms", version = "1.1.0")
 ############################
 # SETUP PYTHON
 ############################
-bazel_dep(name = "rules_python", version = "2.2.0")
+bazel_dep(name = "rules_python", version = "2.3.1")
+
+rules_python_config = use_extension("@rules_python//python/extensions:config.bzl", "config")
+rules_python_config.explicit_init_py(default = True)
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
@@ -21,19 +24,19 @@ use_repo(python, "python_versions")
 
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 pip.parse(
-    hub_name = "pypi",
+    hub_name = "rules_nsis_pypi",
     python_version = "3.12",
     requirements_lock = "//nsis/toolchain:requirements_lock_txt",
 )
-use_repo(pip, "pypi")
+use_repo(pip, "rules_nsis_pypi")
 
 pip_dev = use_extension("@rules_python//python/extensions:pip.bzl", "pip", dev_dependency = True)
 pip_dev.parse(
-    hub_name = "pypi_dev",
+    hub_name = "rules_nsis_pypi_dev",
     python_version = "3.12",
     requirements_lock = "//tests:requirements_lock_txt",
 )
-use_repo(pip_dev, "pypi_dev")
+use_repo(pip_dev, "rules_nsis_pypi_dev")
 
 ############################
 # GET ZLIB
