@@ -188,7 +188,11 @@ Represents a section group inside of a NSIS section group.
 )
 
 def _nsis_component_impl(ctx):
-    files = depset(ctx.files.srcs)
+    rf = ctx.runfiles(files = ctx.files.srcs)
+    rfs = ctx.runfiles(files = ctx.files.service_executable)
+    files = depset(
+        direct = ctx.files.srcs + ctx.files.service_executable,
+        transitive = [rf.files, rfs.files])
 
     return NsisComponentInfo(
         name = str(ctx.label.name),
