@@ -152,7 +152,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_dir_test",
     installer = ":minimal_installer_with_dir",
-    must_have_paths = ["README.md"],
+    must_have_paths = ["Component/README.md"],
 )
 
 nsis_component(
