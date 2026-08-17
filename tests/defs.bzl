@@ -7,6 +7,7 @@ load(
 
 def _nsis_test_config_impl(ctx):
     inst = ctx.attr.installer[NsisInstallerInfo]
+    must_have_paths = ctx.attr.must_have_paths
 
     outfile = ""
     if inst.outfile:
@@ -16,8 +17,12 @@ def _nsis_test_config_impl(ctx):
     else:
         outfile = "{} Setup.exe".format(inst.product)
 
+
     files = set()
     services = dict()
+
+    for p in must_have_paths:
+        files.add(p)
 
     numcomp = 0
 
@@ -109,17 +114,21 @@ _nsis_test_config = rule(
                 DefaultInfo,
             ],
         ),
+        "must_have_paths": attr.string_list(
+            default = [],
+        ),
     },
     outputs = {
         "out": "%{name}.json"
     },
 )
 
-def _nsis_installer_test_impl(name, visibility, installer, **kwargs):
+def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, **kwargs):
 
     _nsis_test_config(
         name = name + "_config",
         installer = installer,
+        must_have_paths = must_have_paths,
         visibility = ["//visibility:private"],
     )
 
@@ -161,6 +170,10 @@ nsis_installer_test = macro(
                 NsisInstallerInfo,
                 DefaultInfo,
             ],
+        ),
+        "must_have_paths": attr.string_list(
+            mandatory = False,
+            default = [],
         ),
     },
 )

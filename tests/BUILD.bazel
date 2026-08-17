@@ -1,6 +1,7 @@
 load("//tests:defs.bzl", "nsis_installer_test")
 load("//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
+load("@rules_python//python:py_binary.bzl", "py_binary")
 
 exports_files([
     "__init__.py",
@@ -75,6 +76,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_test_deps",
     installer = ":minimal_installer_deps",
+    must_have_paths = ["README.md"],
 )
 
 nsis_component(
@@ -112,6 +114,7 @@ nsis_installer(
 nsis_installer_test(
     name = "single_service_test",
     installer = ":single_service_installer",
+    must_have_paths = ["README.md"],
 )
 
 nsis_component_group(
@@ -131,6 +134,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_group_test",
     installer = ":minimal_installer_with_group",
+    must_have_paths = ["README.md"],
 )
 
 nsis_component(
@@ -149,6 +153,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_dir_test",
     installer = ":minimal_installer_with_dir",
+    must_have_paths = ["Component/README.md"],
 )
 
 nsis_component(
@@ -193,6 +198,7 @@ nsis_installer(
 nsis_installer_test(
     name = "ssc_with_group_and_dir_test",
     installer = ":ssc_with_group_and_dir",
+    must_have_paths = ["Component\\README.md"],
 )
 
 nsis_installer(
@@ -207,6 +213,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_nostamp_test",
     installer = ":minimal_installer_with_nostamp",
+    must_have_paths = ["README.md"],
 )
 
 nsis_installer(
@@ -223,6 +230,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_stamp_default_test",
     installer = ":minimal_installer_with_stamp_default",
+    must_have_paths = ["README.md"],
 )
 
 nsis_installer(
@@ -241,4 +249,42 @@ nsis_installer(
     product_path = "Minimal Installer Vendor",
     vendor = "{STABLE_TEST_VENDOR}",
     stamp = 1,
+)
+
+py_binary(
+    name = "bin_with_runfiles",
+    main = "dummy.py",
+    srcs = [
+        "dummy.py",
+        "__init__.py",
+    ],
+    data = [
+        ":nsis_files",
+    ],
+)
+
+nsis_component(
+    name = "minimal_component_runfiles",
+    srcs = [
+        ":bin_with_runfiles",
+        ":nsis_files",
+    ],
+    selection_mode = "default",
+)
+
+nsis_installer(
+    name = "minimal_installer_runfiles",
+    components = [":minimal_component_runfiles"],
+    product = "Minimal Installer Runfiles",
+    product_path = "Minimal Installer Runfiles",
+)
+
+nsis_installer_test(
+    name = "minimal_installer_runfiles_test",
+    installer = ":minimal_installer_runfiles",
+    must_have_paths = [
+        "README.md",
+        "__init__.py",
+        "dummy.py",
+    ],
 )
