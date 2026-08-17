@@ -229,7 +229,7 @@ def _fail_duplicate(kind, name, first_module, second_module):
   fail("Duplicate {} named '{}'. First declared by module '{}', again by module '{}'".format(
     kind, name, first_module, second_module))
 
-def _create_nsis_repositories(module_ctx, mod, toolchain, deps, dev_deps):
+def _create_nsis_repositories(module_ctx, mod, toolchain, deps, dev_deps, tctag):
     nsis_version = toolchain.version
 
     nsis_src_repo_name = "{}_src".format(toolchain.name)
@@ -271,7 +271,7 @@ def _create_nsis_repositories(module_ctx, mod, toolchain, deps, dev_deps):
         tool_repo = tool_repo_name,
     )
 
-    if mod != None and module_ctx.is_dev_dependency(toolchain):
+    if (mod != None and tctag != None and module_ctx.is_dev_dependency(tctag)) or not module_ctx.root_module_has_non_dev_dependency:
         dev_deps.append(tool_repo_name)
         dev_deps.append(toolchains_repo_name)
     else:
@@ -296,28 +296,30 @@ def _nsis_extension_impl(module_ctx):
             """)
         if toolchain.name not in seen.keys():
             seen[toolchain.name] = []
-        seen[toolchain.name].append(toolchain.version)
+        seen[toolchain.name].append({"version": toolchain.version, "mod": mod, "tc": toolchain})
 
-  for name, versions in seen.items():
-    if len(versions) > 1:
-        selected = sorted(versions, reverse = True)[0]
-        print("NOTE: mylang toolchain {} has multiple versions {}, selected {}".format(name, versions, selected))
+  selected = None
+  for name, details in seen.items():
+    if len(details) > 1:
+        selected = sorted(details, reverse = True, key=lambda x: x["version"])[0]
+        print("NOTE: mylang toolchain {} has multiple versions {}, selected {}".format(name, [x["version"] for x in details], selected["version"]))
     else:
-        selected = versions[0]
+        selected = details[0]
 
     nsis_version = toolchain.version
 
     toolchain = struct(
         name = name,
-        version = selected,
+        version = selected["version"],
     )
 
     _create_nsis_repositories(
         module_ctx = module_ctx,
-        mod = None,
+        mod = selected["mod"],
         toolchain = toolchain,
         deps = deps,
         dev_deps = dev_deps,
+        tctag = selected["tc"],
     )
 
   if not tc_defined:
@@ -332,6 +334,7 @@ def _nsis_extension_impl(module_ctx):
           toolchain = default_toolchain,
           deps = deps,
           dev_deps = dev_deps,
+          tctag = None,
       )
 
   return module_ctx.extension_metadata(
