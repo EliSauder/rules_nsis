@@ -32,7 +32,8 @@ The root path to install the software into. Defaults to NSIS's built in
 $PROGRAMFILES64 (or $PROGRAMFILES if 32bit) when installed as admin. When
 installed as a user, defaults to $LOCALAPPDATA\\Programs.
 
-The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
+The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}\\{{.ProductPath}}.
+or {{.InstallRoot}}\\{{.ProductPath}}.
 """,
         "install_path": "Overrides product_path and vendor_path with a specific path.",
         "execution_level": "Set the execution level for the installer.",
@@ -48,6 +49,7 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "outfile": "Specify the outfile.",
         "arch": "The architecture to built the installer for.",
         "eventlog": "Whether or not to create eventlog entries.",
+        "registry_key": "The key to utilize when setting windows registry values.",
     },
 )
 
@@ -670,6 +672,7 @@ def _get_installer_ds(ctx, toolchain):
         ),
         "EventLog": bool(ctx.attr.eventlog),
         "Outfile": str(ctx.attr.outfile),
+        "RegistryKey": str(ctx.attr.registry_key),
         _COMPONENTS_KEY: [],
         _COMPONENT_GROUPS_KEY: [],
     }
@@ -994,7 +997,8 @@ The root path to install the software into. Defaults to NSIS's built in
 $PROGRAMFILES64 (or $PROGRAMFILES if 32bit) when installed as admin. When
 installed as a user, defaults to $LOCALAPPDATA\\Programs.
 
-The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}\\{{.ProductPath}.
+The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}\\{{.ProductPath}
+or {{.InstallRoot}}\\{{.ProductPath}.
 """,
         ),
         "install_path": attr.string(
@@ -1048,6 +1052,16 @@ user: Install software as user.
             mandatory = False,
             default = {},
             doc = "A list of additional defines to include in the installer.",
+        ),
+        "registry_key": attr.string(
+            mandatory = False,
+            default = "",
+            doc = """
+Sets the registry key to utilize when installing.
+Will be used to set the unistall keys, event log keys, and general registry keys.
+
+Defaults to: "{{.Vendor}} {{.Product}}"
+"""
         ),
         "_verbosity": attr.int(
             mandatory = False,

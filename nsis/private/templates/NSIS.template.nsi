@@ -13,10 +13,10 @@ Unicode True
 
 !define PACKAGE_NAME "{{ (ds "in").Product }}"
 !define PACKAGE_PATH_NAME "{{ (ds "in").ProductPath }}"
-!define PACKAGE_PATH_KEY "{{ (ds "in").ProductPath | strings.ReplaceAll "\\" " " }}"
+!define PACKAGE_PATH_KEY "{{ (ds "in").Product | strings.ReplaceAll "\\" " " }}"
 !define PACKAGE_VENDOR "{{ (ds "in").Vendor }}"
 !define PACKAGE_VENDOR_PATH "{{ (ds "in").VendorPath }}"
-!define PACKAGE_VENDOR_KEY "{{ (ds "in").VendorPath | strings.ReplaceAll "\\" " " }}"
+!define PACKAGE_VENDOR_KEY "{{ (ds "in").Vendor | strings.ReplaceAll "\\" " " }}"
 {{- if (ds "in").Version }}
 !define PACKAGE_VERSION "{{ (ds "in").Version }}"
 {{- else }}
@@ -55,19 +55,18 @@ Unicode True
 
 {{- if (ds "in").InstallPath}}
 !define PACKAGE_PATH "{{(ds "in").InstallPath}}"
-{{- if (ds "in").VendorPath}}
-!define PACKAGE_KEY "${PACKAGE_VENDOR_KEY} ${PACKAGE_PATH_KEY}"
-{{- else}}
-!define PACKAGE_KEY "${PACKAGE_PATH_KEY}"
-{{- end}}
-{{- else}}
-{{- if (ds "in").VendorPath}}
+{{- else if (ds "in").VendorPath }}
 !define PACKAGE_PATH "${PACKAGE_VENDOR_PATH}\${PACKAGE_PATH_NAME}"
-!define PACKAGE_KEY "${PACKAGE_VENDOR_KEY} ${PACKAGE_PATH_KEY}"
 {{- else}}
 !define PACKAGE_PATH "${PACKAGE_PATH_NAME}"
-!define PACKAGE_KEY "${PACKAGE_PATH_KEY}"
 {{- end}}
+
+{{- if (ds "in").RegistryKey }}
+!define PACKAGE_KEY "{{ (ds "in").RegistryKey | strings.ReplaceAll "\\" " " }}"
+{{- else if (ds "in").Vendor }}
+!define PACKAGE_KEY "${PACKAGE_VENDOR_KEY} ${PACKAGE_PATH_KEY}"
+{{- else}}
+!define PACKAGE_KEY "${PACKAGE_PATH_KEY}"
 {{- end}}
 
 !define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_KEY}"
