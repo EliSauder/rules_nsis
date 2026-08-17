@@ -352,7 +352,7 @@ def _get_outfile(ctx):
         fail("most provide non-empty product attribute")
 
     if ctx.attr.outfile:
-        fileName =  ctx.actions.declare_file(ctx.attr.outfile)
+        fileName =  ctx.attr.outfile
     elif not ctx.attr.vendor:
         fileName = "{} Setup.exe".format(ctx.attr.product)
     else:
