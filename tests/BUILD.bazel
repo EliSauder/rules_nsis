@@ -265,7 +265,10 @@ py_binary(
 
 nsis_component(
     name = "minimal_component_runfiles",
-    srcs = [":bin_with_runfiles"],
+    srcs = [
+        ":bin_with_runfiles",
+        ":nsis_files",
+    ],
     selection_mode = "default",
 )
 
