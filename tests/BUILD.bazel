@@ -36,6 +36,20 @@ nsis_installer(
     product_path = "Minimal Installer",
 )
 
+nsis_installer(
+    name = "minimal_installer_outfile",
+    components = [":minimal_component"],
+    product = "Minimal Installer",
+    product_path = "Minimal Installer",
+    outfile = "Hello World.exe",
+)
+
+nsis_installer_test(
+    name = "minimal_installer_outfile_test",
+    installer = ":minimal_installer_outfile",
+    must_have_paths = ["README.md"],
+)
+
 nsis_component(
     name = "minimal_component_depsA",
     srcs = [":nsis_files"],
