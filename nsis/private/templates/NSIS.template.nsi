@@ -11,9 +11,9 @@ Unicode True
 
 !define IsNativeARM32 '${IsNativeMachineArchitecture} 448'
 
-!define PACKAGE_NAME "{{ (ds "in").Product }}"
-!define PACKAGE_PATH_NAME "{{ (ds "in").ProductPath }}"
-!define PACKAGE_PATH_KEY "{{ (ds "in").Product | strings.ReplaceAll "\\" " " }}"
+!define PACKAGE_PRODUCT "{{ (ds "in").Product }}"
+!define PACKAGE_PRODUCT_PATH "{{ (ds "in").ProductPath }}"
+!define PACKAGE_PRODUCT_KEY "{{ (ds "in").Product | strings.ReplaceAll "\\" " " }}"
 !define PACKAGE_VENDOR "{{ (ds "in").Vendor }}"
 !define PACKAGE_VENDOR_PATH "{{ (ds "in").VendorPath }}"
 !define PACKAGE_VENDOR_KEY "{{ (ds "in").Vendor | strings.ReplaceAll "\\" " " }}"
@@ -27,16 +27,12 @@ Unicode True
 
 {{- if eq (ds "in").ExecutionLevel "current" }}
 !define INSTALL_ROOT "$LOCALAPPDATA\Programs"
-{{- else}}
-{{- if (ds "in").InstallRoot }}
+{{- else if (ds "in").InstallRoot }}
 !define INSTALL_ROOT "{{(ds "in").InstallRoot}}"
-{{- else}}
-{{- if (ds "in").ArchitectureIs64}}
+{{- else if (ds "in").ArchitectureIs64 }}
 !define INSTALL_ROOT "$PROGRAMFILES64"
 {{- else}}
 !define INSTALL_ROOT "$PROGRAMFILES"
-{{- end}}
-{{- end}}
 {{- end}}
 
 !ifdef OUTFILE
@@ -56,30 +52,33 @@ Unicode True
 {{- if (ds "in").InstallPath}}
 !define PACKAGE_PATH "{{(ds "in").InstallPath}}"
 {{- else if (ds "in").VendorPath }}
-!define PACKAGE_PATH "${PACKAGE_VENDOR_PATH}\${PACKAGE_PATH_NAME}"
+!define PACKAGE_PATH "${PACKAGE_VENDOR_PATH}\${PACKAGE_PRODUCT_PATH}"
 {{- else}}
-!define PACKAGE_PATH "${PACKAGE_PATH_NAME}"
+!define PACKAGE_PATH "${PACKAGE_PRODUCT_PATH}"
 {{- end}}
 
 {{- if (ds "in").RegistryKey }}
-!define PACKAGE_KEY "{{ (ds "in").RegistryKey | strings.ReplaceAll "\\" " " }}"
+!define PACKAGE_REG_APPKEY "{{ (ds "in").RegistryKey | strings.ReplaceAll "\\" " " }}"
+!define PACKAGE_REG_SUBPATH "{{ (ds "in").RegistryKey }}"
 {{- else if (ds "in").Vendor }}
-!define PACKAGE_KEY "${PACKAGE_VENDOR_KEY} ${PACKAGE_PATH_KEY}"
+!define PACKAGE_REG_APPKEY "${PACKAGE_VENDOR_KEY} ${PACKAGE_PRODUCT_KEY}"
+!define PACKAGE_REG_SUBPATH "${PACKAGE_VENDOR}\${PACKAGE_PRODUCT}"
 {{- else}}
-!define PACKAGE_KEY "${PACKAGE_PATH_KEY}"
+!define PACKAGE_REG_APPKEY "${PACKAGE_PRODUCT_KEY}"
+!define PACKAGE_REG_SUBPATH "${PACKAGE_PRODUCT}"
 {{- end}}
 
-!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_KEY}"
-!define REG_KEY "Software\${PACKAGE_PATH}"
+!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_REG_APPKEY}"
+!define REG_KEY "Software\${PACKAGE_REG_SUBPATH}"
 
 !define REG_KEY_INSTLOC "InstallDir"
 
-!define EVENTLOG_KEY "SYSTEM\CurrentControlSet\Services\EventLog\Application\${PACKAGE_KEY}"
+!define EVENTLOG_KEY "SYSTEM\CurrentControlSet\Services\EventLog\Application\${PACKAGE_REG_APPKEY}"
 !define EVENTLOG_FILE "%SystemRoot%\System32\EventCreate.exe"
 !define EVENTLOG_SRC 1
 !define EVENTLOG_TYPS 7
 
-Name "${PACKAGE_NAME}"
+Name "${PACKAGE_PRODUCT}"
 OutFile "${OUTFILE_NAME}"
 InstallDir "${INSTALL_ROOT}\${PACKAGE_PATH}"
 
@@ -101,7 +100,7 @@ SetCompressor {{ (ds "in").Compressor }}
 SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 
 VIProductVersion "${PACKAGE_VERSION}"
-VIAddVersionKey "ProductName" "${PACKAGE_NAME}"
+VIAddVersionKey "ProductName" "${PACKAGE_PRODUCT}"
 VIAddVersionKey "ProductVersion" "${PACKAGE_VERSION}"
 VIAddVersionKey "CompanyName" "${PACKAGE_VENDOR}"
 VIAddVersionKey "FileDescription" "${PACKAGE_DESCRIPTION}"
@@ -347,7 +346,7 @@ Var IsArmInstall
 
 !macro ValidateMutex
     Push $R0
-    System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_NAME}InstallerMutex") i .r1 ?e'
+    System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_PRODUCT}InstallerMutex") i .r1 ?e'
     Pop $R0
     ${If} $R0 != 0
         !insertmacro Log "Another instance is already running, aborting"
@@ -409,7 +408,7 @@ Var SectionSelected_{{.Name}}
 #  ${If} $R0 != ""
 #    ${If} ${FileExists} "$R0\Uninstall.exe"
 #      MessageBox MB_YESNO|MB_ICONQUESTION \
-#        "A previous version of ${PACKAGE_NAME} was found. Do you want to uninstall it first?" \
+#        "A previous version of ${PACKAGE_PRODUCT} was found. Do you want to uninstall it first?" \
 #        IDYES do_uninstall IDNO skip_uninstall
 #
 #      do_uninstall:
@@ -620,10 +619,10 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     {{- if .Service }}
     !insertmacro Service_Query "{{.Name}}" $0
     ${If} $0 = 0
-        !insertmacro Service_Update "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
+        !insertmacro Service_Update "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PACKAGE_VENDOR} ${PACKAGE_PRODUCT} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
         !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
     ${Else}
-        !insertmacro Service_Create "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
+        !insertmacro Service_Create "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PACKAGE_VENDOR} ${PACKAGE_PRODUCT} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
         !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
     ${EndIf}
     {{- end }}
@@ -669,7 +668,7 @@ Section "-Core Installation"
     WriteUninstaller "$INSTDIR\${UNINSTALLER_NAME}"
 
     Push "DisplayName"
-    Push "${PACKAGE_NAME}"
+    Push "${PACKAGE_PRODUCT}"
     Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "DisplayVersion"
@@ -738,7 +737,7 @@ Section "-Core Installation"
 SectionEnd
 
 #Function InstallOptionsPage
-#  !insertmacro MUI_HEADER_TEXT "Install Options" "Choose options for installing ${PACKAGE_NAME}"
+#  !insertmacro MUI_HEADER_TEXT "Install Options" "Choose options for installing ${PACKAGE_PRODUCT}"
 #  !insertmacro MUI_INSTALLOPTIONS_DISPLAY "NSIS(ds "in").InstallOptions.ini"
 #FunctionEnd
 

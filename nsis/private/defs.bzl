@@ -49,7 +49,20 @@ or {{.InstallRoot}}\\{{.ProductPath}}.
         "outfile": "Specify the outfile.",
         "arch": "The architecture to built the installer for.",
         "eventlog": "Whether or not to create eventlog entries.",
-        "registry_key": "The key to utilize when setting windows registry values.",
+        "registry_key": """
+Sets the registry key to utilize when installing.
+Will be used to set the unistall keys, event log keys, and general registry keys.
+This value can (and probably should) contain '\\'. When used to set app key values
+(uninstaller, event log, etc) all '\\' will be replaced with spaces. When used
+for general installer/app settings selection, the '\\' will be kept.
+
+E.g. registry_key = "my\\registry\\path" produces:
+- SOFTWARE\\my\\registry\\path
+- SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\my registry path
+- SYSTEM\CurrentControlSet\Services\EventLog\Application\my registry path
+
+Defaults to: "{{.Vendor}}\\{{.Product}}"
+""",
     },
 )
 
@@ -1059,8 +1072,16 @@ user: Install software as user.
             doc = """
 Sets the registry key to utilize when installing.
 Will be used to set the unistall keys, event log keys, and general registry keys.
+This value can (and probably should) contain '\\'. When used to set app key values
+(uninstaller, event log, etc) all '\\' will be replaced with spaces. When used
+for general installer/app settings selection, the '\\' will be kept.
 
-Defaults to: "{{.Vendor}} {{.Product}}"
+E.g. registry_key = "my\\registry\\path" produces:
+- SOFTWARE\\my\\registry\\path
+- SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\my registry path
+- SYSTEM\CurrentControlSet\Services\EventLog\Application\my registry path
+
+Defaults to: "{{.Vendor}}\\{{.Product}}"
 """
         ),
         "_verbosity": attr.int(

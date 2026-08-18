@@ -55,24 +55,42 @@ env.update(RUNFILES.EnvVars())
 INSTALLER=None
 CONFIG=None
 
-def _get_sub_path(product_path, vendor_path, install_path) -> str:
-    subpath = ""
-    if install_path != None:
-        subpath = str(install_path)
+def _get_registry_app_key(product: str, vendor: str, registry_key: str) -> str:
+    ak = _get_registry_sub_path(product, vendor, registry_key)
+    return ak.replace("\\", " ")
 
-    if product_path == None:
-        raise SystemError("both install path and product path can not be None")
+def _get_registry_sub_path(product: str, vendor: str, registry_key: str) -> str:
+    if registry_key is None:
+        return str(registry_key)
 
-    if vendor_path != None:
-        subpath = f"{str(vendor_path)}\\{str(product_path)}"
+    if product is None:
+        raise Exception("product can not be None")
+
+    ak = ""
+    if vendor is not None:
+        ak = f"{str(vendor)}\\{str(product)}"
     else:
-        subpath = str(product_path)
+        ak = str(product)
 
-    return subpath
+    return ak
 
-def _get_reg_paths(subpath, appkey) -> (str, str):
+def _get_registry_app_key_and_subpath(config: dict) -> str:
+    subpath = _get_registry_sub_path(
+        config["expected_product"] or None,
+        config["expected_vendor"] or None,
+        config["expected_install"] or None,
+    )
+    appkey = _get_registry_app_key(
+        config["expected_product"] or None,
+        config["expected_vendor"] or None,
+        config["expected_registry_key"] or None,
+    )
+    return subpath, appkey
+
+
+def _get_reg_paths(subkey, appkey) -> (str, str):
     return (
-        f"Software\\{subpath}\\{TEST_ID}",
+        f"Software\\{subkey}\\{TEST_ID}",
         f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{appkey}\\{TEST_ID}"
     )
 
@@ -292,14 +310,6 @@ def _get_install_root():
 
     return install_root
 
-def _get_app_key_and_subpath(config: dict) -> str:
-    subpath = _get_sub_path(
-        config["expected_product_path"] or None,
-        config["expected_vendor_path"] or None,
-        config["expected_install_path"] or None,
-    )
-    return subpath, subpath.replace("\\", " ")
-
 
 def _get_uninstaller_cmd(install_root):
     base_uninstaller = os.path.join(install_root, "Uninstall.exe")
@@ -460,10 +470,10 @@ class NsisInstallerTest(unittest.TestCase):
             )
 
         install_root = _get_install_root()
-        subpath, appkey = _get_app_key_and_subpath(config)
+        subkey, appkey = _get_registry_app_key_and_subpath(config)
 
-        _validate_install(self, install_root, subpath, appkey, config, installer)
-        _validate_uninstall(self, install_root, subpath, appkey, config)
+        _validate_install(self, install_root, subkey, appkey, config, installer)
+        _validate_uninstall(self, install_root, subkey, appkey, config)
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
