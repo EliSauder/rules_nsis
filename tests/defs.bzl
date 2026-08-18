@@ -87,6 +87,7 @@ def _nsis_test_config_impl(ctx):
         "expected_product_path": inst.product_path or "",
         "expected_vendor_path": inst.vendor_path or "",
         "expected_install_path": inst.install_path or "",
+        "expected_id": inst.id or "",
         "expected_bitwidth": arch,
         "expected_execution_level": inst.execution_level,
         "expected_services": services,

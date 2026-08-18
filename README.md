@@ -69,6 +69,7 @@ nsis_installer(
 - [x] Dependency Based Selections.
 - [x] Handle Stamping Installers
 - [x] EventLog Registry Entries
+- [x] Uninstall previous installs prior to install
 - [ ] StartMenu Entries. \[Help Wanted]
 - [ ] Desktop Shortcuts. \[Help Wanted]
 - [ ] Update Path. \[Help Wanted]
@@ -80,11 +81,11 @@ nsis_installer(
 
 - Unicode
 - Uninstaller file name: `Uninstaller.exe`
-- Writes to Windows Registry `Software\{{.PackagPath}}` or
-  `Software\{{.VendorPath}}\{{.PackagePath}}` or `Software\{{.InstallPath}}`
+- Writes to Windows Registry `Software\{{.Product}}` or
+  `Software\{{.Vendor}}\{{.Product}}`
   depending on what values are provided. Writes to subkeys:
     - InstallDir
-- Adds uninstaller details to `Software\Microsoft\Windows\CurrentVersion\Uninstall\{{.}}`
+- Adds uninstaller details to `Software\Microsoft\Windows\CurrentVersion\Uninstall\{{.Id}}`
   writes to the same package path as above. Writes to subkeys:
     - DisplayName
     - DisplayVersion
@@ -96,15 +97,19 @@ nsis_installer(
 - Writes to `32` or `64` registry depending on arch selected.
 - Asserts that the installer is being run on the correct architecture based
   on provided arch.
+- By default will allow 32bit installers to be installed on 64bit systems. This
+  can be disabled.
 - Uses MUI for the UI.
 - Logs to StdOut if run from a console.
 - Ensures only one installer is running using a mutex.
+- Uninstalls previous installs when run.
 - Installs and updates windows services using `sc.exe`
     - Will always attempt to stop the service before component section runs.
     - All component files are updated before the service is updated or created.
 - When `/TESTID={{.TestId}}` is passed, will append TestId to the registry
   keys it uses. This is to handle race conditions while testing installers.
 - If version is not provided, will default to `0.0.0.0`.
+- EventLog keys written to `SYSTEM\CurrentControlSet\Services\EventLog\Application\{{.Id}}`
 
 ### Stamping
 - Stamp values will be substituted with their workspace avlues when built with

@@ -298,7 +298,7 @@ def _get_app_key_and_subpath(config: dict) -> str:
         config["expected_vendor_path"] or None,
         config["expected_install_path"] or None,
     )
-    return subpath, subpath.replace("\\", " ")
+    return subpath, (config["expected_id"] or "").replace("\\", " ")
 
 
 def _get_uninstaller_cmd(install_root):

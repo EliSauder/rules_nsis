@@ -54,6 +54,7 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "arch": "The architecture to built the installer for.",
         "allow_32bit_on_64bit": "Allow 32bit installers to run on 64bit OS.",
         "eventlog": "Whether or not to create eventlog entries.",
+        "eventlog_key": "The key to use when creating the event log entry. Defaults to id.",
     },
 )
 
@@ -78,7 +79,7 @@ NsisComponentInfo = provider(
 )
 
 NsisComponentGroupInfo = provider(
-    doc = "NSIS Component Group Information",
+   doc = "NSIS Component Group Information",
     fields = {
         "name": "Component Name",
         "description": "Description",
