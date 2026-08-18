@@ -779,7 +779,30 @@ SectionEnd
 #  !insertmacro MUI_INSTALLOPTIONS_DISPLAY "NSIS(ds "in").InstallOptions.ini"
 #FunctionEnd
 
-!macro UninstallExisting exitcode appkey
+!macro TrimQuotes Input Output
+    Push "${Input}"
+    Call TrimQuotes
+    Pop ${Output}
+!macroend
+
+Function TrimQuotes
+    Exch $R0
+    Push $R1
+
+    StrCpy $R1 $R0 1
+    StrCmp $R1 `"` 0 +2
+        StrCpy $R0 $R0 `` 1
+
+    StrCpy $R1 $R0 1 -1
+    StrCmp $R1 `"` 0 +2
+        StrCpy $R0 $R0 -1
+
+    Pop $R1
+    Exch $R0
+FunctionEnd
+
+
+!macro UninstallExisting appkey exitcode
     Push "${appkey}"
     Call UninstallExisting
     Pop ${exitcode}
@@ -788,36 +811,56 @@ SectionEnd
 Function UninstallExisting #(appkey: str) -> int:
     Exch $0
 
+    Push $1
+
     Push "UninstallString"
     Push "Software\Microsoft\Windows\CurrentVersion\Uninstall\$0"
     Call GetFromRegistry
-    Pop $0
-    ${If} "$0" == ""
+    Pop $1
+    !insertmacro TrimQuotes $1 $1
+    ${If} "$1" == ""
+        Pop $1
         Pop $0
         Push 0
         Return
     ${EndIf}
 
-    IfFileExists "$0" +4 0
+    IfFileExists "$1" exists notexist
+notexist:
     # If not exist
+    Pop $1
     Pop $0
     Push 0
     Return
+
+exists:
     # EndIf
 
-    Push $1
     Push $2
+    Push $3
 
     Push "${REG_KEY_INSTLOC}"
     Push "Software\Microsoft\Windows\CurrentVersion\Uninstall\$0"
     Call GetFromRegistry
-    Pop $1
+    Pop $3
+    !insertmacro TrimQuotes $3 $3
+    ${If} "$3" == ""
+        !insertmacro Log "App $0 has no ${REG_KEY_INSTLOC} path. Please uninstall manually first."
+        MessageBox MB_ICONSTOP "App $0 has no ${REG_KEY_INSTLOC} path defined. Please uninstall manually first." /SD IDOK
+        Pop $3
+        Pop $2
+        Pop $1
+        Pop $0
+        Push 1
+    ${EndIf}
 
-    ExecWait '"$0" /S _?=$1' $2
+    ExecWait '"$1" /S _?=$3' $2
+
 
     ${If} $2 = 0
-        Delete "$0"
-        RMDir "$1"
+        Delete "$1"
+        RMDir "$3"
+        Pop $3
         Pop $2
         Pop $1
         Pop $0
@@ -825,6 +868,7 @@ Function UninstallExisting #(appkey: str) -> int:
         Return
     ${EndIf}
 
+    Pop $3
     Exch $2
     Exch
     Pop $1
@@ -843,8 +887,13 @@ Function .onInit
     !insertmacro SetRegView
     !insertmacro ValidateMutex
 
+    !insertmacro UninstallExisting "${PACKAGE_KEY}" $0
+    ${If} $0 <> 0
+        MessageBox MB_YESNO|MB_ICONSTOP "Failed to uninstall previous, continue anyway?" /SD IDYES IDYES +2
+        Abort
+    ${EndIf}
     {{- range (ds "in").PreviousAppkeys }}
-    !insertmacro UninstallExisting $0 "{{.}}"
+    !insertmacro UninstallExisting "{{.}}" $0
     ${If} $0 <> 0
         MessageBox MB_YESNO|MB_ICONSTOP "Failed to uninstall previous, continue anyway?" /SD IDYES IDYES +2
         Abort
