@@ -4,11 +4,9 @@ load(
     "//nsis/private:defs.bzl",
     "NsisInstallerInfo", "NsisComponentInfo", "NsisComponentGroupInfo",
 )
+load("@aspect_bazel_lib//lib:paths.bzl", "to_rlocation_path")
 
-def _nsis_test_config_impl(ctx):
-    inst = ctx.attr.installer[NsisInstallerInfo]
-    must_have_paths = ctx.attr.must_have_paths
-
+def _get_installer_test_details(ctx, inst, target):
     outfile = ""
     if inst.outfile:
         outfile = inst.outfile
@@ -17,12 +15,8 @@ def _nsis_test_config_impl(ctx):
     else:
         outfile = "{} Setup.exe".format(inst.product)
 
-
     files = set()
     services = dict()
-
-    for p in must_have_paths:
-        files.add(p)
 
     numcomp = 0
 
@@ -62,7 +56,6 @@ def _nsis_test_config_impl(ctx):
                 cmp = chld[NsisComponentInfo]
                 numcomp = numcomp + 1
 
-
                 for f in cmp.srcs.to_list():
                     if cmp.directory:
                         files.add("{}\\{}".format(cmp.directory, f.basename))
@@ -80,7 +73,10 @@ def _nsis_test_config_impl(ctx):
     else:
         arch = "32"
 
-    test_config = {
+    instf = target[DefaultInfo].files.to_list()[0]
+
+    return {
+        "installer_path": to_rlocation_path(ctx, instf),
         "installer_args": [],
         "expected_files": files,
         "expected_installer_name": outfile,
@@ -94,11 +90,32 @@ def _nsis_test_config_impl(ctx):
         "expected_eventlog": inst.eventlog,
     }
 
+def _nsis_test_config_impl(ctx):
+    inst = ctx.attr.installer[NsisInstallerInfo]
+    must_have_paths = ctx.attr.must_have_paths
+    install_first_and_remove = ctx.attr.install_first_and_remove
+
+    det = _get_installer_test_details(ctx, inst, ctx.attr.installer)
+
+    files = set()
+    for p in must_have_paths:
+        files.add(p)
+    for f in det["expected_files"]:
+        files.add(f)
+    det["expected_files"] = files
+
+    preinstall = []
+    for i in install_first_and_remove:
+        inst = i[NsisInstallerInfo]
+        tmp = _get_installer_test_details(ctx, inst, i)
+        preinstall.append(tmp)
+    det["install_first_and_remove"] = preinstall
+
     outf = ctx.actions.declare_file(ctx.attr.name + ".json")
 
     ctx.actions.write(
         output = outf,
-        content = json.encode(test_config),
+        content = json.encode(det),
     )
 
     return [
@@ -118,18 +135,25 @@ _nsis_test_config = rule(
         "must_have_paths": attr.string_list(
             default = [],
         ),
+        "install_first_and_remove": attr.label_list(
+            default = [],
+            providers = [
+                NsisInstallerInfo,
+                DefaultInfo,
+            ],
+        ),
     },
     outputs = {
         "out": "%{name}.json"
     },
 )
 
-def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, **kwargs):
-
+def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, install_first_and_remove, **kwargs):
     _nsis_test_config(
         name = name + "_config",
         installer = installer,
         must_have_paths = must_have_paths,
+        install_first_and_remove = install_first_and_remove,
         visibility = ["//visibility:private"],
     )
 
@@ -144,7 +168,7 @@ def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, **kw
             ":__init__.py",
         ],
         main = ":nsis_install_test.py",
-        data = [installer, f],
+        data = [installer, f] + install_first_and_remove,
         args = [
             "$(rlocationpath {})".format(installer),
             "$(rlocationpath {})".format(f),
@@ -175,6 +199,14 @@ nsis_installer_test = macro(
         "must_have_paths": attr.string_list(
             mandatory = False,
             default = [],
+        ),
+        "install_first_and_remove": attr.label_list(
+            mandatory = False,
+            default = [],
+            providers = [
+                NsisInstallerInfo,
+                DefaultInfo,
+            ],
         ),
     },
 )
