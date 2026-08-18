@@ -12,6 +12,7 @@ register_toolchains(
     dev_dependency = True,
 )
 
+bazel_dep(name = "aspect_bazel_lib", version = "2.22.5", dev_dependency = True)
 bazel_dep(name = "bazel_lib", version = "3.7.1")
 bazel_dep(name = "package_metadata", version = "0.0.13")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")

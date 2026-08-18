@@ -1099,7 +1099,7 @@ user: Install software as user.
             default = False,
             doc = "Whether the installer should setup windows event log logging for the application.",
         ),
-        "previous_appkeys": attr.string(
+        "previous_appkeys": attr.string_list(
             mandatory = False,
             default = [],
             doc = "Previous registry keys to check for UninstallString keys when installing.",
