@@ -47,6 +47,7 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "components": "List of root components and component groups.",
         "outfile": "Specify the outfile.",
         "arch": "The architecture to built the installer for.",
+        "allow_32bit_on_64bit": "Allow 32bit installers to run on 64bit OS.",
         "eventlog": "Whether or not to create eventlog entries.",
     },
 )
@@ -647,6 +648,7 @@ def _get_installer_ds(ctx, toolchain):
             if str(ctx.attr.arch) == "x86_64" or str(ctx.attr.arch) == "arm64"
             else False
         ),
+        "ArchitectureAllow32On64": bool(ctx.attr.allow_32bit_on_64bit),
         "InstallRoot": str(_make_win_path(ctx.attr.install_root)),
         "InstallPath": str(_make_win_path(ctx.attr.install_path)),
         "ExecutionLevel": str(ctx.attr.execution_level),
@@ -1084,6 +1086,11 @@ user: Install software as user.
                 "arm64",
                 "arm32",
             ],
+        ),
+        "allow_32bit_on_64bit": attr.bool(
+            mandatory = False,
+            default = True,
+            doc = "Whether to allow 32bit installers to run on 64bit OS.",
         ),
         "eventlog": attr.bool(
             mandatory = False,

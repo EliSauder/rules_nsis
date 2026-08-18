@@ -291,11 +291,13 @@ Var IsArmInstall
     StrCpy $Is64BitInstall "1"
     StrCpy $IsArmInstall "0"
 {{- else if eq (ds "in").Architecture "x86_32" }}
+    {{- if not (ds "in").ArchitectureAllow32On64 }}
     ${IfNot} ${IsNativeIA32}
         !insertmacro Log "Not IA32, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 32-bit x86 version of Windows." /SD IDOK
         Abort
     ${EndIf}
+    {{- end }}
 
     SetRegView 32
     StrCpy $Is64BitInstall "0"
@@ -311,11 +313,13 @@ Var IsArmInstall
     StrCpy $Is64BitInstall "1"
     StrCpy $IsArmInstall "1"
 {{- else if eq (ds "in").Architecture "arm32" }}
+    {{- if not (ds "in").ArchitectureAllow32On64 }}
     ${IfNot} ${IsNativeARM32}
         !insertmacro Log "Not ARM32, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 32-bit ARM version of Windows." /SD IDOK
         Abort
     ${EndIf}
+    {{- end}}
 
     SetRegView 32
     StrCpy $Is64BitInstall "0"
