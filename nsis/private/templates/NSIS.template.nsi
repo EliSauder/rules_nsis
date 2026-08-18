@@ -297,7 +297,7 @@ Var IsArmInstall
         MessageBox MB_ICONSTOP "This installer requires a 32-bit x86 version of Windows." /SD IDOK
         Abort
     ${EndIf}
-    {{- end}
+    {{- end }}
 
     SetRegView 32
     StrCpy $Is64BitInstall "0"
