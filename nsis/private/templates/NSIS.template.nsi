@@ -51,8 +51,6 @@ Unicode True
 !define ICON_FILE ""
 {{- end}}
 
-!define PRODUCT_KEY "${PRODUCT_ID}"
-
 {{- if (ds "in").InstallPath}}
 !define SUB_PATH "{{(ds "in").InstallPath}}"
 {{- else if (ds "in").VendorPath}}
@@ -276,7 +274,7 @@ Var StdOutAttempted
 Var Is64BitInstall
 Var IsArmInstall
 
-!macro SetRegView
+!macro _SetRegView
 {{- if eq (ds "in").Architecture "x86_64" }}
     ${IfNot} ${IsNativeAMD64}
         !insertmacro Log "Not AMD64, Aborting"
@@ -347,9 +345,9 @@ Var IsArmInstall
 {{- end }}
 !macroend
 
-!macro ValidateMutex
+!macro ValidateMutex Act
     Push $R0
-    System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PUBLISHER}${PRODUCT}InstallerMutex") i .r1 ?e'
+    System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PUBLISHER}${PRODUCT}${Act}Mutex") i .r1 ?e'
     Pop $R0
     ${If} $R0 != 0
         !insertmacro Log "Another instance is already running, aborting"
@@ -476,6 +474,28 @@ Function AddToRegistry
     Pop $2
     Pop $0
     Pop $1
+FunctionEnd
+
+Function un.GetFromRegistry
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
+    ${EndIf}
+    Exch $0
+    Exch
+    Exch $1
+
+    ${If} $TestId != ""
+        Push $3
+        StrCpy $3 $TestId
+        StrCpy $0 "$0\$3"
+        Pop $3
+    ${EndIf}
+
+    ReadRegStr $0 SHCTX "$0" "$1"
+    Pop $1
+    Exch $0
 FunctionEnd
 
 Function GetFromRegistry
@@ -702,6 +722,10 @@ Section "-Core Installation"
 
     WriteUninstaller "$INSTDIR\${UNINSTALLER_NAME}"
 
+    Push "InstallLocation"
+    Push "$INSTDIR"
+    Push "${UN_REG_KEY}"
+    Call AddToRegistry
     Push "DisplayName"
     Push "${PRODUCT}"
     Push "${UN_REG_KEY}"
@@ -798,7 +822,6 @@ Function TrimQuotes
     Exch $R0
 FunctionEnd
 
-
 !macro UninstallExisting appkey exitcode
     Push "${appkey}"
     Call UninstallExisting
@@ -814,16 +837,20 @@ Function UninstallExisting #(appkey: str) -> int:
     Push "Software\Microsoft\Windows\CurrentVersion\Uninstall\$0"
     Call GetFromRegistry
     Pop $1
+
     !insertmacro TrimQuotes $1 $1
     ${If} "$1" == ""
+        !insertmacro Log "No uninstall path for id: $0"
         Pop $1
         Pop $0
         Push 0
         Return
     ${EndIf}
+    !insertmacro Log "$0 has uninstall path: $1"
 
     IfFileExists "$1" exists notexist
 notexist:
+    !insertmacro Log "Uninstall file $1 does not exist"
     # If not exist
     Pop $1
     Pop $0
@@ -831,12 +858,10 @@ notexist:
     Return
 
 exists:
-    # EndIf
-
     Push $2
     Push $3
 
-    Push "${REG_KEY_INSTLOC}"
+    Push "InstallLocation"
     Push "Software\Microsoft\Windows\CurrentVersion\Uninstall\$0"
     Call GetFromRegistry
     Pop $3
@@ -849,12 +874,30 @@ exists:
         Pop $1
         Pop $0
         Push 1
+        Return
     ${EndIf}
 
-    ExecWait '"$1" /S _?=$3' $2
+    Push $4
+    Push $5
+
+    ${If} $TestId == ""
+        nsExec::ExecToStack `"$1" /S _?=$3`
+        Pop $4
+        Pop $5
+    ${Else}
+        StrCpy $2 "$TestId"
+        nsExec::ExecToStack `"$1" /S /TESTID=$2 _?=$3`
+        Pop $4
+        Pop $5
+    ${EndIf}
+    !insertmacro Log `Result of uninstall existing: Code: $4, Output: $5`
+    IntOp $2 $4 + 0
+    Pop $5
+    Pop $4
 
 
     ${If} $2 = 0
+        !insertmacro Log `Successful uninstall: Deleting '$1', Removind '$3'`
         Delete "$1"
         RMDir "$3"
         Pop $3
@@ -881,10 +924,10 @@ Function .onInit
     ClearErrors
 
     !insertmacro SetVarCtx
-    !insertmacro SetRegView
-    !insertmacro ValidateMutex
+    !insertmacro _SetRegView
+    !insertmacro ValidateMutex "Install"
 
-    !insertmacro UninstallExisting "${PRODUCT_KEY}" $0
+    !insertmacro UninstallExisting "${PRODUCT_ID}" $0
     ${If} $0 <> 0
         MessageBox MB_YESNO|MB_ICONSTOP "Failed to uninstall previous, continue anyway?" /SD IDYES IDYES +2
         Abort
@@ -901,7 +944,6 @@ Function .onInit
 FunctionEnd
 
 
-
 Function un.onInit
     Push $0
     ${GetParameters} $0
@@ -910,20 +952,17 @@ Function un.onInit
     ClearErrors
 
     !insertmacro SetVarCtx
-    !insertmacro SetRegView
-    !insertmacro ValidateMutex
+    !insertmacro _SetRegView
+    !insertmacro ValidateMutex "Uninstall"
 
-    ${If} $TestId == ""
-        ReadRegStr $0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
-    ${Else}
-        StrCpy $0 $TestId
-        ReadRegStr $0 SHCTX "${REG_KEY}\$0" "${REG_KEY_INSTLOC}"
-    ${EndIf}
+    Push "InstallLocation"
+    Push "${UN_REG_KEY}"
+    Call un.GetFromRegistry
+    Pop $0
 
-    ${If} ${Errors}
-    ${OrIf} $0 == ""
-        !insertmacro Log "No previous install exists."
-        MessageBox MB_ICONSTOP "No previous install exists." /SD IDOK
+    ${If} "$0" == ""
+        !insertmacro Log "No install exists."
+        MessageBox MB_ICONSTOP "No install exists." /SD IDOK
         Abort
     ${EndIf}
 
@@ -1016,17 +1055,7 @@ Section "Uninstall"
       SetShellVarContext current
   ${EndIf}
 
-  {{- if eq (ds "in").Architecture "x64" }}
-    SetRegView 64
-  {{- else if eq (ds "in").Architecture "x86" }}
-    SetRegView 32
-  {{- else }}
-    ${If} ${RunningX64}
-      SetRegView 64
-    ${Else}
-      SetRegView 32
-    ${EndIf}
-  {{- end }}
+  !insertmacro _SetRegView
 
   #ReadRegStr $StartMenuFolder SHCTX "${UN_REG_KEY}" "StartMenu"
   #${Unless} ${Errors}

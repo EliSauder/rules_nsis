@@ -314,3 +314,25 @@ nsis_installer_test(
         "dummy.py",
     ],
 )
+
+nsis_installer(
+    name = "minimal_installerA",
+    id = "8d5d6365-eccc-48aa-9dff-4baf9e206fc0",
+    components = [":minimal_component"],
+    product = "Minimal Installer A",
+    product_path = "Minimal Installer",
+)
+
+nsis_installer(
+    name = "minimal_installerB",
+    id = "8d5d6365-eccc-48aa-9dff-4baf9e206fc0",
+    components = [":minimal_component_with_dir"],
+    product = "Minimal Installer B",
+    product_path = "Minimal Installer",
+)
+
+nsis_installer_test(
+    name = "install_first_and_remove_test",
+    installer = ":minimal_installerA",
+    install_first_and_remove = ":minimal_installerB",
+)

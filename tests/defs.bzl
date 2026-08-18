@@ -81,7 +81,9 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_files": files,
         "expected_installer_name": outfile,
         "expected_product_path": inst.product_path or "",
+        "expected_product": inst.product or "",
         "expected_vendor_path": inst.vendor_path or "",
+        "expected_vendor": inst.vendor or "",
         "expected_install_path": inst.install_path or "",
         "expected_id": inst.id or "",
         "expected_bitwidth": arch,
@@ -149,11 +151,15 @@ _nsis_test_config = rule(
 )
 
 def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, install_first_and_remove, **kwargs):
+    v = []
+    if install_first_and_remove != None:
+        v.append(install_first_and_remove)
+
     _nsis_test_config(
         name = name + "_config",
         installer = installer,
         must_have_paths = must_have_paths,
-        install_first_and_remove = install_first_and_remove,
+        install_first_and_remove = v,
         visibility = ["//visibility:private"],
     )
 
@@ -168,7 +174,7 @@ def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, inst
             ":__init__.py",
         ],
         main = ":nsis_install_test.py",
-        data = [installer, f] + install_first_and_remove,
+        data = [installer, f] + v,
         args = [
             "$(rlocationpath {})".format(installer),
             "$(rlocationpath {})".format(f),
@@ -200,9 +206,10 @@ nsis_installer_test = macro(
             mandatory = False,
             default = [],
         ),
-        "install_first_and_remove": attr.label_list(
+        "install_first_and_remove": attr.label(
             mandatory = False,
-            default = [],
+            default = None,
+            configurable = False,
             providers = [
                 NsisInstallerInfo,
                 DefaultInfo,

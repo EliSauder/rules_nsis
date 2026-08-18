@@ -101,8 +101,8 @@ def _get_reg_access(bitwidth: str) -> int:
 def _reg_open(root_db: int, path: str, view: int):
     try:
         return winreg.OpenKey(root_db, path, 0, view)
-    except:
-        raise FileNotFoundError(f"error opening key {path}")
+    except (FileNotFoundError, OSError) as e:
+        raise FileNotFoundError(f"error opening key {path}: {e}")
 
 def _reg_value(root: int, path: str, view: int, name: str):
     with _reg_open(root, path, view) as hkey:
@@ -146,6 +146,11 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, subpath: st
     try:
         _reg_value(root, unpath, access, "DisplayVersion")
         testcase.fail(f"Registry key {unpath} with value DisplayVersion still exists")
+    except FileNotFoundError:
+        pass
+    try:
+        _reg_value(root, unpath, access, "InstallLocation")
+        testcase.fail(f"Registry key {unpath} with value InstallLocatino still exists")
     except FileNotFoundError:
         pass
     try:
@@ -265,6 +270,7 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, sub
     _reg_value(root, unpath, access, "NoRepair")
     _reg_value(root, unpath, access, "NoModify")
     _reg_value(root, unpath, access, "DisplayIcon")
+    instlocval, instloctyp = _reg_value(root, unpath, access, "InstallLocation")
 
     testcase.assertEqual(
         inst_root,
@@ -281,14 +287,20 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, sub
         unversionval,
         f"expected install version {versionval} to equal uninstall version {unversionval}",
     )
+    testcase.assertEqual(
+        inst_root,
+        instlocval,
+        f"expected {unpath}\\InstallLocation to equal install path",
+    )
 
-def _get_pre_install_root(hs: int):
+def _get_pre_install_root(hs: int, init: bool = True):
     rt = f"{TEST_TMPDIR}\\pre-install-{hs}"
 
-    pth = pathlib.Path(rt).resolve()
-    if pth.exists():
-        shutil.rmtree(pth)
-    pth.mkdir(parents=True, exist_ok=True)
+    if init:
+        pth = pathlib.Path(rt).resolve()
+        if pth.exists():
+            shutil.rmtree(pth)
+        pth.mkdir(parents=True, exist_ok=True)
 
     return rt
 
@@ -305,9 +317,9 @@ def _get_install_root():
 
 def _get_app_key_and_subpath(config: dict) -> str:
     subpath = _get_sub_path(
-        config["expected_product_path"] or None,
-        config["expected_vendor_path"] or None,
-        config["expected_install_path"] or None,
+        config["expected_product"] or None,
+        config["expected_vendor"] or None,
+        None,
     )
     return subpath, (config["expected_id"] or "").replace("\\", " ")
 
@@ -347,7 +359,7 @@ def _validate_removed_files(testcase: unittest.TestCase, config: dict, install_r
         testcase.assertFalse(os.path.exists(path), f"File: '{path}' exists after uninstall. Install Root Content: \n{dircontent}")
 
     if os.path.exists(install_root):
-        testcase.fail(f"Install root directory left over {install_root}")
+        testcase.fail(f"Install root directory left over {install_root}. Content: {dircontent}")
 
 
 def _validate_files(testcase: unittest.TestCase, config, install_root):
@@ -368,9 +380,9 @@ def _validate_removed_services(testcase, config, install_root):
     for key, val in expected_services.items():
         try:
             svc = psutil.win_service_get(key)
-            testcase.fail(f"Windows service {key}, still exists")
         except:
             continue
+        testcase.fail(f"Windows service {key}, still exists")
 
 
 def _validate_services(testcase, config, install_root):
@@ -429,23 +441,24 @@ def _validate_install(testcase, install_root, subpath, appkey, config, installer
     with testcase.subTest(msg="Validate EventLog Registry"):
         _validate_eventlog(testcase, config, appkey)
 
-def _validate_uninstall(testcase, install_root, subpath, appkey, config):
-    uninstaller_cmd = _get_uninstaller_cmd(install_root)
+def _validate_uninstall(testcase, install_root, subpath, appkey, config, runun=True):
+    if runun:
+        uninstaller_cmd = _get_uninstaller_cmd(install_root)
 
-    proc = subprocess.run(
-        uninstaller_cmd,
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=False,
-        env=env,
-    )
+        proc = subprocess.run(
+            uninstaller_cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+            env=env,
+        )
 
-    testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {uninstaller_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+        testcase.assertEqual(0, proc.returncode, f"Uninstaller failed.\nexit_code: {proc.returncode}\ncmd: {uninstaller_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
-    log = logging.getLogger("NsisInstallerTest.test_installer")
-    log.debug("nsis uninstall stdout=%r", proc.stdout)
-    log.debug("nsis uninstall stderr=%r", proc.stderr)
+        log = logging.getLogger("NsisInstallerTest.test_installer")
+        log.debug("nsis uninstall stdout=%r", proc.stdout)
+        log.debug("nsis uninstall stderr=%r", proc.stderr)
 
     with testcase.subTest(msg="Validate Removed Files"):
         _validate_removed_files(testcase, config, install_root)
@@ -457,14 +470,15 @@ def _validate_uninstall(testcase, install_root, subpath, appkey, config):
         _validate_removed_eventlog(testcase, config, appkey)
 
 def _install_first(testcase: unittest.TestCase, config):
-    rt = _get_pre_install_root(hash(config))
+    rt = _get_pre_install_root(hash(config["installer_path"]))
     subpath, appkey = _get_app_key_and_subpath(config)
+    installer = RUNFILES.Rlocation(config["installer_path"])
     _validate_install(testcase, rt, subpath, appkey, config, installer)
 
 def _install_first_validate_removed(testcase: unittest.TestCase, config):
-    rt = _get_pre_install_root(hash(config))
+    rt = _get_pre_install_root(hash(config["installer_path"]), False)
     subpath, appkey = _get_app_key_and_subpath(config)
-    _validate_uninstall(testcase, rt, subpath, appkey, config)
+    _validate_uninstall(testcase, rt, subpath, appkey, config, False)
 
 class NsisInstallerTest(unittest.TestCase):
     def test_installer(self) -> None:
@@ -480,16 +494,19 @@ class NsisInstallerTest(unittest.TestCase):
             )
 
         for c in config["install_first_and_remove"]:
-            _install_first(testcase, c)
+            _install_first(self, c)
 
         install_root = _get_install_root()
         subpath, appkey = _get_app_key_and_subpath(config)
 
         _validate_install(self, install_root, subpath, appkey, config, installer)
+
         _validate_uninstall(self, install_root, subpath, appkey, config)
 
         for c in config["install_first_and_remove"]:
-            _install_first_validate_removed(testcase, c)
+            _install_first_validate_removed(self, c)
+
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

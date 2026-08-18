@@ -8,6 +8,7 @@ nsis_component(
 
 nsis_installer(
     name = "minimal_installer",
+    id = "9028ce71-646d-4949-910e-0dd8104eec31",
     components = [":minimal_component"],
     product = "Minimal Installer",
     product_path = "Minimal Installer",
