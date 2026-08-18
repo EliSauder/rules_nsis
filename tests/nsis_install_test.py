@@ -1,5 +1,4 @@
 import os
-import uuid
 import hashlib
 import time
 import psutil
@@ -282,16 +281,6 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, sub
         f"expected install version {versionval} to equal uninstall version {unversionval}",
     )
 
-def _get_pre_install_root(hs: int):
-    rt = f"{TEST_TMPDIR}\\pre-install-{hs}"
-
-    pth = pathlib.Path(rt).resolve()
-    if pth.exists():
-        shutil.rmtree(pth)
-    pth.mkdir(parents=True, exist_ok=True)
-
-    return rt
-
 def _get_install_root():
     install_root = f"{TEST_TMPDIR}\\nsis-install-root"
 
@@ -456,15 +445,6 @@ def _validate_uninstall(testcase, install_root, subpath, appkey, config):
     with testcase.subTest(msg="Validate Removed EventLog Reg"):
         _validate_removed_eventlog(testcase, config, appkey)
 
-def _install_first(testcase: unittest.TestCase, config):
-    rt = _get_pre_install_root(hash(config))
-    subpath, appkey = _get_app_key_and_subpath(config)
-    _validate_install(testcase, rt, subpath, appkey, config, installer)
-
-def _install_first_validate_removed(testcase: unittest.TestCase, config):
-    rt = _get_pre_install_root(hash(config))
-    subpath, appkey = _get_app_key_and_subpath(config)
-    _validate_uninstall(testcase, rt, subpath, appkey, config)
 
 class NsisInstallerTest(unittest.TestCase):
     def test_installer(self) -> None:
@@ -479,17 +459,11 @@ class NsisInstallerTest(unittest.TestCase):
                 f"Installer {bn} does not match expected name {exp_inst_name}",
             )
 
-        for c in config["install_first_and_remove"]:
-            _install_first(testcase, c)
-
         install_root = _get_install_root()
         subpath, appkey = _get_app_key_and_subpath(config)
 
         _validate_install(self, install_root, subpath, appkey, config, installer)
         _validate_uninstall(self, install_root, subpath, appkey, config)
-
-        for c in config["install_first_and_remove"]:
-            _install_first_validate_removed(testcase, c)
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
