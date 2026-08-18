@@ -636,7 +636,7 @@ def _hidden(mode):
 def _get_installer_ds(ctx, toolchain):
     data = {
         "Name": str(ctx.attr.name),
-        "Id": str(ctx.attr.name),
+        "Id": str(ctx.attr.id),
         "Product": str(ctx.attr.product),
         "ProductPath": str(_make_win_path(ctx.attr.product_path)),
         "Vendor": str(ctx.attr.vendor),
