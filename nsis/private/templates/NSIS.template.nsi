@@ -437,7 +437,7 @@ Function un.RemoveRegistry
   ${Else}
       SetShellVarContext current
   ${EndIf}
-  Pop $0 # Pop Param 1
+  Exch $0 # Pop Param 1
 
   ${If} $TestId == ""
     !insertmacro Log "Removing registry '$0'"
@@ -449,26 +449,58 @@ Function un.RemoveRegistry
     DeleteRegKey SHCTX "$0\$1"
     Pop $1
   ${EndIf}
+
+  Pop $0
 FunctionEnd
 
 Function AddToRegistry
-  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-      SetShellVarContext all
-  ${Else}
-      SetShellVarContext current
-  ${EndIf}
-  Pop $0 # Pop Param 1
-  Pop $1 # Pop Param 2
-  Pop $2 # Pop Param 3
-  ${If} $TestId != ""
-    Push $3
-    StrCpy $3 $TestId
-    StrCpy $0 "$0\$3"
-    Pop $3
-  ${EndIf}
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
+    ${EndIf}
+    Exch $0
+    Exch 1
+    Exch $1
+    Exch 2
+    Exch $2
 
-  WriteRegStr SHCTX "$0" "$2" "$1"
-  !insertmacro Log "Set install registry entry: '$0' -> '$2' to '$1'"
+
+    ${If} $TestId != ""
+      Push $3
+      StrCpy $3 $TestId
+      StrCpy $0 "$0\$3"
+      Pop $3
+    ${EndIf}
+
+    WriteRegStr SHCTX "$0" "$2" "$1"
+    !insertmacro Log "Set install registry entry: '$0' -> '$2' to '$1'"
+
+    Pop $2
+    Pop $0
+    Pop $1
+FunctionEnd
+
+Function GetFromRegistry
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
+    ${EndIf}
+    Exch $0
+    Exch
+    Exch $1
+
+    ${If} $TestId != ""
+        Push $3
+        StrCpy $3 $TestId
+        StrCpy $0 "$0\$3"
+        Pop $3
+    ${EndIf}
+
+    ReadRegStr $0 SHCTX "$0" "$1"
+    Pop $1
+    Exch $0
 FunctionEnd
 
 !macro _ServiceScExec ARGS OUT_RC
@@ -747,6 +779,59 @@ SectionEnd
 #  !insertmacro MUI_INSTALLOPTIONS_DISPLAY "NSIS(ds "in").InstallOptions.ini"
 #FunctionEnd
 
+!macro UninstallExisting exitcode appkey
+    Push "${appkey}"
+    Call UninstallExisting
+    Pop ${exitcode}
+!macroend
+
+Function UninstallExisting #(appkey: str) -> int:
+    Exch $0
+
+    Push "UninstallString"
+    Push "Software\Microsoft\Windows\CurrentVersion\Uninstall\$0"
+    Call GetFromRegistry
+    Pop $0
+    ${If} "$0" == ""
+        Pop $0
+        Push 0
+        Return
+    ${EndIf}
+
+    IfFileExists "$0" +4 0
+    # If not exist
+    Pop $0
+    Push 0
+    Return
+    # EndIf
+
+    Push $1
+    Push $2
+
+    Push "${REG_KEY_INSTLOC}"
+    Push "Software\Microsoft\Windows\CurrentVersion\Uninstall\$0"
+    Call GetFromRegistry
+    Pop $1
+
+    ExecWait '"$0" /S _?=$1' $2
+
+    ${If} $2 = 0
+        Delete "$0"
+        RMDir "$1"
+        Pop $2
+        Pop $1
+        Pop $0
+        Push 0
+        Return
+    ${EndIf}
+
+    Exch $2
+    Exch
+    Pop $1
+    Exch
+    Pop $0
+FunctionEnd
+
 Function .onInit
     Push $0
     ${GetParameters} $0
@@ -758,6 +843,14 @@ Function .onInit
     !insertmacro SetRegView
     !insertmacro ValidateMutex
 
+    {{- range (ds "in").PreviousAppkeys }}
+    !insertmacro UninstallExisting $0 "{{.}}"
+    ${If} $0 <> 0
+        MessageBox MB_YESNO|MB_ICONSTOP "Failed to uninstall previous, continue anyway?" /SD IDYES IDYES +2
+        Abort
+    ${EndIf}
+    {{- end}}
+
     {{- range (ds "in").Components }}
     {{- template "sectionVarInit" .}}
     {{- end}}
@@ -766,8 +859,8 @@ Function .onInit
     {{- template "sectionGroupVarInit" .}}
     {{- end}}
     Pop $0
-
 FunctionEnd
+
 
 
 Function un.onInit

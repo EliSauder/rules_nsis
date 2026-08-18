@@ -49,6 +49,7 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "arch": "The architecture to built the installer for.",
         "allow_32bit_on_64bit": "Allow 32bit installers to run on 64bit OS.",
         "eventlog": "Whether or not to create eventlog entries.",
+        "previous_appkeys": "A list of previous registry app keys to check for UninstallStrings to uninsatll prior to install.",
     },
 )
 
@@ -672,6 +673,7 @@ def _get_installer_ds(ctx, toolchain):
         ),
         "EventLog": bool(ctx.attr.eventlog),
         "Outfile": str(ctx.attr.outfile),
+        "PreviousAppkeys": [str(x) for x in ctx.attr.previous_appkeys],
         _COMPONENTS_KEY: [],
         _COMPONENT_GROUPS_KEY: [],
     }
@@ -1096,6 +1098,11 @@ user: Install software as user.
             mandatory = False,
             default = False,
             doc = "Whether the installer should setup windows event log logging for the application.",
+        ),
+        "previous_appkeys": attr.string(
+            mandatory = False,
+            default = [],
+            doc = "Previous registry keys to check for UninstallString keys when installing.",
         ),
         "_render_script": attr.label(
             default = Label("//nsis/private/render:stamp_data"),
