@@ -426,6 +426,11 @@ def _validate_install(testcase, install_root, subpath, appkey, config, installer
         env=env,
     )
 
+    if proc.returncode != 0 and config["expect_failed_install"]:
+        return True
+    if proc.returncode == 0 and config["expect_failed_install"]:
+        testcase.fail("expected fail but no failure was reported by the installer.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+
     testcase.assertEqual(0, proc.returncode, f"Installer failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
     log = logging.getLogger("NsisInstallerTest.test_installer")
@@ -440,6 +445,8 @@ def _validate_install(testcase, install_root, subpath, appkey, config, installer
         _validate_services(testcase, config, install_root)
     with testcase.subTest(msg="Validate EventLog Registry"):
         _validate_eventlog(testcase, config, appkey)
+
+    return False
 
 def _validate_uninstall(testcase, install_root, subpath, appkey, config, runun=True):
     if runun:
@@ -499,7 +506,9 @@ class NsisInstallerTest(unittest.TestCase):
         install_root = _get_install_root()
         subpath, appkey = _get_app_key_and_subpath(config)
 
-        _validate_install(self, install_root, subpath, appkey, config, installer)
+        res = _validate_install(self, install_root, subpath, appkey, config, installer)
+        if res:
+            return
 
         _validate_uninstall(self, install_root, subpath, appkey, config)
 

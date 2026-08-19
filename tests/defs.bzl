@@ -90,6 +90,7 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_execution_level": inst.execution_level,
         "expected_services": services,
         "expected_eventlog": inst.eventlog,
+        "expect_failed_install": False,
     }
 
 def _nsis_test_config_impl(ctx):
@@ -112,6 +113,8 @@ def _nsis_test_config_impl(ctx):
         tmp = _get_installer_test_details(ctx, inst, i)
         preinstall.append(tmp)
     det["install_first_and_remove"] = preinstall
+
+    det["expect_failed_install"] = bool(ctx.attr.expect_failed_install)
 
     outf = ctx.actions.declare_file(ctx.attr.name + ".json")
 
@@ -144,13 +147,16 @@ _nsis_test_config = rule(
                 DefaultInfo,
             ],
         ),
+        "expect_failed_install": attr.bool(
+            default = False,
+        ),
     },
     outputs = {
         "out": "%{name}.json"
     },
 )
 
-def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, install_first_and_remove, **kwargs):
+def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, install_first_and_remove, expect_failed_install, target_compatible_with, **kwargs):
     v = []
     if install_first_and_remove != None:
         v.append(install_first_and_remove)
@@ -161,6 +167,7 @@ def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, inst
         must_have_paths = must_have_paths,
         install_first_and_remove = v,
         visibility = ["//visibility:private"],
+        expect_failed_install = expect_failed_install,
     )
 
     f = ":{}_config".format(name)
@@ -179,7 +186,7 @@ def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, inst
             "$(rlocationpath {})".format(installer),
             "$(rlocationpath {})".format(f),
         ],
-        target_compatible_with = ["@platforms//os:windows"],
+        target_compatible_with = ["@platforms//os:windows"] + target_compatible_with,
         timeout = "short",
         visibility = visibility,
         tags = tags,
@@ -214,6 +221,14 @@ nsis_installer_test = macro(
                 NsisInstallerInfo,
                 DefaultInfo,
             ],
+        ),
+        "expect_failed_install": attr.bool(
+            mandatory = False,
+            default = False,
+        ),
+        "target_compatible_with": attr.label_list(
+            mandatory = False,
+            default = [],
         ),
     },
 )
