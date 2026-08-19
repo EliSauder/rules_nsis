@@ -1,5 +1,5 @@
 load("//tests:defs.bzl", "nsis_installer_test")
-load("//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer")
+load("//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer", "nsis_directory")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 
@@ -49,7 +49,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_outfile_test",
     installer = ":minimal_installer_outfile",
-    must_have_paths = ["README.md"],
+    must_have_files = ["README.md"],
 )
 
 nsis_component(
@@ -93,7 +93,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_test_deps",
     installer = ":minimal_installer_deps",
-    must_have_paths = ["README.md"],
+    must_have_files = ["README.md"],
 )
 
 nsis_component(
@@ -132,7 +132,7 @@ nsis_installer(
 nsis_installer_test(
     name = "single_service_test",
     installer = ":single_service_installer",
-    must_have_paths = ["README.md"],
+    must_have_files = ["README.md"],
 )
 
 nsis_component_group(
@@ -153,7 +153,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_group_test",
     installer = ":minimal_installer_with_group",
-    must_have_paths = ["README.md"],
+    must_have_files = ["README.md"],
 )
 
 nsis_component(
@@ -173,7 +173,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_dir_test",
     installer = ":minimal_installer_with_dir",
-    must_have_paths = ["Component/README.md"],
+    must_have_files = ["Component/README.md"],
 )
 
 nsis_component(
@@ -219,7 +219,7 @@ nsis_installer(
 nsis_installer_test(
     name = "ssc_with_group_and_dir_test",
     installer = ":ssc_with_group_and_dir",
-    must_have_paths = ["Component\\README.md"],
+    must_have_files = ["Component\\README.md"],
 )
 
 nsis_installer(
@@ -235,7 +235,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_nostamp_test",
     installer = ":minimal_installer_with_nostamp",
-    must_have_paths = ["README.md"],
+    must_have_files = ["README.md"],
 )
 
 nsis_installer(
@@ -253,7 +253,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_with_stamp_default_test",
     installer = ":minimal_installer_with_stamp_default",
-    must_have_paths = ["README.md"],
+    must_have_files = ["README.md"],
 )
 
 nsis_installer(
@@ -308,7 +308,7 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_runfiles_test",
     installer = ":minimal_installer_runfiles",
-    must_have_paths = [
+    must_have_files = [
         "README.md",
         "__init__.py",
         "dummy.py",
@@ -367,4 +367,34 @@ nsis_installer_test(
     installer = ":minimal_installer_arch32_not_allowed_on64",
     expect_failed_install = True,
     target_compatible_with = ["@platforms//cpu:x86_64"]
+)
+
+nsis_directory(
+    name = "test_root_dir",
+    path = "C:\\ROOT",
+    grants = {
+        "Everyone": "RW",
+    },
+)
+
+nsis_component(
+    name = "create_root_dir_component",
+    dirs = [
+        ":test_root_dir",
+    ],
+    selection_mode = "default",
+)
+
+nsis_installer(
+    name = "create_root_dir_installer",
+    id = "887a81fc-cf67-42d9-aebb-9fab608f759c",
+    components = [":create_root_dir_component"],
+    product = "Create Root Dir Installer",
+    product_path = "Create Root Dir Installer",
+)
+
+nsis_installer_test(
+    name = "create_root_dir_installer_test",
+    installer = ":create_root_dir_installer",
+    must_have_dirs = ["C:\\ROOT"],
 )

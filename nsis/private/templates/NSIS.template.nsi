@@ -176,81 +176,80 @@ VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
 ;--------------------------------
 ;Languages
 
-  !insertmacro MUI_LANGUAGE "English" ;first language is the default language
-  !insertmacro MUI_LANGUAGE "Afrikaans"
-  !insertmacro MUI_LANGUAGE "Albanian"
-  !insertmacro MUI_LANGUAGE "Arabic"
-  !insertmacro MUI_LANGUAGE "Asturian"
-  !insertmacro MUI_LANGUAGE "Basque"
-  !insertmacro MUI_LANGUAGE "Belarusian"
-  !insertmacro MUI_LANGUAGE "Bosnian"
-  !insertmacro MUI_LANGUAGE "Breton"
-  !insertmacro MUI_LANGUAGE "Bulgarian"
-  !insertmacro MUI_LANGUAGE "Catalan"
-  !insertmacro MUI_LANGUAGE "Corsican"
-  !insertmacro MUI_LANGUAGE "Croatian"
-  !insertmacro MUI_LANGUAGE "Czech"
-  !insertmacro MUI_LANGUAGE "Danish"
-  !insertmacro MUI_LANGUAGE "Dutch"
-  !insertmacro MUI_LANGUAGE "Esperanto"
-  !insertmacro MUI_LANGUAGE "Estonian"
-  !insertmacro MUI_LANGUAGE "Farsi"
-  !insertmacro MUI_LANGUAGE "Finnish"
-  !insertmacro MUI_LANGUAGE "French"
-  !insertmacro MUI_LANGUAGE "Galician"
-  !insertmacro MUI_LANGUAGE "German"
-  !insertmacro MUI_LANGUAGE "Greek"
-  !insertmacro MUI_LANGUAGE "Hebrew"
-  !insertmacro MUI_LANGUAGE "Hungarian"
-  !insertmacro MUI_LANGUAGE "Icelandic"
-  !insertmacro MUI_LANGUAGE "Indonesian"
-  !insertmacro MUI_LANGUAGE "Irish"
-  !insertmacro MUI_LANGUAGE "Italian"
-  !insertmacro MUI_LANGUAGE "Japanese"
-  !insertmacro MUI_LANGUAGE "Korean"
-  !insertmacro MUI_LANGUAGE "Kurdish"
-  !insertmacro MUI_LANGUAGE "Latvian"
-  !insertmacro MUI_LANGUAGE "Lithuanian"
-  !insertmacro MUI_LANGUAGE "Luxembourgish"
-  !insertmacro MUI_LANGUAGE "Macedonian"
-  !insertmacro MUI_LANGUAGE "Malay"
-  !insertmacro MUI_LANGUAGE "Mongolian"
-  !insertmacro MUI_LANGUAGE "Norwegian"
-  !insertmacro MUI_LANGUAGE "NorwegianNynorsk"
-  !insertmacro MUI_LANGUAGE "Pashto"
-  !insertmacro MUI_LANGUAGE "Polish"
-  !insertmacro MUI_LANGUAGE "Portuguese"
-  !insertmacro MUI_LANGUAGE "PortugueseBR"
-  !insertmacro MUI_LANGUAGE "Romanian"
-  !insertmacro MUI_LANGUAGE "Russian"
-  !insertmacro MUI_LANGUAGE "ScotsGaelic"
-  !insertmacro MUI_LANGUAGE "Serbian"
-  !insertmacro MUI_LANGUAGE "SerbianLatin"
-  !insertmacro MUI_LANGUAGE "SimpChinese"
-  !insertmacro MUI_LANGUAGE "Slovak"
-  !insertmacro MUI_LANGUAGE "Slovenian"
-  !insertmacro MUI_LANGUAGE "Spanish"
-  !insertmacro MUI_LANGUAGE "SpanishInternational"
-  !insertmacro MUI_LANGUAGE "Swedish"
-  !insertmacro MUI_LANGUAGE "Tatar"
-  !insertmacro MUI_LANGUAGE "Thai"
-  !insertmacro MUI_LANGUAGE "TradChinese"
-  !insertmacro MUI_LANGUAGE "Turkish"
-  !insertmacro MUI_LANGUAGE "Ukrainian"
-  !insertmacro MUI_LANGUAGE "Uzbek"
-  !insertmacro MUI_LANGUAGE "Vietnamese"
-  !insertmacro MUI_LANGUAGE "Welsh"
+!insertmacro MUI_LANGUAGE "English" ;first language is the default language
+!insertmacro MUI_LANGUAGE "Afrikaans"
+!insertmacro MUI_LANGUAGE "Albanian"
+!insertmacro MUI_LANGUAGE "Arabic"
+!insertmacro MUI_LANGUAGE "Asturian"
+!insertmacro MUI_LANGUAGE "Basque"
+!insertmacro MUI_LANGUAGE "Belarusian"
+!insertmacro MUI_LANGUAGE "Bosnian"
+!insertmacro MUI_LANGUAGE "Breton"
+!insertmacro MUI_LANGUAGE "Bulgarian"
+!insertmacro MUI_LANGUAGE "Catalan"
+!insertmacro MUI_LANGUAGE "Corsican"
+!insertmacro MUI_LANGUAGE "Croatian"
+!insertmacro MUI_LANGUAGE "Czech"
+!insertmacro MUI_LANGUAGE "Danish"
+!insertmacro MUI_LANGUAGE "Dutch"
+!insertmacro MUI_LANGUAGE "Esperanto"
+!insertmacro MUI_LANGUAGE "Estonian"
+!insertmacro MUI_LANGUAGE "Farsi"
+!insertmacro MUI_LANGUAGE "Finnish"
+!insertmacro MUI_LANGUAGE "French"
+!insertmacro MUI_LANGUAGE "Galician"
+!insertmacro MUI_LANGUAGE "German"
+!insertmacro MUI_LANGUAGE "Greek"
+!insertmacro MUI_LANGUAGE "Hebrew"
+!insertmacro MUI_LANGUAGE "Hungarian"
+!insertmacro MUI_LANGUAGE "Icelandic"
+!insertmacro MUI_LANGUAGE "Indonesian"
+!insertmacro MUI_LANGUAGE "Irish"
+!insertmacro MUI_LANGUAGE "Italian"
+!insertmacro MUI_LANGUAGE "Japanese"
+!insertmacro MUI_LANGUAGE "Korean"
+!insertmacro MUI_LANGUAGE "Kurdish"
+!insertmacro MUI_LANGUAGE "Latvian"
+!insertmacro MUI_LANGUAGE "Lithuanian"
+!insertmacro MUI_LANGUAGE "Luxembourgish"
+!insertmacro MUI_LANGUAGE "Macedonian"
+!insertmacro MUI_LANGUAGE "Malay"
+!insertmacro MUI_LANGUAGE "Mongolian"
+!insertmacro MUI_LANGUAGE "Norwegian"
+!insertmacro MUI_LANGUAGE "NorwegianNynorsk"
+!insertmacro MUI_LANGUAGE "Pashto"
+!insertmacro MUI_LANGUAGE "Polish"
+!insertmacro MUI_LANGUAGE "Portuguese"
+!insertmacro MUI_LANGUAGE "PortugueseBR"
+!insertmacro MUI_LANGUAGE "Romanian"
+!insertmacro MUI_LANGUAGE "Russian"
+!insertmacro MUI_LANGUAGE "ScotsGaelic"
+!insertmacro MUI_LANGUAGE "Serbian"
+!insertmacro MUI_LANGUAGE "SerbianLatin"
+!insertmacro MUI_LANGUAGE "SimpChinese"
+!insertmacro MUI_LANGUAGE "Slovak"
+!insertmacro MUI_LANGUAGE "Slovenian"
+!insertmacro MUI_LANGUAGE "Spanish"
+!insertmacro MUI_LANGUAGE "SpanishInternational"
+!insertmacro MUI_LANGUAGE "Swedish"
+!insertmacro MUI_LANGUAGE "Tatar"
+!insertmacro MUI_LANGUAGE "Thai"
+!insertmacro MUI_LANGUAGE "TradChinese"
+!insertmacro MUI_LANGUAGE "Turkish"
+!insertmacro MUI_LANGUAGE "Ukrainian"
+!insertmacro MUI_LANGUAGE "Uzbek"
+!insertmacro MUI_LANGUAGE "Vietnamese"
+!insertmacro MUI_LANGUAGE "Welsh"
 
 Var StdOutHandle
 Var StdOutAttempted
-
 !macro Log TEXT
     ${IfNot} ${Silent}
         DetailPrint `${TEXT}`
     ${EndIf}
     ${If} $StdOutHandle == ""
     ${AndIf} $StdOutAttempted == ""
-        StrCpy $StdOutAttempted "Yes"
+        StrCpy $StdOutAttempted "Y"
         Push $0
         Push $1
         System::Call 'kernel32::AttachConsole(i -1)i.r1'
@@ -460,7 +459,6 @@ Function AddToRegistry
     Exch 2
     Exch $2
 
-
     ${If} $TestId != ""
       Push $3
       StrCpy $3 $TestId
@@ -519,6 +517,58 @@ Function GetFromRegistry
     Pop $1
     Exch $0
 FunctionEnd
+
+!macro _iCaclsExec ARGS RECURSIVE OUT_RC
+    ${If} RECURSIVE > 0
+        !insertmacro Log `Executing: $SYSDIR\icacls.exe ${ARGS} /C /Q /T`
+    ${Else}
+        !insertmacro Log `Executing: $SYSDIR\icacls.exe ${ARGS} /C /Q`
+    ${EndIf}
+    ClearErrors
+    Push $0
+    Push $1
+    ${If} RECURSIVE > 0
+        nsExec::ExecToStack `"$SYSDIR\icacls.exe" ${ARGS} /C /Q /T`
+    ${Else}
+        nsExec::ExecToStack `"$SYSDIR\icacls.exe" ${ARGS} /C /Q`
+    ${EndIf}
+    Pop $0
+    Pop $1
+    !insertmacro Log `Code: $0, Output: $1`
+    Pop $1
+    Push $0
+    Exch
+    Pop $0
+    Pop ${OUT_RC}
+!macroend
+
+!macro iCacls_Grant PATH SID PERM RECURSIVE OUT_RC
+    !insertmacro _iCaclsExec `${PATH} /grant ${SID}:${PERM}` ${RECURSIVE} ${OUT_RC}
+!macroend
+
+!macro iCacls_Deny PATH SID PERM RECURSIVE OUT_RC
+    !insertmacro _iCaclsExec `${PATH} /deny ${SID}:${PERM}` ${RECURSIVE} ${OUT_RC}
+!macroend
+
+!macro iCacls_RemoveGrant PATH SID RECURSIVE OUT_RC
+    !insertmacro _iCaclsExec `${PATH} /remove:g ${SID}` ${RECURSIVE} ${OUT_RC}
+!macroend
+
+!macro iCacls_RemoveDeny PATH SID RECURSIVE OUT_RC
+    !insertmacro _iCaclsExec `${PATH} /remove:d ${SID}` ${RECURSIVE} ${OUT_RC}
+!macroend
+
+!macro iCacls_IntegrityLevel PATH LVL INHERTOPTS RECURSIVE
+    ${IF} INHERTOPTS == ""
+        !insertmacro _iCaclsExec `${PATH} /setintegritylevel ${LVL}` ${RECURSIVE} ${OUT_RC}
+    ${Else}
+        !insertmacro _iCaclsExec `${PATH} /setintegritylevel ${INHERTOPTS}${LVL}` ${RECURSIVE} ${OUT_RC}
+    ${EndIf}
+!macroend
+
+!macro iCacls_Substitute PATH SIDOLD SIDNEW RECURSIVE
+    !insertmacro _iCaclsExec`${PATH} /substitute ${SIDOLD} ${SIDNEW}` ${RECURSIVE} ${OUT_RC}
+!macroend
 
 !macro _ServiceScExec ARGS OUT_RC
     !insertmacro Log `Executing: $SYSDIR\sc.exe ${ARGS}`
@@ -640,12 +690,18 @@ Delete "$INSTDIR\{{ .Name }}"
 RMDir /r "$INSTDIR\{{ . }}"
 {{- end}}
 {{- end}}
+
+{{- range .CreateDirectories }}
+RMDir "{{.Path}}"
+{{- end}}
+
 {{ end }}
 
 ; ------------------------
 ; SECTIONS
 {{ define "section" }}
 Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
+    Push $0
     !insertmacro Log "Entering Section {{.Name}}-{{.DisplayName}}"
     ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
         SetShellVarContext all
@@ -681,6 +737,31 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
         !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
     ${EndIf}
     {{- end }}
+
+    {{- range .CreateDirectories }}
+    {{ $r := conv.ToInt64 .Recursive }}
+    {{ $p := .Path }}
+    CreateDirectory "{{ $p }}"
+    {{- range $old, $new := .Substitutions}}
+    !insertmacro iCacls_Substitute "{{$p}}" "{{$old}}" "{{$new}}" {{ $r }} $0
+    {{- end}}
+    {{- range .GrantsRemove}}
+    !insertmacro iCacls_RemoveGrant "{{$p}}" "{{.}}" {{$r}} $0
+    {{- end}}
+    {{- range .DenialsRemove}}
+    !insertmacro iCacls_RemoveDeny "{{$p}}" "{{.}}" {{$r}} $0
+    {{- end}}
+    {{- range $sid, $perm := .Grants}}
+    !insertmacro iCacls_Grant "{{$p}}" "{{$sid}}" "{{$perm}}" {{$r}} $0
+    {{- end}}
+    {{- range $sid, $perm := .Denials}}
+    !insertmacro iCacls_Deny "{{$p}}" "{{$sid}}" "{{$perm}}" {{$r}} $0
+    {{- end}}
+    {{- if .IntegrityLevel}}
+    !insertmacro iCacls_IntegrityLevel "{{$p}}" "{{.IntegrityLevel}}" "{{.IntegrityLevelInheritanceRights}}" {{$r}} $0
+    {{- end}}
+    {{- end }}
+    Pop $0
 SectionEnd
 {{ end }}
 

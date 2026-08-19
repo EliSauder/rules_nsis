@@ -26,7 +26,7 @@ genrule(
   cmd = \"\"\"
 ls external
 prefix="$$(realpath "$$(dirname "$(OUTS)")")"
-$(execpath @rules_nsis//nsis/toolchain:scons_bin) SKIPSTUBS=all SKIPPLUGINS=all SKIPUTILS=all SKIPMISC=all \
+$(execpath @rules_nsis//nsis/toolchain:scons_bin) UNICODE=yes SKIPSTUBS=all SKIPPLUGINS=all SKIPUTILS=all SKIPMISC=all \
   NSIS_CONFIG_CONST_DATA_PATH=no PREFIX="$$prefix" -C "$(location :nsis_src_files_dir)" \
   VERSION="{version}" install-compiler
 
