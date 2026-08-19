@@ -99,17 +99,25 @@ def _get_installer_test_details(ctx, inst, target):
 
 def _nsis_test_config_impl(ctx):
     inst = ctx.attr.installer[NsisInstallerInfo]
-    must_have_paths = ctx.attr.must_have_paths
+    must_have_files = ctx.attr.must_have_files
+    must_have_dirs = ctx.attr.must_have_dirs
     install_first_and_remove = ctx.attr.install_first_and_remove
 
     det = _get_installer_test_details(ctx, inst, ctx.attr.installer)
 
     files = set()
-    for p in must_have_paths:
+    for p in must_have_files:
         files.add(p)
     for f in det["expected_files"]:
         files.add(f)
     det["expected_files"] = files
+
+    dirs = dict()
+    for p in must_have_dirs:
+        dirs[p] = None
+    for k, v in det["expected_dirs"].items():
+        dirs[k] = v
+    det["expected_dirs"] = dirs
 
     preinstall = []
     for i in install_first_and_remove:
@@ -141,7 +149,10 @@ _nsis_test_config = rule(
                 DefaultInfo,
             ],
         ),
-        "must_have_paths": attr.string_list(
+        "must_have_files": attr.string_list(
+            default = [],
+        ),
+        "must_have_dirs": attr.string_list(
             default = [],
         ),
         "install_first_and_remove": attr.label_list(
@@ -160,7 +171,7 @@ _nsis_test_config = rule(
     },
 )
 
-def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, install_first_and_remove, expect_failed_install, target_compatible_with, **kwargs):
+def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must_have_dirs, install_first_and_remove, expect_failed_install, target_compatible_with, **kwargs):
     v = []
     if install_first_and_remove != None:
         v.append(install_first_and_remove)
@@ -168,7 +179,8 @@ def _nsis_installer_test_impl(name, visibility, installer, must_have_paths, inst
     _nsis_test_config(
         name = name + "_config",
         installer = installer,
-        must_have_paths = must_have_paths,
+        must_have_files = must_have_files,
+        must_have_dirs = must_have_dirs,
         install_first_and_remove = v,
         visibility = ["//visibility:private"],
         expect_failed_install = expect_failed_install,
@@ -213,7 +225,11 @@ nsis_installer_test = macro(
                 DefaultInfo,
             ],
         ),
-        "must_have_paths": attr.string_list(
+        "must_have_files": attr.string_list(
+            mandatory = False,
+            default = [],
+        ),
+        "must_have_dirs": attr.string_list(
             mandatory = False,
             default = [],
         ),
