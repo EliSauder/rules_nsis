@@ -382,7 +382,7 @@ nsis_component(
     dirs = [
         ":test_root_dir",
     ],
-    selection_mode = "optional",
+    selection_mode = "default",
 )
 
 nsis_installer(
