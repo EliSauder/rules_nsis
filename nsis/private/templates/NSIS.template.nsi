@@ -11,32 +11,30 @@ Unicode True
 
 !define IsNativeARM32 '${IsNativeMachineArchitecture} 448'
 
-!define PACKAGE_NAME "{{ (ds "in").Product }}"
-!define PACKAGE_PATH_NAME "{{ (ds "in").ProductPath }}"
-!define PACKAGE_PATH_KEY "{{ (ds "in").ProductPath | strings.ReplaceAll "\\" " " }}"
-!define PACKAGE_VENDOR "{{ (ds "in").Vendor }}"
-!define PACKAGE_VENDOR_PATH "{{ (ds "in").VendorPath }}"
-!define PACKAGE_VENDOR_KEY "{{ (ds "in").VendorPath | strings.ReplaceAll "\\" " " }}"
+!define PRODUCT_ID "{{ (ds "in").Id }}"
+
+!define PRODUCT "{{ (ds "in").Product }}"
+!define PRODUCT_PATH "{{ (ds "in").ProductPath }}"
+!define PUBLISHER "{{ (ds "in").Vendor }}"
+!define PUBLISHER_PATH "{{ (ds "in").VendorPath }}"
+
+!define PRODUCT_DESCRIPTION "{{ (ds "in").Description }}"
+!define PRODUCT_COPYRIGHT "{{ (ds "in").Copyright }}"
+
 {{- if (ds "in").Version }}
-!define PACKAGE_VERSION "{{ (ds "in").Version }}"
+!define PRODUCT_VERSION "{{ (ds "in").Version }}"
 {{- else }}
-!define PACKAGE_VERSION "0.0.0.0"
+!define PRODUCT_VERSION "0.0.0.0"
 {{- end }}
-!define PACKAGE_DESCRIPTION "{{ (ds "in").Description }}"
-!define PACKAGE_COPYRIGHT "{{ (ds "in").Copyright }}"
 
 {{- if eq (ds "in").ExecutionLevel "current" }}
 !define INSTALL_ROOT "$LOCALAPPDATA\Programs"
-{{- else}}
-{{- if (ds "in").InstallRoot }}
+{{- else if (ds "in").InstallRoot }}
 !define INSTALL_ROOT "{{(ds "in").InstallRoot}}"
-{{- else}}
-{{- if (ds "in").ArchitectureIs64}}
+{{- else if (ds "in").ArchitectureIs64}}
 !define INSTALL_ROOT "$PROGRAMFILES64"
 {{- else}}
 !define INSTALL_ROOT "$PROGRAMFILES"
-{{- end}}
-{{- end}}
 {{- end}}
 
 !ifdef OUTFILE
@@ -54,35 +52,32 @@ Unicode True
 {{- end}}
 
 {{- if (ds "in").InstallPath}}
-!define PACKAGE_PATH "{{(ds "in").InstallPath}}"
-{{- if (ds "in").VendorPath}}
-!define PACKAGE_KEY "${PACKAGE_VENDOR_KEY} ${PACKAGE_PATH_KEY}"
+!define SUB_PATH "{{(ds "in").InstallPath}}"
+{{- else if (ds "in").VendorPath}}
+!define SUB_PATH "${PUBLISHER_PATH}\${PRODUCT_PATH}"
 {{- else}}
-!define PACKAGE_KEY "${PACKAGE_PATH_KEY}"
-{{- end}}
-{{- else}}
-{{- if (ds "in").VendorPath}}
-!define PACKAGE_PATH "${PACKAGE_VENDOR_PATH}\${PACKAGE_PATH_NAME}"
-!define PACKAGE_KEY "${PACKAGE_VENDOR_KEY} ${PACKAGE_PATH_KEY}"
-{{- else}}
-!define PACKAGE_PATH "${PACKAGE_PATH_NAME}"
-!define PACKAGE_KEY "${PACKAGE_PATH_KEY}"
-{{- end}}
+!define SUB_PATH "${PRODUCT_PATH}"
 {{- end}}
 
-!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PACKAGE_KEY}"
-!define REG_KEY "Software\${PACKAGE_PATH}"
+{{- if (ds "in").VendorPath}}
+!define PRODUCT_KEY_PATH "${PUBLISHER}\${PRODUCT}"
+{{- else}}
+!define PRODUCT_KEY_PATH "${PRODUCT}"
+{{- end}}
+
+!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_ID}"
+!define REG_KEY "Software\${PRODUCT_KEY_PATH}"
 
 !define REG_KEY_INSTLOC "InstallDir"
 
-!define EVENTLOG_KEY "SYSTEM\CurrentControlSet\Services\EventLog\Application\${PACKAGE_KEY}"
+!define EVENTLOG_KEY "SYSTEM\CurrentControlSet\Services\EventLog\Application\${PRODUCT_ID}"
 !define EVENTLOG_FILE "%SystemRoot%\System32\EventCreate.exe"
 !define EVENTLOG_SRC 1
 !define EVENTLOG_TYPS 7
 
-Name "${PACKAGE_NAME}"
+Name "${PRODUCT}"
 OutFile "${OUTFILE_NAME}"
-InstallDir "${INSTALL_ROOT}\${PACKAGE_PATH}"
+InstallDir "${INSTALL_ROOT}\${SUB_PATH}"
 
 {{- if (ds "in").ExecutionLevel }}
 RequestExecutionLevel {{ (ds "in").ExecutionLevel }}
@@ -101,13 +96,13 @@ InstallDirRegKey HKCU "${REG_KEY}" "${REG_KEY_INSTLOC}"
 SetCompressor {{ (ds "in").Compressor }}
 SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 
-VIProductVersion "${PACKAGE_VERSION}"
-VIAddVersionKey "ProductName" "${PACKAGE_NAME}"
-VIAddVersionKey "ProductVersion" "${PACKAGE_VERSION}"
-VIAddVersionKey "CompanyName" "${PACKAGE_VENDOR}"
-VIAddVersionKey "FileDescription" "${PACKAGE_DESCRIPTION}"
-VIAddVersionKey "LegalCopyright" "${PACKAGE_COPYRIGHT}"
-VIAddVersionKey "FileVersion" "${PACKAGE_VERSION}"
+VIProductVersion "${PRODUCT_VERSION}"
+VIAddVersionKey "ProductName" "${PRODUCT}"
+VIAddVersionKey "ProductVersion" "${PRODUCT_VERSION}"
+VIAddVersionKey "CompanyName" "${PUBLISHER}"
+VIAddVersionKey "FileDescription" "${PRODUCT_DESCRIPTION}"
+VIAddVersionKey "LegalCopyright" "${PRODUCT_COPYRIGHT}"
+VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
 
 #Var INSTALL_DESKTOP
 #Var INSTALL_STARTMENU
@@ -279,7 +274,7 @@ Var StdOutAttempted
 Var Is64BitInstall
 Var IsArmInstall
 
-!macro SetRegView
+!macro _SetRegView
 {{- if eq (ds "in").Architecture "x86_64" }}
     ${IfNot} ${IsNativeAMD64}
         !insertmacro Log "Not AMD64, Aborting"
@@ -350,9 +345,9 @@ Var IsArmInstall
 {{- end }}
 !macroend
 
-!macro ValidateMutex
+!macro ValidateMutex Act
     Push $R0
-    System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PACKAGE_VENDOR}${PACKAGE_NAME}InstallerMutex") i .r1 ?e'
+    System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PUBLISHER}${PRODUCT}${Act}Mutex") i .r1 ?e'
     Pop $R0
     ${If} $R0 != 0
         !insertmacro Log "Another instance is already running, aborting"
@@ -414,7 +409,7 @@ Var SectionSelected_{{.Name}}
 #  ${If} $R0 != ""
 #    ${If} ${FileExists} "$R0\Uninstall.exe"
 #      MessageBox MB_YESNO|MB_ICONQUESTION \
-#        "A previous version of ${PACKAGE_NAME} was found. Do you want to uninstall it first?" \
+#        "A previous version of ${PRODUCT} was found. Do you want to uninstall it first?" \
 #        IDYES do_uninstall IDNO skip_uninstall
 #
 #      do_uninstall:
@@ -437,7 +432,7 @@ Function un.RemoveRegistry
   ${Else}
       SetShellVarContext current
   ${EndIf}
-  Pop $0 # Pop Param 1
+  Exch $0 # Pop Param 1
 
   ${If} $TestId == ""
     !insertmacro Log "Removing registry '$0'"
@@ -449,26 +444,80 @@ Function un.RemoveRegistry
     DeleteRegKey SHCTX "$0\$1"
     Pop $1
   ${EndIf}
+
+  Pop $0
 FunctionEnd
 
 Function AddToRegistry
-  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-      SetShellVarContext all
-  ${Else}
-      SetShellVarContext current
-  ${EndIf}
-  Pop $0 # Pop Param 1
-  Pop $1 # Pop Param 2
-  Pop $2 # Pop Param 3
-  ${If} $TestId != ""
-    Push $3
-    StrCpy $3 $TestId
-    StrCpy $0 "$0\$3"
-    Pop $3
-  ${EndIf}
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
+    ${EndIf}
+    Exch $0
+    Exch 1
+    Exch $1
+    Exch 2
+    Exch $2
 
-  WriteRegStr SHCTX "$0" "$2" "$1"
-  !insertmacro Log "Set install registry entry: '$0' -> '$2' to '$1'"
+
+    ${If} $TestId != ""
+      Push $3
+      StrCpy $3 $TestId
+      StrCpy $0 "$0\$3"
+      Pop $3
+    ${EndIf}
+
+    WriteRegStr SHCTX "$0" "$2" "$1"
+    !insertmacro Log "Set install registry entry: '$0' -> '$2' to '$1'"
+
+    Pop $2
+    Pop $0
+    Pop $1
+FunctionEnd
+
+Function un.GetFromRegistry
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
+    ${EndIf}
+    Exch $0
+    Exch
+    Exch $1
+
+    ${If} $TestId != ""
+        Push $3
+        StrCpy $3 $TestId
+        StrCpy $0 "$0\$3"
+        Pop $3
+    ${EndIf}
+
+    ReadRegStr $0 SHCTX "$0" "$1"
+    Pop $1
+    Exch $0
+FunctionEnd
+
+Function GetFromRegistry
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
+    ${EndIf}
+    Exch $0
+    Exch
+    Exch $1
+
+    ${If} $TestId != ""
+        Push $3
+        StrCpy $3 $TestId
+        StrCpy $0 "$0\$3"
+        Pop $3
+    ${EndIf}
+
+    ReadRegStr $0 SHCTX "$0" "$1"
+    Pop $1
+    Exch $0
 FunctionEnd
 
 !macro _ServiceScExec ARGS OUT_RC
@@ -625,10 +674,10 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     {{- if .Service }}
     !insertmacro Service_Query "{{.Name}}" $0
     ${If} $0 = 0
-        !insertmacro Service_Update "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
+        !insertmacro Service_Update "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PUBLISHER} ${PRODUCT} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
         !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
     ${Else}
-        !insertmacro Service_Create "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PACKAGE_VENDOR} ${PACKAGE_NAME} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
+        !insertmacro Service_Create "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PUBLISHER} ${PRODUCT} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
         !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
     ${EndIf}
     {{- end }}
@@ -667,22 +716,26 @@ Section "-Core Installation"
     Call AddToRegistry
 
     Push "Version"
-    Push "${PACKAGE_VERSION}"
+    Push "${PRODUCT_VERSION}"
     Push "${REG_KEY}"
     Call AddToRegistry
 
     WriteUninstaller "$INSTDIR\${UNINSTALLER_NAME}"
 
+    Push "InstallLocation"
+    Push "$INSTDIR"
+    Push "${UN_REG_KEY}"
+    Call AddToRegistry
     Push "DisplayName"
-    Push "${PACKAGE_NAME}"
+    Push "${PRODUCT}"
     Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "DisplayVersion"
-    Push "${PACKAGE_VERSION}"
+    Push "${PRODUCT_VERSION}"
     Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "Publisher"
-    Push "${PACKAGE_VENDOR}"
+    Push "${PUBLISHER}"
     Push "${UN_REG_KEY}"
     Call AddToRegistry
     Push "UninstallString"
@@ -743,9 +796,125 @@ Section "-Core Installation"
 SectionEnd
 
 #Function InstallOptionsPage
-#  !insertmacro MUI_HEADER_TEXT "Install Options" "Choose options for installing ${PACKAGE_NAME}"
+#  !insertmacro MUI_HEADER_TEXT "Install Options" "Choose options for installing ${PRODUCT}"
 #  !insertmacro MUI_INSTALLOPTIONS_DISPLAY "NSIS(ds "in").InstallOptions.ini"
 #FunctionEnd
+
+!macro TrimQuotes Input Output
+    Push "${Input}"
+    Call TrimQuotes
+    Pop ${Output}
+!macroend
+
+Function TrimQuotes
+    Exch $R0
+    Push $R1
+
+    StrCpy $R1 $R0 1
+    StrCmp $R1 `"` 0 +2
+        StrCpy $R0 $R0 `` 1
+
+    StrCpy $R1 $R0 1 -1
+    StrCmp $R1 `"` 0 +2
+        StrCpy $R0 $R0 -1
+
+    Pop $R1
+    Exch $R0
+FunctionEnd
+
+!macro UninstallExisting appkey exitcode
+    Push "${appkey}"
+    Call UninstallExisting
+    Pop ${exitcode}
+!macroend
+
+Function UninstallExisting #(appkey: str) -> int:
+    Exch $0
+
+    Push $1
+
+    Push "UninstallString"
+    Push "Software\Microsoft\Windows\CurrentVersion\Uninstall\$0"
+    Call GetFromRegistry
+    Pop $1
+
+    !insertmacro TrimQuotes $1 $1
+    ${If} "$1" == ""
+        !insertmacro Log "No uninstall path for id: $0"
+        Pop $1
+        Pop $0
+        Push 0
+        Return
+    ${EndIf}
+    !insertmacro Log "$0 has uninstall path: $1"
+
+    IfFileExists "$1" exists notexist
+notexist:
+    !insertmacro Log "Uninstall file $1 does not exist"
+    # If not exist
+    Pop $1
+    Pop $0
+    Push 0
+    Return
+
+exists:
+    Push $2
+    Push $3
+
+    Push "InstallLocation"
+    Push "Software\Microsoft\Windows\CurrentVersion\Uninstall\$0"
+    Call GetFromRegistry
+    Pop $3
+    !insertmacro TrimQuotes $3 $3
+    ${If} "$3" == ""
+        !insertmacro Log "App $0 has no ${REG_KEY_INSTLOC} path. Please uninstall manually first."
+        MessageBox MB_ICONSTOP "App $0 has no ${REG_KEY_INSTLOC} path defined. Please uninstall manually first." /SD IDOK
+        Pop $3
+        Pop $2
+        Pop $1
+        Pop $0
+        Push 1
+        Return
+    ${EndIf}
+
+    Push $4
+    Push $5
+
+    ${If} $TestId == ""
+        nsExec::ExecToStack `"$1" /S _?=$3`
+        Pop $4
+        Pop $5
+    ${Else}
+        StrCpy $2 "$TestId"
+        nsExec::ExecToStack `"$1" /S /TESTID=$2 _?=$3`
+        Pop $4
+        Pop $5
+    ${EndIf}
+    !insertmacro Log `Result of uninstall existing: Code: $4, Output: $5`
+    IntOp $2 $4 + 0
+    Pop $5
+    Pop $4
+
+
+    ${If} $2 = 0
+        !insertmacro Log `Successful uninstall: Deleting '$1', Removind '$3'`
+        Delete "$1"
+        RMDir "$3"
+        Pop $3
+        Pop $2
+        Pop $1
+        Pop $0
+        Push 0
+        Return
+    ${EndIf}
+
+    Pop $3
+    Exch $2
+    Exch
+    Pop $1
+    Exch
+    Pop $0
+FunctionEnd
 
 Function .onInit
     Push $0
@@ -755,8 +924,14 @@ Function .onInit
     ClearErrors
 
     !insertmacro SetVarCtx
-    !insertmacro SetRegView
-    !insertmacro ValidateMutex
+    !insertmacro _SetRegView
+    !insertmacro ValidateMutex "Install"
+
+    !insertmacro UninstallExisting "${PRODUCT_ID}" $0
+    ${If} $0 <> 0
+        MessageBox MB_YESNO|MB_ICONSTOP "Failed to uninstall previous, continue anyway?" /SD IDYES IDYES +2
+        Abort
+    ${EndIf}
 
     {{- range (ds "in").Components }}
     {{- template "sectionVarInit" .}}
@@ -766,7 +941,6 @@ Function .onInit
     {{- template "sectionGroupVarInit" .}}
     {{- end}}
     Pop $0
-
 FunctionEnd
 
 
@@ -778,20 +952,17 @@ Function un.onInit
     ClearErrors
 
     !insertmacro SetVarCtx
-    !insertmacro SetRegView
-    !insertmacro ValidateMutex
+    !insertmacro _SetRegView
+    !insertmacro ValidateMutex "Uninstall"
 
-    ${If} $TestId == ""
-        ReadRegStr $0 SHCTX "${REG_KEY}" "${REG_KEY_INSTLOC}"
-    ${Else}
-        StrCpy $0 $TestId
-        ReadRegStr $0 SHCTX "${REG_KEY}\$0" "${REG_KEY_INSTLOC}"
-    ${EndIf}
+    Push "InstallLocation"
+    Push "${UN_REG_KEY}"
+    Call un.GetFromRegistry
+    Pop $0
 
-    ${If} ${Errors}
-    ${OrIf} $0 == ""
-        !insertmacro Log "No previous install exists."
-        MessageBox MB_ICONSTOP "No previous install exists." /SD IDOK
+    ${If} "$0" == ""
+        !insertmacro Log "No install exists."
+        MessageBox MB_ICONSTOP "No install exists." /SD IDOK
         Abort
     ${EndIf}
 
@@ -884,17 +1055,7 @@ Section "Uninstall"
       SetShellVarContext current
   ${EndIf}
 
-  {{- if eq (ds "in").Architecture "x64" }}
-    SetRegView 64
-  {{- else if eq (ds "in").Architecture "x86" }}
-    SetRegView 32
-  {{- else }}
-    ${If} ${RunningX64}
-      SetRegView 64
-    ${Else}
-      SetRegView 32
-    ${EndIf}
-  {{- end }}
+  !insertmacro _SetRegView
 
   #ReadRegStr $StartMenuFolder SHCTX "${UN_REG_KEY}" "StartMenu"
   #${Unless} ${Errors}

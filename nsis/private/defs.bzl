@@ -19,6 +19,11 @@ NsisInstallerInfo = provider(
     doc = "Defines that every installer contains.",
     fields = {
         "name": "The name of the installer",
+        "id": """
+The unique identifier for this product. This should be the same accross all
+versions, names, and install locations of the product. It will be used to
+identify the product inside the windows registry.
+""",
         "product": "The display name of the software being packaged.",
         "product_path": "The path name of the software being packaged.",
         "vendor": "The display name of the vendor providing the software.",
@@ -49,6 +54,7 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "arch": "The architecture to built the installer for.",
         "allow_32bit_on_64bit": "Allow 32bit installers to run on 64bit OS.",
         "eventlog": "Whether or not to create eventlog entries.",
+        "eventlog_key": "The key to use when creating the event log entry. Defaults to id.",
     },
 )
 
@@ -73,7 +79,7 @@ NsisComponentInfo = provider(
 )
 
 NsisComponentGroupInfo = provider(
-    doc = "NSIS Component Group Information",
+   doc = "NSIS Component Group Information",
     fields = {
         "name": "Component Name",
         "description": "Description",
@@ -630,6 +636,7 @@ def _hidden(mode):
 def _get_installer_ds(ctx, toolchain):
     data = {
         "Name": str(ctx.attr.name),
+        "Id": str(ctx.attr.id),
         "Product": str(ctx.attr.product),
         "ProductPath": str(_make_win_path(ctx.attr.product_path)),
         "Vendor": str(ctx.attr.vendor),
@@ -916,6 +923,7 @@ def _nsis_installer_impl(ctx):
     return _makensis(ctx, toolchain, script, options, srcs) + [
         NsisInstallerInfo(
             name = ctx.attr.name,
+            id = ctx.attr.id,
             product = ctx.attr.product,
             product_path = ctx.attr.product_path,
             vendor = ctx.attr.vendor,
@@ -947,6 +955,14 @@ nsis_installer = rule(
     cfg = windows_source_transition,
     doc = "Builds a windows installer .exe using NSIS.",
     attrs = dict({
+        "id": attr.string(
+            mandatory = True,
+            doc = """
+The unique identifier for this product. This should be the same accross all
+versions, names, and install locations of the product. It will be used to
+identify the product inside the windows registry.
+""",
+        ),
         "product": attr.string(
             mandatory = True,
             doc = "The display name of the software being packaged.",
@@ -996,7 +1012,9 @@ The root path to install the software into. Defaults to NSIS's built in
 $PROGRAMFILES64 (or $PROGRAMFILES if 32bit) when installed as admin. When
 installed as a user, defaults to $LOCALAPPDATA\\Programs.
 
-The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}\\{{.ProductPath}.
+The final $INSTPATH for the software will be one of
+- {{.InstallRoot}}\\{{.VendorPath}}\\{{.ProductPath}.
+- {{.InstallRoot}}\\{{.ProductPath}.
 """,
         ),
         "install_path": attr.string(
@@ -1051,12 +1069,6 @@ user: Install software as user.
             default = {},
             doc = "A list of additional defines to include in the installer.",
         ),
-        "_verbosity": attr.int(
-            mandatory = False,
-            default = 2,
-            doc = "makensis verbosity: 0 none, 1 errors, 2 warnings, 3 info, 4 all.",
-            values = [0, 1, 2, 3, 4],
-        ),
         "components": attr.label_list(
             mandatory = False,
             allow_empty = False,
@@ -1096,6 +1108,12 @@ user: Install software as user.
             mandatory = False,
             default = False,
             doc = "Whether the installer should setup windows event log logging for the application.",
+        ),
+        "_verbosity": attr.int(
+            mandatory = False,
+            default = 2,
+            doc = "makensis verbosity: 0 none, 1 errors, 2 warnings, 3 info, 4 all.",
+            values = [0, 1, 2, 3, 4],
         ),
         "_render_script": attr.label(
             default = Label("//nsis/private/render:stamp_data"),

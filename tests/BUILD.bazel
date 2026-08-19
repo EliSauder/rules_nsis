@@ -31,6 +31,7 @@ nsis_component(
 
 nsis_installer(
     name = "minimal_installer",
+    id = "8d5d6365-eccc-48aa-9dff-4baf9e206fc0",
     components = [":minimal_component"],
     product = "Minimal Installer",
     product_path = "Minimal Installer",
@@ -38,6 +39,7 @@ nsis_installer(
 
 nsis_installer(
     name = "minimal_installer_outfile",
+    id = "e6885d94-b532-4a03-970a-7d37283945b2",
     components = [":minimal_component"],
     product = "Minimal Installer",
     product_path = "Minimal Installer",
@@ -77,6 +79,7 @@ nsis_component(
 
 nsis_installer(
     name = "minimal_installer_deps",
+    id = "54929554-846d-45fb-b2f4-05da614053ce",
     components = [
         ":minimal_component",
         ":minimal_component_depsA",
@@ -107,6 +110,7 @@ nsis_component(
 
 nsis_installer(
     name = "single_service_installer",
+    id = "93061bb4-387d-4653-aef0-396ea6573afc",
     product = "Single Service Installer",
     product_path = "SSI",
     eventlog = True,
@@ -140,6 +144,7 @@ nsis_component_group(
 
 nsis_installer(
     name = "minimal_installer_with_group",
+    id = "0ba7fe50-2dc5-4d43-8c7d-309ce7f0d28c",
     components = [":minimal_group"],
     product = "Minimal Installer Group",
     product_path = "Minimal Installer Group",
@@ -159,6 +164,7 @@ nsis_component(
 
 nsis_installer(
     name = "minimal_installer_with_dir",
+    id = "053d27a9-f532-4b69-9ede-42bb634de08b",
     components = [":minimal_component_with_dir"],
     product = "Minimal Installer Dir",
     product_path = "Minimal Installer Dir",
@@ -192,6 +198,7 @@ nsis_component_group(
 
 nsis_installer(
     name = "ssc_with_group_and_dir",
+    id = "7cb8f799-ce8b-41d8-94d1-717e9fd56217",
     product = "Single Service Installer GrpDir",
     product_path = "SSI",
     vendor = "Company Department",
@@ -217,6 +224,7 @@ nsis_installer_test(
 
 nsis_installer(
     name = "minimal_installer_with_nostamp",
+    id = "e7598904-2a8f-4f07-a7b8-c56472237744",
     components = [":minimal_component"],
     product = "Minimal Installer STAMP",
     stamp = 0,
@@ -232,6 +240,7 @@ nsis_installer_test(
 
 nsis_installer(
     name = "minimal_installer_with_stamp_default",
+    id = "a66e7e6c-7f1c-421f-b10d-54b2af0db5a6",
     components = [":minimal_component"],
     product = "Minimal Installer STAMP2",
     product_path = "Minimal Installer STAMP2",
@@ -249,6 +258,7 @@ nsis_installer_test(
 
 nsis_installer(
     name = "minimal_installer_with_nostamp_vendor",
+    id = "d3b2f114-f5d2-4346-806b-f88ca707ce1d",
     components = [":minimal_component"],
     product = "Minimal Installer NoStamp Vendor",
     product_path = "Minimal Installer NoStamp Vendor",
@@ -258,6 +268,7 @@ nsis_installer(
 
 nsis_installer(
     name = "minimal_installer_with_stamp_vendor",
+    id = "21fee1ca-dc02-4b44-a950-322283d2f6a3",
     components = [":minimal_component"],
     product = "Minimal Installer Vendor",
     product_path = "Minimal Installer Vendor",
@@ -288,6 +299,7 @@ nsis_component(
 
 nsis_installer(
     name = "minimal_installer_runfiles",
+    id = "e517ee24-7f00-4b34-96e7-1c59ea712988",
     components = [":minimal_component_runfiles"],
     product = "Minimal Installer Runfiles",
     product_path = "Minimal Installer Runfiles",
@@ -301,4 +313,58 @@ nsis_installer_test(
         "__init__.py",
         "dummy.py",
     ],
+)
+
+nsis_installer(
+    name = "minimal_installerA",
+    id = "8d5d6365-eccc-48aa-9dff-4baf9e206fc0",
+    components = [":minimal_component"],
+    product = "Minimal Installer A",
+    product_path = "Minimal Installer",
+)
+
+nsis_installer(
+    name = "minimal_installerB",
+    id = "8d5d6365-eccc-48aa-9dff-4baf9e206fc0",
+    components = [":minimal_component_with_dir"],
+    product = "Minimal Installer B",
+    product_path = "Minimal Installer",
+)
+
+nsis_installer_test(
+    name = "install_first_and_remove_test",
+    installer = ":minimal_installerA",
+    install_first_and_remove = ":minimal_installerB",
+)
+
+nsis_installer(
+    name = "minimal_installer_arch32_allowed_on64",
+    id = "b540e991-9102-4082-b9aa-37c4d3e21817",
+    components = [":minimal_component"],
+    product = "Minimal Installer 32 allowed 64",
+    product_path = "Minimal Installer",
+    arch = "x86_32",
+)
+
+nsis_installer_test(
+    name = "32bit_install_on_64bit",
+    installer = ":minimal_installer_arch32_allowed_on64",
+    target_compatible_with = ["@platforms//cpu:x86_64"]
+)
+
+nsis_installer(
+    name = "minimal_installer_arch32_not_allowed_on64",
+    id = "325cae94-81e8-4442-8d2b-6846edde35a7",
+    components = [":minimal_component"],
+    product = "Minimal Installer 32 not allowed 64",
+    product_path = "Minimal Installer",
+    arch = "x86_32",
+    allow_32bit_on_64bit = False,
+)
+
+nsis_installer_test(
+    name = "32bit_fail_install_on_64bit",
+    installer = ":minimal_installer_arch32_not_allowed_on64",
+    expect_failed_install = True,
+    target_compatible_with = ["@platforms//cpu:x86_64"]
 )

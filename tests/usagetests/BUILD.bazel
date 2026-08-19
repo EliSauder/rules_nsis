@@ -1,5 +1,4 @@
 load("@rules_nsis//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer")
-load("@rules_nsis//tests:defs.bzl", "nsis_installer_test")
 
 nsis_component(
     name = "minimal_component",
@@ -9,6 +8,7 @@ nsis_component(
 
 nsis_installer(
     name = "minimal_installer",
+    id = "9028ce71-646d-4949-910e-0dd8104eec31",
     components = [":minimal_component"],
     product = "Minimal Installer",
     product_path = "Minimal Installer",
