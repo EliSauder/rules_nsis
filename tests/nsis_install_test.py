@@ -361,6 +361,20 @@ def _validate_removed_files(testcase: unittest.TestCase, config: dict, install_r
     if os.path.exists(install_root):
         testcase.fail(f"Install root directory left over {install_root}. Content: {dircontent}")
 
+def _validate_removed_directories(testcase: unittest.TestCase, config):
+    expected_dirs = config.get("expected_dirs", {})
+
+    for key, val in expected_dirs.items():
+        testcase.assertFalse(os.path.exists(key), f"Directory stil exsts after uninstall: {key}")
+
+def _validate_directories(testcase: unittest.TestCase, config):
+    expected_dirs = config.get("expected_dirs", {})
+
+    for key, val in expected_dirs.items():
+        testcase.assertTrue(os.path.exists(key), f"Expected directory does not exist: {key}")
+        testcase.assertFalse(os.path.isfile(key), f"Expected directory is actually a file: {key}")
+        testcase.assertTrue(os.path.isdir(key), f"Expected directory is not a directory: {key}")
+
 
 def _validate_files(testcase: unittest.TestCase, config, install_root):
     expected_files = config.get("expected_files", [])
@@ -373,6 +387,8 @@ def _validate_files(testcase: unittest.TestCase, config, install_root):
         fs = [x.as_uri() for x in dir.iterdir() if x.is_file()]
 
         testcase.assertTrue(os.path.exists(path), f"Expected file missing: {path}. Found: {fs}")
+        testcase.assertFalse(os.path.isdir(path), f"Expected file is a directory: {path}. Found: {fs}")
+        testcase.assertTrue(os.path.isfile(path), f"Expected file is not a file: {path}. Found: {fs}")
 
 def _validate_removed_services(testcase, config, install_root):
     expected_services = config.get("expected_services", {})
@@ -439,6 +455,8 @@ def _validate_install(testcase, install_root, subpath, appkey, config, installer
 
     with testcase.subTest(msg="Validate Installed Files"):
         _validate_files(testcase, config, install_root)
+    with testcase.subTest(msg="Validate Installed Directories"):
+        _validate_directories(testcase, config)
     with testcase.subTest(msg="Validate Installed Registry Keys"):
         _validate_reg(testcase, config, install_root, subpath, appkey)
     with testcase.subTest(msg="Validate Installed Services"):
@@ -469,6 +487,8 @@ def _validate_uninstall(testcase, install_root, subpath, appkey, config, runun=T
 
     with testcase.subTest(msg="Validate Removed Files"):
         _validate_removed_files(testcase, config, install_root)
+    with testcase.subTest(msg="Validate Removed Directories"):
+        _validate_removed_directories(testcase, config)
     with testcase.subTest(msg="Validate Removed Registry Keys"):
         _validate_removed_reg(testcase, config, subpath, appkey)
     with testcase.subTest(msg="Validate Removed Services"):

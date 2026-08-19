@@ -73,13 +73,14 @@ NsisComponentInfo = provider(
         "display_name": "The display name of the group.",
         "install_categories": "The install categories (types) the component is enabled in.",
         "srcs": "The file sources of the component.",
+        "dirs": "The directories to create with the component.",
         "dependencies": "The components this one depends on.",
         "shortcuts": "A list of shortcuts to make.",
     },
 )
 
 NsisComponentGroupInfo = provider(
-   doc = "NSIS Component Group Information",
+    doc = "NSIS Component Group Information",
     fields = {
         "name": "Component Name",
         "description": "Description",
@@ -87,6 +88,50 @@ NsisComponentGroupInfo = provider(
         "bold": "Whether the group name is bolded or not.",
         "display_name": "The display name of the group.",
         "components": "The list of components or sub groups within the group.",
+    },
+)
+
+NsisDirectoryInfo = provider(
+    doc = """
+Represents a directory that will be created when installing. This should only
+be utilized for system directories that need to be created with administrator
+privileges and then accessed by a non-administrator user.
+""",
+    fields = {
+        "name": "directory name",
+        "path": "The path that the directory will be located at.",
+        "grants": """
+A dictionary of SID that will be granted permissions to the permissions they
+will receive. For details of syntax please review the icacls documentation:
+https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/icacls
+""",
+        "grants_remove": """
+A list of SID to remove existing grants from.
+
+This will always run before grants are applied.
+""",
+        "denials": """
+A dictionary of SID that will be denied permissions to the permissions they
+will be denied. For details of syntax please review the icacls documentation:
+https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/icacls
+""",
+        "denials_remove": """
+A list of SID to remove existing denials from.
+
+This will always run before denials are applied.
+""",
+        "integrity_level": """
+The integrity level of the directory. Must be one of: l - low, m - medium, h - high.
+""",
+        "integrity_level_inheritance_rights": "Inheritance rights to apply with the integrity level",
+        "substitutions": """
+A dictionary of OLD SIDS to NEW SIDs that will replace them.
+
+This will run before all other SID based permissions are evaluated.
+""",
+        "recursive": """
+Whether or not to apply the permissions recrsively.
+""",
     },
 )
 
@@ -216,6 +261,7 @@ def _nsis_component_impl(ctx):
         shortcuts = ctx.attr.shortcuts,
         srcs = files,
         dependencies = ctx.attr.dependencies,
+        dirs = [x[NsisDirectoryInfo] for x in ctx.attr.dirs if NsisDirectoryInfo in x ]
     )
 
 nsis_component = rule(
@@ -303,10 +349,24 @@ Default: ["Full", "Typical"]
 """,
         ),
         "srcs": attr.label_list(
-            mandatory = True,
-            allow_empty = False,
+            mandatory = False,
+            allow_empty = True,
             allow_files = True,
             cfg = "target",
+            providers = [
+                [DefaultInfo],
+            ],
+            doc = "The sources to install as apart of this component.",
+        ),
+        "dirs": attr.label_list(
+            mandatory = False,
+            allow_empty = True,
+            allow_files = False,
+            cfg = "target",
+            providers = [
+                [NsisDirectoryInfo],
+            ],
+            doc = "A list of directories to create."
         ),
         "dependencies": attr.label_list(
             mandatory = False,
@@ -329,6 +389,106 @@ strict install order. Components should be able to be installed in any order.
         ),
     },
 )
+
+def _nsis_directory_impl(ctx):
+    return NsisDirectoryInfo(
+        name = str(ctx.label.name),
+        path = str(ctx.attr.path),
+        grants = ctx.attr.grants,
+        grants_remove = ctx.attr.grants_remove,
+        denials = ctx.attr.denials,
+        denials_remove = ctx.attr.denials_remove,
+        integrity_level = ctx.attr.integrity_level,
+        integrity_level_inheritance_rights = ctx.attr.integrity_level_inheritance_rights,
+        substitutions = ctx.attr.substitutions,
+        recursive = bool(ctx.attr.recursive),
+    )
+
+nsis_directory = rule(
+    implementation = _nsis_directory_impl,
+    doc = """
+Represents a directory that will be created when installing. This should only
+be utilized for system directories that need to be created with administrator
+privileges and then accessed by a non-administrator user.
+""",
+    attrs = {
+        "path": attr.string(
+            mandatory = True,
+            default = "",
+            doc = "The path that the directory will be located at.",
+        ),
+        "grants": attr.string_dict(
+            mandatory = False,
+            default = {},
+            doc = """
+A dictionary of SID that will be granted permissions to the permissions they
+will receive. For details of syntax please review the icacls documentation:
+https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/icacls
+""",
+        ),
+        "grants_remove": attr.string_list(
+            mandatory = False,
+            default = [],
+            doc = """
+A list of SID to remove existing grants from.
+
+This will always run before grants are applied.
+""",
+        ),
+        "denials": attr.string_dict(
+            mandatory = False,
+            default = {},
+            doc = """
+A dictionary of SID that will be denied permissions to the permissions they
+will be denied. For details of syntax please review the icacls documentation:
+https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/icacls
+""",
+        ),
+        "denials_remove": attr.string_list(
+            mandatory = False,
+            default = [],
+            doc = """
+A list of SID to remove existing denials from.
+
+This will always run before denials are applied.
+""",
+        ),
+        "integrity_level": attr.string(
+            mandatory = False,
+            values = [
+                "l",
+                "m",
+                "h",
+            ],
+            default = "",
+            doc = """
+The integrity level of the directory. Must be one of: l - low, m - medium, h - high.
+""",
+        ),
+        "integrity_level_inheritance_rights": attr.string(
+            mandatory = False,
+            default = "",
+            doc = "Inheritance rights to apply with the integrity level",
+        ),
+        "substitutions": attr.string_dict(
+            mandatory = False,
+            default = {},
+            doc = """
+A dictionary of OLD SIDS to NEW SIDs that will replace them.
+
+This will run before all other SID based permissions are evaluated.
+""",
+        ),
+        "recursive": attr.bool(
+            mandatory = False,
+            default = True,
+            doc = """
+Whether or not to apply the permissions recrsively.
+""",
+        ),
+    },
+)
+
 
 def _remove_stamp_templates(instr):
     outstr = ""
@@ -700,6 +860,20 @@ def _get_group_ds(toolchain, group, inst_cat):
         _COMPONENT_GROUPS_KEY: [],
     }
 
+def _get_create_directory_ds(directory):
+    return {
+        "Name": directory.name,
+        "Path": directory.path,
+        "Grants": directory.grants,
+        "GrantsRemove": directory.grants_remove,
+        "Denials": directory.denials,
+        "DenialsRemove": directory.denials_remove,
+        "IntegrityLevel": directory.integrity_level,
+        "IntegrityLevelInheritanceRights": directory.integrity_level_inheritance_rights,
+        "Substitutions": directory.substitutions,
+        "Recursive": bool(directory.recursive),
+    }
+
 def _get_component_ds(toolchain, component, inst_cat):
     dispname = component.display_name
     if dispname == None or len(dispname.strip()) == 0:
@@ -721,6 +895,7 @@ def _get_component_ds(toolchain, component, inst_cat):
         "InstallCategories": " ".join([str(inst_cat.index(x) + 1) for x in component.install_categories]),
         "Files": [],
         "Directories": [],
+        "CreateDirectories": [_get_create_directory_ds(x) for x in component.dirs],
         "Dependencies": [str(x[NsisComponentInfo].name) for x in component.dependencies],
         "Shortcuts": [],
     }

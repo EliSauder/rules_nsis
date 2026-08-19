@@ -68,7 +68,6 @@ filegroup(
     ],
 )
 
-
 gomplate_repository = use_repo_rule("//nsis/private:gomplate.bzl", "gomplate_repository")
 gomplate_repository(name = "gomplate")
 

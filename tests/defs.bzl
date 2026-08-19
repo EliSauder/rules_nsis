@@ -16,6 +16,7 @@ def _get_installer_test_details(ctx, inst, target):
         outfile = "{} Setup.exe".format(inst.product)
 
     files = set()
+    ds = dict()
     services = dict()
 
     numcomp = 0
@@ -29,6 +30,8 @@ def _get_installer_test_details(ctx, inst, target):
                     files.add("{}\\{}".format(cmp.directory, f.basename))
                 else:
                     files.add("{}".format(f.basename))
+            for d in cmp.dirs:
+                ds[d.path] = d
             if cmp.service:
                 services[cmp.name] = {
                     "start_type": cmp.service_start_type,
@@ -79,6 +82,7 @@ def _get_installer_test_details(ctx, inst, target):
         "installer_path": to_rlocation_path(ctx, instf),
         "installer_args": [],
         "expected_files": files,
+        "expected_dirs": ds,
         "expected_installer_name": outfile,
         "expected_product_path": inst.product_path or "",
         "expected_product": inst.product or "",
