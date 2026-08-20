@@ -206,10 +206,11 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
 
 
         valEmh, typEmh = _reg_value(root, reg_path, access, "EventMessageFile")
+        emf = ";".join(v["event_message_files"])
         testcase.assertEqual(
             valEmh,
-            v["event_message_files"],
-            f"EventMessageFile {valEmh} != '{v["event_message_files"]}'"
+            emf,
+            f"EventMessageFile {valEmh} != '{emf}'"
         )
 
         valTs, typTs = _reg_value(root, reg_path, access, "TypesSupported")
@@ -219,7 +220,7 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
             f"TypesSupported {valTs} != {str(st)} (1 | 2 | 4 [Error | Warn | Info])"
         )
 
-        cmf = v["category_message_files"]
+        cmf = ";".join(v["category_message_files"])
         if cmf and len(cmf) > 0:
             valcmf, typcmf = _reg_value(root, reg_path, access, "CategoryMessageFile")
             testcase.assertEqual(
@@ -227,7 +228,7 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
                 cmf,
                 f"CategoryMessageFile {valcmf} != {cmf}"
             )
-        pmf = v["parameter_message_files"]
+        pmf = ";".join(v["parameter_message_files"])
         if pmf and len(pmf) > 0:
             valpmf, typpmf = _reg_value(root, reg_path, access, "ParameterMessageFile")
             testcase.assertEqual(

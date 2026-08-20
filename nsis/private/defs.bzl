@@ -219,19 +219,19 @@ Defines an event log source to be installed and utilized,
                 "information",
             ],
         ),
-        "event_message_file": attr.string_list(
+        "event_message_files": attr.string_list(
             mandatory = False,
             default = [
                 "%SystemRoot%\\System32\\EventCreate.exe",
             ],
             doc = "Defines the values that will go into the EventMessageFile registry subkey",
         ),
-        "category_message_file": attr.string_list(
+        "category_message_files": attr.string_list(
             mandatory = False,
             default = [],
             doc = "Defines the values that will go into the CategoryMessageFile registry subkey",
         ),
-        "parameter_message_file": attr.string_list(
+        "parameter_message_files": attr.string_list(
             default = [],
             mandatory = False,
             doc = "Defines the values that will go into the ParameterMessageFile registry subkey",
@@ -963,9 +963,9 @@ def _get_eventlog_ds(eventlog):
         "Key": str(eventlog.key),
         "Source": str(eventlog.source),
         "SupportedTypes": int(st),
-        "EventMessageFile": str(eventlog.event_message_files),
-        "CategoryMessageFile": str(eventlog.category_message_files),
-        "ParameterMessageFile": str(eventlog.parameter_message_files),
+        "EventMessageFile": ";".join(eventlog.event_message_files),
+        "CategoryMessageFile": ";".join(eventlog.category_message_files),
+        "ParameterMessageFile": ";".join(eventlog.parameter_message_files),
     }
 
 def _get_component_ds(toolchain, component, inst_cat):

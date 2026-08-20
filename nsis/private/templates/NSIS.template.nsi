@@ -773,25 +773,25 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
 
         Push "TypesSupported"
-        Push ${EVENTLOG_TYPS}
+        Push "{{.SupportedTypes}}"
         Push "${ROOT_EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
         Call AddToRegistry
 
         Push "EventMessageFile"
         Push "{{.EventMessageFile}}"
-        Push "${EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
+        Push "${ROOT_EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
         Call AddToRegistry
 
         {{- if .CategoryMessageFile}}
         Push "CategoryMessageFile"
         Push "{{.CategoryMessageFile}}"
-        Push "${EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
+        Push "${ROOT_EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
         Call AddToRegistry
         {{- end}}
         {{- if .ParameterMessageFile}}
         Push "ParameterMessageFile"
         Push "{{.ParameterMessageFile}}"
-        Push "${EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
+        Push "${ROOT_EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
         Call AddToRegistry
         {{- end}}
     ${EndIf}
