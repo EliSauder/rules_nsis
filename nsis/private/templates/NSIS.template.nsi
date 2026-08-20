@@ -9,6 +9,10 @@ Unicode True
 
 !include FileFunc.nsh
 
+{{- range (ds "in").IncludeFiles }}
+!include "{{.}}"
+{{- end }}
+
 !define IsNativeARM32 '${IsNativeMachineArchitecture} 448'
 
 !define PRODUCT_ID "{{ (ds "in").Id }}"
@@ -275,6 +279,7 @@ Var IsArmInstall
     ${IfNot} ${IsNativeAMD64}
         !insertmacro Log "Not AMD64, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 64-bit x86 version of Windows." /SD IDOK
+        SetErrorLevel 3
         Abort
     ${EndIf}
 
@@ -286,6 +291,7 @@ Var IsArmInstall
     ${IfNot} ${IsNativeIA32}
         !insertmacro Log "Not IA32, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 32-bit x86 version of Windows." /SD IDOK
+        SetErrorLevel 3
         Abort
     ${EndIf}
     {{- end }}
@@ -297,6 +303,7 @@ Var IsArmInstall
     ${IfNot} ${IsNativeARM64}
         !insertmacro Log "Not ARM64, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 64-bit ARM version of Windows." /SD IDOK
+        SetErrorLevel 3
         Abort
     ${EndIf}
 
@@ -308,6 +315,7 @@ Var IsArmInstall
     ${IfNot} ${IsNativeARM32}
         !insertmacro Log "Not ARM32, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 32-bit ARM version of Windows." /SD IDOK
+        SetErrorLevel 3
         Abort
     ${EndIf}
     {{- end}}
@@ -659,6 +667,10 @@ SectionGroupEnd
 #Var RootPath
 
 {{ define "sectionDelete" }}
+{{ if .HasPreUninstall }}
+!insertmacro PreUninstall_{{.Name}} "$INSTDIR\{{.Directory}}"
+{{ end }}
+
 !insertmacro Log "Removing section {{.Name}}-{{.DisplayName}}"
 {{- if .Service }}
 !insertmacro Service_Stop "{{ .Name }}" $0
@@ -701,12 +713,19 @@ ${EndIf}
 {{- end}}
 {{- end}}
 
+{{ if .HasPostUninstall }}
+!insertmacro PostUninstall_{{.Name}} "$INSTDIR\{{.Directory}}"
+{{ end }}
 {{ end }}
 
 ; ------------------------
 ; SECTIONS
 {{ define "section" }}
 Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
+    {{ if .HasPreInstall }}
+    !insertmacro PreInstall_{{.Name}} "$INSTDIR\{{.Directory}}"
+    {{ end }}
+
     Push $0
     !insertmacro Log "Entering Section {{.Name}}-{{.DisplayName}}"
     ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
@@ -799,6 +818,10 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     {{- end}}
 
     Pop $0
+
+    {{ if .HasPostInstall }}
+    !insertmacro PostInstall_{{.Name}} "$OUTDIR"
+    {{ end }}
 SectionEnd
 {{ end }}
 
@@ -1016,6 +1039,10 @@ exists:
 FunctionEnd
 
 Function .onInit
+    {{ if (ds "in").HasPreInit }}
+    !insertmacro PreInit
+    {{ end }}
+
     Push $0
     ${GetParameters} $0
     ClearErrors
@@ -1040,10 +1067,18 @@ Function .onInit
     {{- template "sectionGroupVarInit" .}}
     {{- end}}
     Pop $0
+
+    {{ if (ds "in").HasPostInit }}
+    !insertmacro PostInit
+    {{ end }}
 FunctionEnd
 
 
 Function un.onInit
+    {{ if (ds "in").HasPreUninit }}
+    !insertmacro PreUnInit
+    {{ end }}
+
     Push $0
     ${GetParameters} $0
     ClearErrors
@@ -1068,6 +1103,10 @@ Function un.onInit
     StrCpy $INSTDIR "$0"
 
     Pop $0
+
+    {{ if (ds "in").HasPostUninit }}
+    !insertmacro PostUnInit
+    {{ end }}
 FunctionEnd
 
 Function .onSelChange

@@ -101,7 +101,7 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_execution_level": inst.execution_level,
         "expected_services": services,
         "expected_eventlog": elsrcs,
-        "expect_failed_install": False,
+        "expected_installer_exitcode": 0,
     }
 
 def _nsis_test_config_impl(ctx):
@@ -133,7 +133,7 @@ def _nsis_test_config_impl(ctx):
         preinstall.append(tmp)
     det["install_first_and_remove"] = preinstall
 
-    det["expect_failed_install"] = bool(ctx.attr.expect_failed_install)
+    det["expected_installer_exitcode"] = int(ctx.attr.expected_installer_exitcode)
 
     outf = ctx.actions.declare_file(ctx.attr.name + ".json")
 
@@ -169,8 +169,8 @@ _nsis_test_config = rule(
                 DefaultInfo,
             ],
         ),
-        "expect_failed_install": attr.bool(
-            default = False,
+        "expected_installer_exitcode": attr.int(
+            default = 0,
         ),
     },
     outputs = {
@@ -178,7 +178,7 @@ _nsis_test_config = rule(
     },
 )
 
-def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must_have_dirs, install_first_and_remove, expect_failed_install, target_compatible_with, **kwargs):
+def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must_have_dirs, install_first_and_remove, expected_installer_exitcode, target_compatible_with, **kwargs):
     v = []
     if install_first_and_remove != None:
         v.append(install_first_and_remove)
@@ -190,7 +190,7 @@ def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must
         must_have_dirs = must_have_dirs,
         install_first_and_remove = v,
         visibility = ["//visibility:private"],
-        expect_failed_install = expect_failed_install,
+        expected_installer_exitcode = expected_installer_exitcode,
     )
 
     f = ":{}_config".format(name)
@@ -249,9 +249,9 @@ nsis_installer_test = macro(
                 DefaultInfo,
             ],
         ),
-        "expect_failed_install": attr.bool(
+        "expected_installer_exitcode": attr.int(
             mandatory = False,
-            default = False,
+            default = 0,
         ),
         "target_compatible_with": attr.label_list(
             mandatory = False,
