@@ -56,7 +56,7 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
     },
 )
 
-NsisEventLogSource = provider(
+NsisEventLogSourceInfo = provider(
     doc = "An event log source",
     fields = {
         "name": "The bazel target name",
@@ -185,7 +185,7 @@ def _nsis_define(args_style, key, value = None):
     return prefix + key + "=" + _quote_nsi_string(value)
 
 def _nsis_eventlog_source_impl(ctx):
-    return NsisEventLogSource(
+    return NsisEventLogSourceInfo(
         name = ctx.label.name,
         key = ctx.attr.key,
         source = ctx.attr.source,
@@ -460,7 +460,7 @@ strict install order. Components should be able to be installed in any order.
             default = None,
             doc = "Whether the installer should setup windows event log logging for the application.",
             providers = [
-                NsisEventLogSource,
+                NsisEventLogSourceInfo,
             ],
         ),
     },
@@ -954,9 +954,9 @@ def _get_eventlog_ds(eventlog):
     for t in eventlog.supported_types:
         if t == "error":
             st = st + 1
-        elif t == "information":
-            st = st + 2
         elif t == "warning":
+            st = st + 2
+        elif t == "information":
             st = st + 4
 
     return {
@@ -993,9 +993,9 @@ def _get_component_ds(toolchain, component, inst_cat):
         "Dependencies": [str(x[NsisComponentInfo].name) for x in component.dependencies],
         "Shortcuts": [],
     }
-    if component.eventlog != None and NsisEventLogSource in component.eventlog:
+    if component.eventlog != None and NsisEventLogSourceInfo in component.eventlog:
         data["HasEventLog"] = True
-        data["EventLog"] = _get_eventlog_ds(component.eventlog[NsisEventLogSource])
+        data["EventLog"] = _get_eventlog_ds(component.eventlog[NsisEventLogSourceInfo])
     else:
         data["HasEventLog"] = False
         data["EventLog"] = None

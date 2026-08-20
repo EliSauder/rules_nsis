@@ -179,42 +179,63 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, subpath: st
     except FileNotFoundError:
         pass
 
-def _get_eventlog_registry_path(appkey: str) -> str:
-    return f"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\{appkey}\\{TEST_ID}"
+def _get_eventlog_registry_path(key: str, src: str) -> str:
+    return f"SYSTEM\\CurrentControlSet\\Services\\EventLog\\{key}\\{src}\\{TEST_ID}"
 
 def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
-    if not config["expected_eventlog"]:
-        return
     exlvl = (config["expected_execution_level"] or "admin")
     if exlvl != "admin":
         return
 
     root = _get_reg_db("admin") # Event log registry is always against local machine
-
-    reg_path = _get_eventlog_registry_path(appkey)
     access = winreg.KEY_READ | winreg.KEY_QUERY_VALUE
 
-    with _reg_open(root, reg_path, access): pass
 
-    valCs, typCs = _reg_value(root, reg_path, access, "CustomSource")
-    valEmh, typEmh = _reg_value(root, reg_path, access, "EventMessageFile")
-    valTs, typTs = _reg_value(root, reg_path, access, "TypesSupported")
+    for k, v in config["expected_eventlog"].items():
+        reg_path = _get_eventlog_registry_path(v["key"], v["source"])
+        with _reg_open(root, reg_path, access): pass
 
-    testcase.assertEqual(
-        valCs,
-        "1",
-        f"CustomSource {valCs} != 1"
-    )
-    testcase.assertEqual(
-        valEmh,
-        "%SystemRoot%\\System32\\EventCreate.exe",
-        f"EventMessageFile {valEmh} != '%SystemRoot%\\System32\\EventCreate.exe'"
-    )
-    testcase.assertEqual(
-        valTs,
-        "7",
-        f"TypesSupported {valTs} != 7 (1 | 2 | 4 [Info | Warn | Error])"
-    )
+        st = 0
+        for t in v.supported_types:
+            if t == "error":
+                st = st + 1
+            elif t == "warning":
+                st = st + 2
+            elif t == "information":
+                st = st + 4
+
+
+        valEmh, typEmh = _reg_value(root, reg_path, access, "EventMessageFile")
+        testcase.assertEqual(
+            valEmh,
+            v["event_message_files"],
+            f"EventMessageFile {valEmh} != '{v["event_message_files"]}'"
+        )
+
+        valTs, typTs = _reg_value(root, reg_path, access, "TypesSupported")
+        testcase.assertEqual(
+            valTs,
+            str(st),
+            f"TypesSupported {valTs} != {str(st)} (1 | 2 | 4 [Error | Warn | Info])"
+        )
+
+        cmf = v["category_message_files"]
+        if cmf and len(cmf) > 0:
+            valcmf, typcmf = _reg_value(root, reg_path, access, "CategoryMessageFile")
+            testcase.assertEqual(
+                valcmf,
+                cmf,
+                f"CategoryMessageFile {valcmf} != {cmf}"
+            )
+        pmf = v["parameter_message_files"]
+        if pmf and len(pmf) > 0:
+            valpmf, typpmf = _reg_value(root, reg_path, access, "ParameterMessageFile")
+            testcase.assertEqual(
+                valcmf,
+                cmf,
+                f"ParameterMessageFile {valpmf} != {pmf}"
+            )
+
 
 def _validate_removed_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
     if not config["expected_eventlog"]:
