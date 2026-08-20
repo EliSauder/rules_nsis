@@ -172,6 +172,8 @@ def _make_win_path(value):
     return v
 
 def _make_sys_path(toolchain, value):
+    if value == None:
+        return None
     if toolchain.path_style == "windows":
         return _make_win_path(value)
     return _make_unix_path(value)
@@ -718,7 +720,7 @@ def _make_nsis_args(ctx, toolchain, outfile):
 
     return args
 
-def _makensis(ctx, toolchain, script, options_file, inputs):
+def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
     if not script:
         fail("script can not be None")
     if not options_file:
@@ -733,6 +735,7 @@ def _makensis(ctx, toolchain, script, options_file, inputs):
             _quote_nsi_string(_make_sys_path(toolchain, options_file.path)),
         ),
     )
+
     args.add(_make_sys_path(toolchain, script.path))
 
     makensis = toolchain.makensis
@@ -752,6 +755,7 @@ def _makensis(ctx, toolchain, script, options_file, inputs):
     inputs = depset(
         direct = [script, options_file],
         transitive = [
+            user_scripts,
             makensis_dir,
             inputs,
             makensis_files,
@@ -1009,6 +1013,10 @@ def _get_installer_ds(ctx, toolchain):
             else None
         ),
         "Outfile": str(ctx.attr.outfile),
+        "HasPostInit": ctx.attr.post_init != None,
+        "HasPreInit": ctx.attr.pre_init != None,
+        "HasPostUninit": ctx.attr.post_uninit != None,
+        "HasPreUninit": ctx.attr.pre_uninit != None,
         _COMPONENTS_KEY: [],
         _COMPONENT_GROUPS_KEY: [],
     }
@@ -1087,6 +1095,10 @@ def _get_component_ds(toolchain, component, inst_cat):
         "CreateDirectories": [_get_create_directory_ds(x) for x in component.dirs],
         "Dependencies": [str(x[NsisComponentInfo].name) for x in component.dependencies],
         "Shortcuts": [],
+        "HasPostInstall": component.post_install != None,
+        "HasPreInstall": component.pre_install != None,
+        "HasPostUninstall": component.post_uninstall != None,
+        "HasPreUninstall": component.pre_uninstall != None,
     }
     if component.eventlog != None and NsisEventLogSourceInfo in component.eventlog:
         data["HasEventLog"] = True
@@ -1190,11 +1202,11 @@ def _all_files(ctx):
 
     return srcs
 
-def _render_file(ctx, tmpl, datafiles):
-    hs = "{}-{}".format(ctx.attr.name, hash(tmpl.path))
-    outname = "nsistmpl-{}.nsi".format(hs)
-
-    renderedtmpl = ctx.actions.declare_file(str(outname))
+def _render_file(ctx, infile, datafiles, outfile = None):
+    if infile == None:
+        return None
+    if outfile == None:
+        return None
 
     dfs = []
 
@@ -1202,29 +1214,29 @@ def _render_file(ctx, tmpl, datafiles):
     args.add("--missing-key")
     args.add("error")
     args.add("--file")
-    args.add(str(tmpl.path))
+    args.add(str(infile.path))
     for k, v in datafiles.items():
         args.add("--datasource")
         args.add("{}={}".format(k, str(v.path)))
         dfs.append(v)
 
     args.add("--out")
-    args.add(str(renderedtmpl.path))
+    args.add(str(outfile.path))
 
-    inputs = depset(direct = dfs + [tmpl])
+    inputs = depset(direct = dfs + [infile])
 
     ctx.actions.run(
-        mnemonic = "RenderNsiTemplate",
-        progress_message = "Rendering Tpl {} - Rendering".format(tmpl.short_path),
+        mnemonic = "RenderTemplate",
+        progress_message = "Rendering Tpl {} - Rendering".format(infile.short_path),
         executable = ctx.executable._gomplate,
         arguments = [args],
         inputs = inputs,
         tools = [ctx.executable._gomplate],
-        outputs = [renderedtmpl],
+        outputs = [outfile],
         use_default_shell_env = False
     )
 
-    return renderedtmpl
+    return outfile
 
 def _stamp_file(ctx, nm, data):
     hs = "{}-{}".format(ctx.attr.name, nm)
@@ -1288,16 +1300,61 @@ def _handle_stamping(ctx, data, component_map):
 
     return datafiles
 
+def _get_render_file(ctx, prefix, infile):
+    hs = "{}-{}-{}-{}{}".format(
+        prefix, ctx.attr.name, infile.basename, hash(infile.path), infile.extension)
+    return ctx.actions.declare_file(hs)
+
+def _get_user_script_files(ctx):
+    files = set()
+    files.add(ctx.attr.post_init)
+    files.add(ctx.attr.pre_init)
+    files.add(ctx.attr.post_uninit)
+    files.add(ctx.attr.pre_uninit)
+
+    for c in ctx.attr.components:
+        if NsisComponentInfo not in c:
+            continue
+        cmp = c[NsisComponentInfo]
+        files.add(cmp.post_install)
+        files.add(cmp.pre_install)
+        files.add(cmp.post_uninstall)
+        files.add(cmp.pre_uninstall)
+
+    files.discard(None)
+
+    outf = dict()
+
+    for f in files:
+        outf[f] = _get_render_file(ctx, "userscript", f)
+
+    return outf
+
+def _get_root_script_files(ctx):
+    root = _get_render_file(ctx, "nsis", ctx.file._template)
+    opt = _get_render_file(ctx, "nsis-options", ctx.file._template_options)
+
+    return root, opt
 
 def _build_rendered_templates(ctx, toolchain):
     data, component_map = _build_data_structure(ctx, toolchain)
 
+    rootscript, option = _get_root_script_files(ctx)
+
+    scripts = _get_user_script_files(ctx)
+    data["IncludeFiles"] = [v.path for k, v in scripts.items()]
+
     datafiles = _handle_stamping(ctx, data, component_map)
 
-    script = _render_file(ctx, ctx.file._template, datafiles)
-    option = _render_file(ctx, ctx.file._template_options, datafiles)
+    files = set()
+    for s, d in scripts.items():
+        f = _render_file(ctx, s, datafiles, d)
+        files.append(f)
 
-    return (script, option)
+    script = _render_file(ctx, ctx.file._template, datafiles, rootscript)
+    option = _render_file(ctx, ctx.file._template_options, datafiles, option)
+
+    return (rootscript, option, depset([f for f in files]))
 
 def _read_stamp_values(ctx, stamp):
     if not stamp:
@@ -1308,9 +1365,9 @@ def _nsis_installer_impl(ctx):
     toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
 
     srcs = _all_files(ctx)
-    script, options = _build_rendered_templates(ctx, toolchain)
+    script, options, user_scripts = _build_rendered_templates(ctx, toolchain)
 
-    return _makensis(ctx, toolchain, script, options, srcs) + [
+    return _makensis(ctx, toolchain, script, options, srcs, user_scripts) + [
         NsisInstallerInfo(
             name = ctx.attr.name,
             id = ctx.attr.id,

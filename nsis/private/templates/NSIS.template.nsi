@@ -9,6 +9,10 @@ Unicode True
 
 !include FileFunc.nsh
 
+{{- range (ds "in").IncludeFiles }}
+!include {{.}}
+{{- end }}
+
 !define IsNativeARM32 '${IsNativeMachineArchitecture} 448'
 
 !define PRODUCT_ID "{{ (ds "in").Id }}"
