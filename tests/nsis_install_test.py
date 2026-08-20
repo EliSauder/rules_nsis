@@ -450,7 +450,7 @@ def _validate_install(testcase, install_root, subpath, appkey, config, installer
     testcase.assertEqual(
         proc.returncode,
         expcode,
-        f"Expected exitcode {expcode}, got exit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+        f"Expected exitcode {expcode}, got exit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n",
     )
 
     if proc.returncode != 0:
