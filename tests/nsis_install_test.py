@@ -446,12 +446,15 @@ def _validate_install(testcase, install_root, subpath, appkey, config, installer
         env=env,
     )
 
-    if proc.returncode != 0 and config["expect_failed_install"]:
-        return True
-    if proc.returncode == 0 and config["expect_failed_install"]:
-        testcase.fail("expected fail but no failure was reported by the installer.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+    expcode = config["expected_installer_exitcode"]
+    testcase.assertEqual(
+        proc.returncode,
+        expcode,
+        f"Expected exitcode {expcode}, got exit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+    )
 
-    testcase.assertEqual(0, proc.returncode, f"Installer failed.\nexit_code: {proc.returncode}\ncmd: {installer_cmd}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
+    if proc.returncode != 0:
+        return True
 
     log = logging.getLogger("NsisInstallerTest.test_installer")
     log.debug("nsis stdout=%r", proc.stdout)
