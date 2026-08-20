@@ -53,6 +53,10 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "outfile": "Specify the outfile.",
         "arch": "The architecture to built the installer for.",
         "allow_32bit_on_64bit": "Allow 32bit installers to run on 64bit OS.",
+        "post_init": "The post .onInit nsh script to run.",
+        "pre_init": "The pre .onInit nsh script to run.",
+        "post_uninit": "The post un.onInit nsh script to run.",
+        "pre_uninit": "The pre un.onInit nsh script to run.",
     },
 )
 
@@ -88,6 +92,10 @@ NsisComponentInfo = provider(
         "dependencies": "The components this one depends on.",
         "shortcuts": "A list of shortcuts to make.",
         "eventlog": "Whether or not to create eventlog entries.",
+        "post_install": "A post install .nsh script to run after the component is installed.",
+        "pre_install": "A pre install .nsh script to run before the component is installed.",
+        "post_uninstall": "A post uninstall .nsh script to run after the component is uninstalled.",
+        "pre_uninstall": "A pre uninstall .nsh script to run before the component is uninstalled.",
     },
 )
 
@@ -330,6 +338,10 @@ def _nsis_component_impl(ctx):
         dependencies = ctx.attr.dependencies,
         dirs = [x[NsisDirectoryInfo] for x in ctx.attr.dirs if NsisDirectoryInfo in x ],
         eventlog = ctx.attr.eventlog,
+        post_install = ctx.attr.post_install,
+        pre_install = ctx.attr.pre_install,
+        post_uninstall = ctx.attr.post_uninstall,
+        pre_uninstall = ctx.attr.pre_uninstall,
     )
 
 nsis_component = rule(
@@ -462,6 +474,87 @@ strict install order. Components should be able to be installed in any order.
             providers = [
                 NsisEventLogSourceInfo,
             ],
+        ),
+        "post_install": attr.label(
+            mandatory = False,
+            default = None,
+            allow_single_file = ["*.nsh"],
+            executable = False,
+            doc = """
+Provide a .nsh file that defines a `PostInstall_<bazel name>` macro that takes
+one argument OUTPATH
+
+This will be included and called after the component's install logic has completed.
+The script should properly handle the stack and not overwrite values.
+
+This file will be run through the go template engine prior to use in the installer.
+To get component details from the template engine, use data source
+`component_<bazel name>`.
+Example:
+```
+{{ (ds "component_<bazel name>").InstallCategories }}
+```
+
+Like the installer, component fields are avilable via their CamelCaseName.
+
+Notes:
+- InstallCategories will be a single string value with the calculated install category numbers to be used with nsis's SectionIn
+- DisabledByDefault is available as a bool field
+- Required is available as a bool field
+- IsHidden is available as a bool field
+- CreateDirectories is available as a list of nsis_directory rules (same CamelCaseName field access works).
+- Files is a list of {Name,Source} with Name being the output file name and source the bazel path to access the file from.
+- Directories is a list of source paths that are directories
+- Shortcuts is a list exactly like `Files`
+- HasEventLog is available as a bool field.
+- EventLog is available as a nsis_eventlog_source rule (same CamelCaseName field access).
+```
+""",
+        ),
+        "pre_install": attr.label(
+            mandatory = False,
+            default = None,
+            allow_single_file = ["*.nsh"],
+            executable = False,
+            doc = """
+Provide a .nsh file that defines a `PreInstall_<bazel name>` macro that takes
+one argument OUTPATH
+
+This will be included and called before the component's install logic has started.
+The script should properly handle the stack and not overwrite values.
+
+For more details see `post_install`.
+"""
+        ),
+        "post_uninstall": attr.label(
+            mandatory = False,
+            default = None,
+            allow_single_file = ["*.nsh"],
+            executable = False,
+            doc = """
+Provide a .nsh file that defines a `PostUninstall_<bazel name>` macro that takes
+one argument OUTPATH
+
+This will be included and called before the component's uninstall logic has finished.
+The script should properly handle the stack and not overwrite values.
+
+For more details see `post_install`.
+""",
+        ),
+        "pre_uninstall": attr.label(
+            mandatory = False,
+            default = None,
+            allow_single_file = ["*.nsh"],
+            executable = False,
+            doc = """
+Provide a .nsh file that defines a `PreUninstall_<bazel name>` macro that takes
+one argument OUTPATH
+
+This will be included and called after the component's uninstall logic has finished.
+The script should properly handle the stack and not overwrite values.
+
+For more details see `post_install`.
+""",
         ),
     },
 )
@@ -798,6 +891,8 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
     n_edges = len(edges)
     n_vert = len(verticies)
 
+    component_map = dict()
+
     for i in range(n_edges * n_vert):
         if len(next_stack) == 0:
             break
@@ -821,11 +916,10 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
             gdata[_COMPONENTS_KEY] = next_components
             current_groups_data.append(gdata)
         elif NsisComponentInfo in v:
-            current_components_data.append(
-                _get_component_ds(
-                    toolchain,
-                    v[NsisComponentInfo],
-                    inst_cat))
+            cmp = v[NsisComponentInfo]
+            cd = _get_component_ds(toolchain, cmp, inst_cat)
+            component_map[cmp.name] = cd
+            current_components_data.append(cd)
 
         for e in es:
             next_stack.append((e, next_components, next_groups))
@@ -858,6 +952,7 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
         data_components,
         data_groups,
         deps,
+        component_map,
     )
 
 def _disabled_by_default(mode):
@@ -1036,13 +1131,13 @@ def _build_data_structure(ctx, toolchain):
     inst_data = _get_installer_ds(ctx, toolchain)
     inst_cat = ctx.attr.install_categories
 
-    cmps, grps, deps = _build_recursive_structure(ctx, toolchain, inst_cat)
+    cmps, grps, deps, component_map = _build_recursive_structure(ctx, toolchain, inst_cat)
 
     inst_data[_COMPONENTS_KEY] = cmps
     inst_data[_COMPONENT_GROUPS_KEY] = grps
     inst_data[_COMPONENT_DEPS_KEY] = deps
 
-    return inst_data
+    return inst_data, component_map
 
 def _all_files_component_list(lst):
     transitive = []
@@ -1095,23 +1190,28 @@ def _all_files(ctx):
 
     return srcs
 
-def _render_file(ctx, tmpl, datafile):
-    hs = "{}-{}".format(hash(ctx.attr.name), hash(tmpl.path))
+def _render_file(ctx, tmpl, datafiles):
+    hs = "{}-{}".format(ctx.attr.name, hash(tmpl.path))
     outname = "nsistmpl-{}.nsi".format(hs)
 
     renderedtmpl = ctx.actions.declare_file(str(outname))
+
+    dfs = []
 
     args = ctx.actions.args()
     args.add("--missing-key")
     args.add("error")
     args.add("--file")
     args.add(str(tmpl.path))
-    args.add("--datasource")
-    args.add("in={}".format(str(datafile.path)))
+    for k, v in datafiles.items():
+        args.add("--datasource")
+        args.add("{}={}".format(k, str(v.path)))
+        dfs.append(v)
+
     args.add("--out")
     args.add(str(renderedtmpl.path))
 
-    inputs = depset(direct = [datafile, tmpl])
+    inputs = depset(direct = dfs + [tmpl])
 
     ctx.actions.run(
         mnemonic = "RenderNsiTemplate",
@@ -1121,13 +1221,13 @@ def _render_file(ctx, tmpl, datafile):
         inputs = inputs,
         tools = [ctx.executable._gomplate],
         outputs = [renderedtmpl],
-        use_default_shell_env = False,
+        use_default_shell_env = False
     )
 
     return renderedtmpl
 
-def _handle_stamping(ctx, data):
-    hs = "{}".format(hash(ctx.attr.name))
+def _stamp_file(ctx, nm, data):
+    hs = "{}-{}".format(ctx.attr.name, nm)
     stamp = maybe_stamp(ctx)
 
     datafile = ctx.actions.declare_file("data-{}.json".format(hs))
@@ -1136,13 +1236,13 @@ def _handle_stamping(ctx, data):
         content = json.encode(data),
     )
 
-    defaultsfile = ctx.actions.declare_file("default-sub-{}.json".format(hs))
+    defaultsfile = ctx.actions.declare_file("stamp-defaults-{}.json".format(hs))
     ctx.actions.write(
         output = defaultsfile,
         content = json.encode(ctx.attr.stamp_defaults),
     )
 
-    outname = "data-sub-{}.json".format(hs)
+    outname = "data-stamped-{}.json".format(hs)
     outfile = ctx.actions.declare_file(outname)
 
     inputs = [datafile, defaultsfile, ctx.executable._render_script]
@@ -1174,14 +1274,28 @@ def _handle_stamping(ctx, data):
 
     return outfile
 
+def _handle_stamping(ctx, data, component_map):
+    datafiles = dict()
+
+    f = _stamp_file(ctx, "in", data)
+    datafiles["in"] = f
+
+    for k, c in component_map.items():
+        if k in datafiles:
+            fail("{} was already defined once. Please use a different name. If you are using 'in' please change it as 'in' is a reserved component for rules_nsis.".format(k))
+        df = _stamp_file(ctx, k, c)
+        datafiles[k] = df
+
+    return datafiles
+
 
 def _build_rendered_templates(ctx, toolchain):
-    data = _build_data_structure(ctx, toolchain)
+    data, component_map = _build_data_structure(ctx, toolchain)
 
-    datafile = _handle_stamping(ctx, data)
+    datafiles = _handle_stamping(ctx, data, component_map)
 
-    script = _render_file(ctx, ctx.file._template, datafile)
-    option = _render_file(ctx, ctx.file._template_options, datafile)
+    script = _render_file(ctx, ctx.file._template, datafiles)
+    option = _render_file(ctx, ctx.file._template_options, datafiles)
 
     return (script, option)
 
@@ -1222,6 +1336,10 @@ def _nsis_installer_impl(ctx):
             components = ctx.attr.components,
             outfile = ctx.attr.outfile,
             arch = ctx.attr.arch,
+            post_init = ctx.attr.post_init,
+            pre_init = ctx.attr.post_init,
+            post_uninit = ctx.attr.post_uninit,
+            pre_uninit = ctx.attr.post_uninit,
         ),
     ]
 
@@ -1378,6 +1496,79 @@ user: Install software as user.
             mandatory = False,
             default = True,
             doc = "Whether to allow 32bit installers to run on 64bit OS.",
+        ),
+        "post_init": attr.label(
+            mandatory = False,
+            default = None,
+            allow_single_file = ["*.nsh"],
+            executable = False,
+            doc = """
+Provide a .nsh file that defines a `PostInit` macro that takes no arguments.
+
+This will be included and called after .onInit logic has completed.
+The script should properly handle the stack and not overwrite values.
+
+This file will additionally be run through the template engine meaning that
+all the fields of the installer rule are available via the go template expression
+`{{ (ds "in").CamelCaseName }}` with the exception of `Srcs` which is split into
+`Components` and `ComponentGroups`. An additional `ComponentDependencies` key is
+available which is a list of:
+```jsonc
+{
+    "Component": "", // <component label name>
+    "Dependencies": [], // flattened list of dependency tag names
+    "Dependants": [], // flattened list of dependant tag names
+    // calculated list of components that should have their reference count
+    // decremented when the Component is deselected.
+    "RemoveRefs": []
+}
+
+For details about the component or component group data structure, see the
+`nsis_component` and `nsis_component_group` rule documentation.
+```
+""",
+        ),
+        "pre_init": attr.label(
+            mandatory = False,
+            default = None,
+            allow_single_file = ["*.nsh"],
+            executable = False,
+            doc = """
+Provide a .nsh file that defines a `PreInit` macro that takes no arguments.
+
+This will be included and called before .onInit logic is executed.
+The script should properly handle the stack and not overwrite values.
+
+For more details see `post_init`.
+"""
+        ),
+        "post_uninit": attr.label(
+            mandatory = False,
+            default = None,
+            allow_single_file = ["*.nsh"],
+            executable = False,
+            doc = """
+Provide a .nsh file that defines a `PostUnInit` macro that takes no arguments.
+
+This will be included and called after un.onInit logic is executed.
+The script should properly handle the stack and not overwrite values.
+
+For more details see `post_init`.
+""",
+        ),
+        "pre_uninit": attr.label(
+            mandatory = False,
+            default = None,
+            allow_single_file = ["*.nsh"],
+            executable = False,
+            doc = """
+Provide a .nsh file that defines a `PreUnInit` macro that takes no arguments.
+
+This will be included and called before un.onInit logic is executed.
+The script should properly handle the stack and not overwrite values.
+
+For more details see `post_init`.
+""",
         ),
         "_verbosity": attr.int(
             mandatory = False,
