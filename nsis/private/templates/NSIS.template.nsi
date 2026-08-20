@@ -10,7 +10,7 @@ Unicode True
 !include FileFunc.nsh
 
 {{- range (ds "in").IncludeFiles }}
-!include {{.}}
+!include "{{.}}"
 {{- end }}
 
 !define IsNativeARM32 '${IsNativeMachineArchitecture} 448'
@@ -663,6 +663,10 @@ SectionGroupEnd
 #Var RootPath
 
 {{ define "sectionDelete" }}
+{{ if .HasPreUninstall }}
+!insertmacro PreUninstall_{{.Name}} "$INSTDIR\{{.Directory}}"
+{{ end }}
+
 !insertmacro Log "Removing section {{.Name}}-{{.DisplayName}}"
 {{- if .Service }}
 !insertmacro Service_Stop "{{ .Name }}" $0
@@ -705,12 +709,19 @@ ${EndIf}
 {{- end}}
 {{- end}}
 
+{{ if .HasPostUninstall }}
+!insertmacro PostUninstall_{{.Name}} "$INSTDIR\{{.Directory}}"
+{{ end }}
 {{ end }}
 
 ; ------------------------
 ; SECTIONS
 {{ define "section" }}
 Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
+    {{ if .HasPreInstall }}
+    !insertmacro PreInstall_{{.Name}} "$INSTDIR\{{.Directory}}"
+    {{ end }}
+
     Push $0
     !insertmacro Log "Entering Section {{.Name}}-{{.DisplayName}}"
     ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
@@ -803,6 +814,10 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     {{- end}}
 
     Pop $0
+
+    {{ if .HasPostInstall }}
+    !insertmacro PostInstall_{{.Name}} "$OUTDIR"
+    {{ end }}
 SectionEnd
 {{ end }}
 
@@ -1020,6 +1035,10 @@ exists:
 FunctionEnd
 
 Function .onInit
+    {{ if (ds "in").HasPreInit }}
+    !insertmacro PreInit
+    {{ end }}
+
     Push $0
     ${GetParameters} $0
     ClearErrors
@@ -1044,10 +1063,18 @@ Function .onInit
     {{- template "sectionGroupVarInit" .}}
     {{- end}}
     Pop $0
+
+    {{ if (ds "in").HasPostInit }}
+    !insertmacro PostInit
+    {{ end }}
 FunctionEnd
 
 
 Function un.onInit
+    {{ if (ds "in").HasPreUninit }}
+    !insertmacro PreUnInit
+    {{ end }}
+
     Push $0
     ${GetParameters} $0
     ClearErrors
@@ -1072,6 +1099,10 @@ Function un.onInit
     StrCpy $INSTDIR "$0"
 
     Pop $0
+
+    {{ if (ds "in").HasPostUninit }}
+    !insertmacro PostUnInit
+    {{ end }}
 FunctionEnd
 
 Function .onSelChange
