@@ -1342,7 +1342,7 @@ def _build_rendered_templates(ctx, toolchain):
     rootscript, option = _get_root_script_files(ctx)
 
     scripts = _get_user_script_files(ctx)
-    data["IncludeFiles"] = [v.path for k, v in scripts.items()]
+    data["IncludeFiles"] = [_make_sys_path(toolchain, v.path) for k, v in scripts.items()]
 
     datafiles = _handle_stamping(ctx, data, component_map)
 
