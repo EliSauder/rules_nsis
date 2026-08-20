@@ -196,7 +196,7 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
         with _reg_open(root, reg_path, access): pass
 
         st = 0
-        for t in v.supported_types:
+        for t in v["supported_types"]:
             if t == "error":
                 st = st + 1
             elif t == "warning":
