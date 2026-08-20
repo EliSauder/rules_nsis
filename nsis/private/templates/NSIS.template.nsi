@@ -695,7 +695,7 @@ RMDir "{{.Path}}"
 {{- if .EventLog }}
 {{- with .EventLog}}
 ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-    Push "${ROOT_EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
+    Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
     Call un.RemoveRegistry
 ${EndIf}
 {{- end}}
@@ -774,24 +774,24 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
 
         Push "TypesSupported"
         Push "{{.SupportedTypes}}"
-        Push "${ROOT_EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
+        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
         Call AddToRegistry
 
         Push "EventMessageFile"
         Push "{{.EventMessageFile}}"
-        Push "${ROOT_EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
+        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
         Call AddToRegistry
 
         {{- if .CategoryMessageFile}}
         Push "CategoryMessageFile"
         Push "{{.CategoryMessageFile}}"
-        Push "${ROOT_EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
+        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
         Call AddToRegistry
         {{- end}}
         {{- if .ParameterMessageFile}}
         Push "ParameterMessageFile"
         Push "{{.ParameterMessageFile}}"
-        Push "${ROOT_EVENTLOG_KEY}/{{.Key}}/{{.Source}}"
+        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
         Call AddToRegistry
         {{- end}}
     ${EndIf}
