@@ -279,6 +279,7 @@ Var IsArmInstall
     ${IfNot} ${IsNativeAMD64}
         !insertmacro Log "Not AMD64, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 64-bit x86 version of Windows." /SD IDOK
+        SetErrorLevel 3
         Abort
     ${EndIf}
 
@@ -290,6 +291,7 @@ Var IsArmInstall
     ${IfNot} ${IsNativeIA32}
         !insertmacro Log "Not IA32, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 32-bit x86 version of Windows." /SD IDOK
+        SetErrorLevel 3
         Abort
     ${EndIf}
     {{- end }}
@@ -301,6 +303,7 @@ Var IsArmInstall
     ${IfNot} ${IsNativeARM64}
         !insertmacro Log "Not ARM64, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 64-bit ARM version of Windows." /SD IDOK
+        SetErrorLevel 3
         Abort
     ${EndIf}
 
@@ -312,6 +315,7 @@ Var IsArmInstall
     ${IfNot} ${IsNativeARM32}
         !insertmacro Log "Not ARM32, Aborting"
         MessageBox MB_ICONSTOP "This installer requires a 32-bit ARM version of Windows." /SD IDOK
+        SetErrorLevel 3
         Abort
     ${EndIf}
     {{- end}}
