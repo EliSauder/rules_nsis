@@ -53,8 +53,19 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "outfile": "Specify the outfile.",
         "arch": "The architecture to built the installer for.",
         "allow_32bit_on_64bit": "Allow 32bit installers to run on 64bit OS.",
-        "eventlog": "Whether or not to create eventlog entries.",
-        "eventlog_key": "The key to use when creating the event log entry. Defaults to id.",
+    },
+)
+
+NsisEventLogSource = provider(
+    doc = "An event log source",
+    fields = {
+        "name": "The bazel target name",
+        "key": "The event log key to log under",
+        "source": "The source name to use in the installer",
+        "supported_types": "The types supported by the logger.",
+        "event_message_files": "The message file(s) to utilize separated by semicolons",
+        "parameter_message_files": "The message file(s) to utilize separated by semicolons",
+        "category_message_files": "The message file(s) to utilize separated by semicolons",
     },
 )
 
@@ -76,6 +87,7 @@ NsisComponentInfo = provider(
         "dirs": "The directories to create with the component.",
         "dependencies": "The components this one depends on.",
         "shortcuts": "A list of shortcuts to make.",
+        "eventlog": "Whether or not to create eventlog entries.",
     },
 )
 
@@ -172,6 +184,61 @@ def _nsis_define(args_style, key, value = None):
 
     return prefix + key + "=" + _quote_nsi_string(value)
 
+def _nsis_eventlog_source_impl(ctx):
+    return NsisEventLogSource(
+        name = ctx.label.name,
+        key = ctx.attr.key,
+        source = ctx.attr.source,
+        supported_types = ctx.attr.supported_types,
+        event_message_files = ctx.attr.event_message_files,
+        category_message_files = ctx.attr.category_message_files,
+        parameter_message_files = ctx.attr.parameter_message_files,
+    )
+
+nsis_eventlog_source = rule(
+    implementation = _nsis_eventlog_source_impl,
+    doc = """
+Defines an event log source to be installed and utilized,
+""",
+    attrs = {
+        "key": attr.string(
+            mandatory = False,
+            default = "Application",
+            doc = "The event log key to utilize.",
+        ),
+        "source": attr.string(
+            mandatory = True,
+            doc = "The sourec name to utilize",
+        ),
+        "supported_types": attr.string_list(
+            mandatory = False,
+            doc = "The supported event types. error, warning, and/or information",
+            default = [
+                "error",
+                "warning",
+                "information",
+            ],
+        ),
+        "event_message_file": attr.string_list(
+            mandatory = False,
+            default = [
+                "%SystemRoot%\\System32\\EventCreate.exe",
+            ],
+            doc = "Defines the values that will go into the EventMessageFile registry subkey",
+        ),
+        "category_message_file": attr.string_list(
+            mandatory = False,
+            default = [],
+            doc = "Defines the values that will go into the CategoryMessageFile registry subkey",
+        ),
+        "parameter_message_file": attr.string_list(
+            default = [],
+            mandatory = False,
+            doc = "Defines the values that will go into the ParameterMessageFile registry subkey",
+        ),
+    }
+)
+
 def _nsis_component_group_impl(ctx):
     edges=[]
 
@@ -261,7 +328,8 @@ def _nsis_component_impl(ctx):
         shortcuts = ctx.attr.shortcuts,
         srcs = files,
         dependencies = ctx.attr.dependencies,
-        dirs = [x[NsisDirectoryInfo] for x in ctx.attr.dirs if NsisDirectoryInfo in x ]
+        dirs = [x[NsisDirectoryInfo] for x in ctx.attr.dirs if NsisDirectoryInfo in x ],
+        eventlog = ctx.attr.eventlog,
     )
 
 nsis_component = rule(
@@ -386,6 +454,14 @@ strict install order. Components should be able to be installed in any order.
             allow_empty = True,
             doc = "(Unused) A list of files that, when installed, will be created as shortcuts if short cuts are enabled.",
             allow_files = True,
+        ),
+        "eventlog": attr.label(
+            mandatory = False,
+            default = None,
+            doc = "Whether the installer should setup windows event log logging for the application.",
+            providers = [
+                NsisEventLogSource,
+            ],
         ),
     },
 )
@@ -837,7 +913,6 @@ def _get_installer_ds(ctx, toolchain):
             if ctx.attr.menu_image != None
             else None
         ),
-        "EventLog": bool(ctx.attr.eventlog),
         "Outfile": str(ctx.attr.outfile),
         _COMPONENTS_KEY: [],
         _COMPONENT_GROUPS_KEY: [],
@@ -874,6 +949,25 @@ def _get_create_directory_ds(directory):
         "Recursive": bool(directory.recursive),
     }
 
+def _get_eventlog_ds(eventlog):
+    st = 0
+    for t in eventlog.supported_types:
+        if t == "error":
+            st = st + 1
+        elif t == "information":
+            st = st + 2
+        elif t == "warning":
+            st = st + 4
+
+    return {
+        "Key": str(eventlog.key),
+        "Source": str(eventlog.source),
+        "SupportedTypes": int(st),
+        "EventMessageFile": str(eventlog.event_message_files),
+        "CategoryMessageFile": str(eventlog.category_message_files),
+        "ParameterMessageFile": str(eventlog.parameter_message_files),
+    }
+
 def _get_component_ds(toolchain, component, inst_cat):
     dispname = component.display_name
     if dispname == None or len(dispname.strip()) == 0:
@@ -899,6 +993,13 @@ def _get_component_ds(toolchain, component, inst_cat):
         "Dependencies": [str(x[NsisComponentInfo].name) for x in component.dependencies],
         "Shortcuts": [],
     }
+    if component.eventlog != None and NsisEventLogSource in component.eventlog:
+        data["HasEventLog"] = True
+        data["EventLog"] = _get_eventlog_ds(component.eventlog[NsisEventLogSource])
+    else:
+        data["HasEventLog"] = False
+        data["EventLog"] = None
+
     if component.service_executable != None:
         f = component.service_executable[DefaultInfo].files.to_list()[0]
 
@@ -1121,7 +1222,6 @@ def _nsis_installer_impl(ctx):
             components = ctx.attr.components,
             outfile = ctx.attr.outfile,
             arch = ctx.attr.arch,
-            eventlog = ctx.attr.eventlog,
         ),
     ]
 
@@ -1278,11 +1378,6 @@ user: Install software as user.
             mandatory = False,
             default = True,
             doc = "Whether to allow 32bit installers to run on 64bit OS.",
-        ),
-        "eventlog": attr.bool(
-            mandatory = False,
-            default = False,
-            doc = "Whether the installer should setup windows event log logging for the application.",
         ),
         "_verbosity": attr.int(
             mandatory = False,

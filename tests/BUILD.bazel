@@ -113,7 +113,6 @@ nsis_installer(
     id = "93061bb4-387d-4653-aef0-396ea6573afc",
     product = "Single Service Installer",
     product_path = "SSI",
-    eventlog = True,
     vendor = "Company Department",
     vendor_path = "Company\\Department",
     description = "Description",

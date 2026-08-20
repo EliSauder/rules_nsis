@@ -93,6 +93,7 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_bitwidth": arch,
         "expected_execution_level": inst.execution_level,
         "expected_services": services,
+        # TODO: UPDATE TESTS with new eventlog logic
         "expected_eventlog": inst.eventlog,
         "expect_failed_install": False,
     }
