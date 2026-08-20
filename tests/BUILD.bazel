@@ -1,5 +1,12 @@
 load("//tests:defs.bzl", "nsis_installer_test")
-load("//nsis:defs.bzl", "nsis_component", "nsis_component_group", "nsis_installer", "nsis_directory")
+load(
+    "//nsis:defs.bzl",
+    "nsis_component",
+    "nsis_component_group",
+    "nsis_installer",
+    "nsis_directory",
+    "nsis_eventlog_source",
+)
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 
@@ -113,7 +120,6 @@ nsis_installer(
     id = "93061bb4-387d-4653-aef0-396ea6573afc",
     product = "Single Service Installer",
     product_path = "SSI",
-    eventlog = True,
     vendor = "Company Department",
     vendor_path = "Company\\Department",
     description = "Description",
@@ -397,4 +403,29 @@ nsis_installer_test(
     name = "create_root_dir_installer_test",
     installer = ":create_root_dir_installer",
     must_have_dirs = ["C:\\ROOT"],
+)
+
+nsis_eventlog_source(
+    name = "minimal_eventlog_source",
+    source = "MinimalSource",
+)
+
+nsis_component(
+    name = "minimal_component_eventlog",
+    srcs = [":nsis_files"],
+    selection_mode = "default",
+    eventlog = ":minimal_eventlog_source"
+)
+
+nsis_installer(
+    name = "minimal_installer_eventlog",
+    id = "7e5787c2-c4fb-4c59-bc9b-9e89790f016d",
+    components = [":minimal_component_eventlog"],
+    product = "Minimal Installer Eventlog",
+    product_path = "Minimal Installer Eventlog",
+)
+
+nsis_installer_test(
+    name = "minimal_installer_eventlog_test",
+    installer = ":minimal_installer_eventlog",
 )

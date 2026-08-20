@@ -2,7 +2,10 @@ load("@rules_python//python:py_test.bzl", "py_test")
 load("@bazel_skylib//lib:shell.bzl", "shell")
 load(
     "//nsis/private:defs.bzl",
-    "NsisInstallerInfo", "NsisComponentInfo", "NsisComponentGroupInfo",
+    "NsisInstallerInfo",
+    "NsisComponentInfo",
+    "NsisComponentGroupInfo",
+    "NsisEventLogSourceInfo",
 )
 load("@aspect_bazel_lib//lib:paths.bzl", "to_rlocation_path")
 
@@ -18,6 +21,7 @@ def _get_installer_test_details(ctx, inst, target):
     files = set()
     ds = dict()
     services = dict()
+    elsrcs =dict()
 
     numcomp = 0
 
@@ -32,6 +36,9 @@ def _get_installer_test_details(ctx, inst, target):
                     files.add("{}".format(f.basename))
             for d in cmp.dirs:
                 ds[d.path] = d
+            if cmp.eventlog != None and NsisEventLogSourceInfo in cmp.eventlog:
+                elg = cmp.eventlog[NsisEventLogSourceInfo]
+                elsrcs["{}/{}".format(elg.key, elg.source)] = elg
             if cmp.service:
                 services[cmp.name] = {
                     "start_type": cmp.service_start_type,
@@ -93,7 +100,7 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_bitwidth": arch,
         "expected_execution_level": inst.execution_level,
         "expected_services": services,
-        "expected_eventlog": inst.eventlog,
+        "expected_eventlog": elsrcs,
         "expect_failed_install": False,
     }
 

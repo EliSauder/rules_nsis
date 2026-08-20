@@ -70,10 +70,7 @@ Unicode True
 
 !define REG_KEY_INSTLOC "InstallDir"
 
-!define EVENTLOG_KEY "SYSTEM\CurrentControlSet\Services\EventLog\Application\${PRODUCT_ID}"
-!define EVENTLOG_FILE "%SystemRoot%\System32\EventCreate.exe"
-!define EVENTLOG_SRC 1
-!define EVENTLOG_TYPS 7
+!define ROOT_EVENTLOG_KEY "SYSTEM\CurrentControlSet\Services\EventLog"
 
 Name "${PRODUCT}"
 OutFile "${OUTFILE_NAME}"
@@ -695,6 +692,15 @@ RMDir /r "$INSTDIR\{{ . }}"
 RMDir "{{.Path}}"
 {{- end}}
 
+{{- if .EventLog }}
+{{- with .EventLog}}
+${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+    Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
+    Call un.RemoveRegistry
+${EndIf}
+{{- end}}
+{{- end}}
+
 {{ end }}
 
 ; ------------------------
@@ -761,6 +767,37 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     !insertmacro iCacls_IntegrityLevel "{{$p}}" "{{.IntegrityLevel}}" "{{.IntegrityLevelInheritanceRights}}" {{$r}} $0
     {{- end}}
     {{- end }}
+
+    {{- if .EventLog }}
+    {{- with .EventLog}}
+    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
+
+        Push "TypesSupported"
+        Push "{{.SupportedTypes}}"
+        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
+        Call AddToRegistry
+
+        Push "EventMessageFile"
+        Push "{{.EventMessageFile}}"
+        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
+        Call AddToRegistry
+
+        {{- if .CategoryMessageFile}}
+        Push "CategoryMessageFile"
+        Push "{{.CategoryMessageFile}}"
+        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
+        Call AddToRegistry
+        {{- end}}
+        {{- if .ParameterMessageFile}}
+        Push "ParameterMessageFile"
+        Push "{{.ParameterMessageFile}}"
+        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
+        Call AddToRegistry
+        {{- end}}
+    ${EndIf}
+    {{- end}}
+    {{- end}}
+
     Pop $0
 SectionEnd
 {{ end }}
@@ -831,25 +868,6 @@ Section "-Core Installation"
     Push "1"
     Push "${UN_REG_KEY}"
     Call AddToRegistry
-
-    {{- if (ds "in").EventLog }}
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-        Push "CustomSource"
-        Push ${EVENTLOG_SRC}
-        Push "${EVENTLOG_KEY}"
-        Call AddToRegistry
-
-        Push "TypesSupported"
-        Push ${EVENTLOG_TYPS}
-        Push "${EVENTLOG_KEY}"
-        Call AddToRegistry
-
-        Push "EventMessageFile"
-        Push "${EVENTLOG_FILE}"
-        Push "${EVENTLOG_KEY}"
-        Call AddToRegistry
-    ${EndIf}
-    {{- end}}
 
     ${If} "${ICON_FILE}" != ""
         Push "DisplayIcon"
@@ -1152,13 +1170,6 @@ Section "Uninstall"
   Call un.RemoveRegistry
   Push "${REG_KEY}"
   Call un.RemoveRegistry
-
-  {{- if (ds "in").EventLog }}
-  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-    Push "${EVENTLOG_KEY}"
-    Call un.RemoveRegistry
-  ${EndIf}
-  {{- end}}
 
   ;Remove the uninstaller itself.
   SetFileAttributes "$INSTDIR\${UNINSTALLER_NAME}" NORMAL
