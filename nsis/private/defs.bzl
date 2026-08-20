@@ -340,10 +340,10 @@ def _nsis_component_impl(ctx):
         dependencies = ctx.attr.dependencies,
         dirs = [x[NsisDirectoryInfo] for x in ctx.attr.dirs if NsisDirectoryInfo in x ],
         eventlog = ctx.attr.eventlog,
-        post_install = ctx.attr.post_install,
-        pre_install = ctx.attr.pre_install,
-        post_uninstall = ctx.attr.post_uninstall,
-        pre_uninstall = ctx.attr.pre_uninstall,
+        post_install = ctx.file.post_install,
+        pre_install = ctx.file.pre_install,
+        post_uninstall = ctx.file.post_uninstall,
+        pre_uninstall = ctx.file.pre_uninstall,
     )
 
 nsis_component = rule(
@@ -480,7 +480,7 @@ strict install order. Components should be able to be installed in any order.
         "post_install": attr.label(
             mandatory = False,
             default = None,
-            allow_single_file = ["*.nsh"],
+            allow_single_file = [".nsh"],
             executable = False,
             doc = """
 Provide a .nsh file that defines a `PostInstall_<bazel name>` macro that takes
@@ -516,7 +516,7 @@ Notes:
         "pre_install": attr.label(
             mandatory = False,
             default = None,
-            allow_single_file = ["*.nsh"],
+            allow_single_file = [".nsh"],
             executable = False,
             doc = """
 Provide a .nsh file that defines a `PreInstall_<bazel name>` macro that takes
@@ -531,7 +531,7 @@ For more details see `post_install`.
         "post_uninstall": attr.label(
             mandatory = False,
             default = None,
-            allow_single_file = ["*.nsh"],
+            allow_single_file = [".nsh"],
             executable = False,
             doc = """
 Provide a .nsh file that defines a `PostUninstall_<bazel name>` macro that takes
@@ -546,7 +546,7 @@ For more details see `post_install`.
         "pre_uninstall": attr.label(
             mandatory = False,
             default = None,
-            allow_single_file = ["*.nsh"],
+            allow_single_file = [".nsh"],
             executable = False,
             doc = """
 Provide a .nsh file that defines a `PreUninstall_<bazel name>` macro that takes
@@ -1301,16 +1301,16 @@ def _handle_stamping(ctx, data, component_map):
     return datafiles
 
 def _get_render_file(ctx, prefix, infile):
-    hs = "{}-{}-{}-{}{}".format(
+    hs = "{}-{}-{}-{}.{}".format(
         prefix, ctx.attr.name, infile.basename, hash(infile.path), infile.extension)
     return ctx.actions.declare_file(hs)
 
 def _get_user_script_files(ctx):
     files = set()
-    files.add(ctx.attr.post_init)
-    files.add(ctx.attr.pre_init)
-    files.add(ctx.attr.post_uninit)
-    files.add(ctx.attr.pre_uninit)
+    files.add(ctx.file.post_init)
+    files.add(ctx.file.pre_init)
+    files.add(ctx.file.post_uninit)
+    files.add(ctx.file.pre_uninit)
 
     for c in ctx.attr.components:
         if NsisComponentInfo not in c:
@@ -1349,7 +1349,7 @@ def _build_rendered_templates(ctx, toolchain):
     files = set()
     for s, d in scripts.items():
         f = _render_file(ctx, s, datafiles, d)
-        files.append(f)
+        files.add(f)
 
     script = _render_file(ctx, ctx.file._template, datafiles, rootscript)
     option = _render_file(ctx, ctx.file._template_options, datafiles, option)
@@ -1393,10 +1393,10 @@ def _nsis_installer_impl(ctx):
             components = ctx.attr.components,
             outfile = ctx.attr.outfile,
             arch = ctx.attr.arch,
-            post_init = ctx.attr.post_init,
-            pre_init = ctx.attr.post_init,
-            post_uninit = ctx.attr.post_uninit,
-            pre_uninit = ctx.attr.post_uninit,
+            post_init = ctx.file.post_init,
+            pre_init = ctx.file.post_init,
+            post_uninit = ctx.file.post_uninit,
+            pre_uninit = ctx.file.post_uninit,
         ),
     ]
 
@@ -1557,7 +1557,7 @@ user: Install software as user.
         "post_init": attr.label(
             mandatory = False,
             default = None,
-            allow_single_file = ["*.nsh"],
+            allow_single_file = [".nsh"],
             executable = False,
             doc = """
 Provide a .nsh file that defines a `PostInit` macro that takes no arguments.
@@ -1588,7 +1588,7 @@ For details about the component or component group data structure, see the
         "pre_init": attr.label(
             mandatory = False,
             default = None,
-            allow_single_file = ["*.nsh"],
+            allow_single_file = [".nsh"],
             executable = False,
             doc = """
 Provide a .nsh file that defines a `PreInit` macro that takes no arguments.
@@ -1602,7 +1602,7 @@ For more details see `post_init`.
         "post_uninit": attr.label(
             mandatory = False,
             default = None,
-            allow_single_file = ["*.nsh"],
+            allow_single_file = [".nsh"],
             executable = False,
             doc = """
 Provide a .nsh file that defines a `PostUnInit` macro that takes no arguments.
@@ -1616,7 +1616,7 @@ For more details see `post_init`.
         "pre_uninit": attr.label(
             mandatory = False,
             default = None,
-            allow_single_file = ["*.nsh"],
+            allow_single_file = [".nsh"],
             executable = False,
             doc = """
 Provide a .nsh file that defines a `PreUnInit` macro that takes no arguments.

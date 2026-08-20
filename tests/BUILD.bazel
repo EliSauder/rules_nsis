@@ -429,3 +429,17 @@ nsis_installer_test(
     name = "minimal_installer_eventlog_test",
     installer = ":minimal_installer_eventlog",
 )
+
+nsis_installer(
+    name = "minimal_installer_withpostinit",
+    id = "72a4d1ed-532b-434d-833c-a0edb32ed4a7",
+    components = [":minimal_component"],
+    product = "Minimal Installer PostInit",
+    product_path = "Minimal Installer PostInit",
+    post_init = "dummy.nsh",
+)
+
+nsis_installer_test(
+    name = "minimal_installer_withpostinit_test",
+    installer = ":minimal_installer_withpostinit",
+)
