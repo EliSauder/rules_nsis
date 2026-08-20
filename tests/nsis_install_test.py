@@ -239,38 +239,20 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
 
 
 def _validate_removed_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
-    if not config["expected_eventlog"]:
-        return
     exlvl = (config["expected_execution_level"] or "admin")
     if exlvl != "admin":
         return
 
     root = _get_reg_db("admin") # Event log registry is always against local machine
-
-    reg_path = _get_eventlog_registry_path(appkey)
     access = winreg.KEY_READ | winreg.KEY_QUERY_VALUE
 
-    try:
-        with _reg_open(root, reg_path, access):
-            testcase.fail(f"Registry key {reg_path} still exists")
-    except FileNotFoundError:
-        pass
-
-    try:
-        _reg_value(root, reg_path, access, "CustomSource")
-        testcase.fail(f"Registry key {reg_path} with value CustomSource still exists")
-    except FileNotFoundError:
-        pass
-    try:
-        _reg_value(root, reg_path, access, "EventMessageFile")
-        testcase.fail(f"Registry key {reg_path} with value EventMessageFile still exists")
-    except FileNotFoundError:
-        pass
-    try:
-        _reg_value(root, reg_path, access, "TypesSupported")
-        testcase.fail(f"Registry key {reg_path} with value TypesSupported still exists")
-    except FileNotFoundError:
-        pass
+    for k, v in config["expected_eventlog"].items():
+        reg_path = _get_eventlog_registry_path(v["key"], v["source"])
+        try:
+            with _reg_open(root, reg_path, access):
+                testcase.fail(f"Registry key {reg_path} still exists")
+        except FileNotFoundError:
+            pass
 
 
 def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, subpath: str, appkey: str):
