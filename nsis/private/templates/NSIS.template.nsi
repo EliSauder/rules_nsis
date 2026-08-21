@@ -6,6 +6,10 @@ Unicode True
 !include MUI2.nsh
 !include x64.nsh
 !include Sections.nsh
+!include Logging.nsh
+!include Utility.nsh
+!include Sc.nsh
+!include Uninstall.nsh
 
 !include FileFunc.nsh
 
@@ -73,8 +77,6 @@ Unicode True
 !define REG_KEY "Software\${PRODUCT_KEY_PATH}"
 
 !define REG_KEY_INSTLOC "InstallDir"
-
-!define ROOT_EVENTLOG_KEY "SYSTEM\CurrentControlSet\Services\EventLog"
 
 Name "${PRODUCT}"
 OutFile "${OUTFILE_NAME}"
@@ -242,35 +244,6 @@ VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
 !insertmacro MUI_LANGUAGE "Vietnamese"
 !insertmacro MUI_LANGUAGE "Welsh"
 
-Var StdOutHandle
-Var StdOutAttempted
-!macro Log TEXT
-    ${IfNot} ${Silent}
-        DetailPrint `${TEXT}`
-    ${EndIf}
-    ${If} $StdOutHandle == ""
-    ${AndIf} $StdOutAttempted == ""
-        StrCpy $StdOutAttempted "Y"
-        Push $0
-        Push $1
-        System::Call 'kernel32::AttachConsole(i -1)i.r1'
-        ${If} $1 != 0
-            System::Call 'kernel32::GetStdHandle(i -11)i.r0'
-            StrCpy $StdOutHandle $0
-        ${EndIf}
-        Pop $1
-        Pop $0
-    ${EndIf}
-
-    ${If} $StdOutHandle != ""
-        FileWrite $StdOutHandle `${TEXT}$\r$\n`
-    ${EndIf}
-!macroend
-
-!macro UnLog TEXT
-    !insertmacro Log `${TEXT}`
-!macroend
-
 Var Is64BitInstall
 Var IsArmInstall
 
@@ -349,25 +322,6 @@ Var IsArmInstall
 {{- end }}
 !macroend
 
-!macro ValidateMutex Act
-    Push $R0
-    System::Call 'kernel32::CreateMutex(i 0, i 0, t "${PUBLISHER}${PRODUCT}${Act}Mutex") i .r1 ?e'
-    Pop $R0
-    ${If} $R0 != 0
-        !insertmacro Log "Another instance is already running, aborting"
-        MessageBox MB_ICONEXCLAMATION "Another instance of this installer is already running." /SD IDOK
-        Abort
-    ${EndIf}
-    Pop $R0
-!macroend
-
-!macro SetVarCtx
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} == 1
-        SetShellVarContext all
-    ${Else}
-        SetShellVarContext current
-    ${EndIf}
-!macroend
 
 {{define "sectionSelChangeVar"}}
 Var SelectRefCnt_{{.Name}}
@@ -427,215 +381,6 @@ Var SectionSelected_{{.Name}}
 #    ${EndIf}
 #  ${EndIf}
 #FunctionEnd
-
-Var TestId
-
-Function un.RemoveRegistry
-  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-      SetShellVarContext all
-  ${Else}
-      SetShellVarContext current
-  ${EndIf}
-  Exch $0 # Pop Param 1
-
-  ${If} $TestId == ""
-    !insertmacro Log "Removing registry '$0'"
-    DeleteRegKey SHCTX "$0"
-  ${Else}
-    Push $1
-    StrCpy $1 $TestId
-    !insertmacro Log "Removing registry '$0\$1'"
-    DeleteRegKey SHCTX "$0\$1"
-    Pop $1
-  ${EndIf}
-
-  Pop $0
-FunctionEnd
-
-Function AddToRegistry
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-        SetShellVarContext all
-    ${Else}
-        SetShellVarContext current
-    ${EndIf}
-    Exch $0
-    Exch 1
-    Exch $1
-    Exch 2
-    Exch $2
-
-    ${If} $TestId != ""
-      Push $3
-      StrCpy $3 $TestId
-      StrCpy $0 "$0\$3"
-      Pop $3
-    ${EndIf}
-
-    WriteRegStr SHCTX "$0" "$2" "$1"
-    !insertmacro Log "Set install registry entry: '$0' -> '$2' to '$1'"
-
-    Pop $2
-    Pop $0
-    Pop $1
-FunctionEnd
-
-Function un.GetFromRegistry
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-        SetShellVarContext all
-    ${Else}
-        SetShellVarContext current
-    ${EndIf}
-    Exch $0
-    Exch
-    Exch $1
-
-    ${If} $TestId != ""
-        Push $3
-        StrCpy $3 $TestId
-        StrCpy $0 "$0\$3"
-        Pop $3
-    ${EndIf}
-
-    ReadRegStr $0 SHCTX "$0" "$1"
-    Pop $1
-    Exch $0
-FunctionEnd
-
-Function GetFromRegistry
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-        SetShellVarContext all
-    ${Else}
-        SetShellVarContext current
-    ${EndIf}
-    Exch $0
-    Exch
-    Exch $1
-
-    ${If} $TestId != ""
-        Push $3
-        StrCpy $3 $TestId
-        StrCpy $0 "$0\$3"
-        Pop $3
-    ${EndIf}
-
-    ReadRegStr $0 SHCTX "$0" "$1"
-    Pop $1
-    Exch $0
-FunctionEnd
-
-!macro _iCaclsExec ARGS RECURSIVE OUT_RC
-    ${If} RECURSIVE > 0
-        !insertmacro Log `Executing: $SYSDIR\icacls.exe ${ARGS} /C /Q /T`
-    ${Else}
-        !insertmacro Log `Executing: $SYSDIR\icacls.exe ${ARGS} /C /Q`
-    ${EndIf}
-    ClearErrors
-    Push $0
-    Push $1
-    ${If} RECURSIVE > 0
-        nsExec::ExecToStack `"$SYSDIR\icacls.exe" ${ARGS} /C /Q /T`
-    ${Else}
-        nsExec::ExecToStack `"$SYSDIR\icacls.exe" ${ARGS} /C /Q`
-    ${EndIf}
-    Pop $0
-    Pop $1
-    !insertmacro Log `Code: $0, Output: $1`
-    Pop $1
-    Push $0
-    Exch
-    Pop $0
-    Pop ${OUT_RC}
-!macroend
-
-!macro iCacls_Grant PATH SID PERM RECURSIVE OUT_RC
-    !insertmacro _iCaclsExec `${PATH} /grant ${SID}:${PERM}` ${RECURSIVE} ${OUT_RC}
-!macroend
-
-!macro iCacls_Deny PATH SID PERM RECURSIVE OUT_RC
-    !insertmacro _iCaclsExec `${PATH} /deny ${SID}:${PERM}` ${RECURSIVE} ${OUT_RC}
-!macroend
-
-!macro iCacls_RemoveGrant PATH SID RECURSIVE OUT_RC
-    !insertmacro _iCaclsExec `${PATH} /remove:g ${SID}` ${RECURSIVE} ${OUT_RC}
-!macroend
-
-!macro iCacls_RemoveDeny PATH SID RECURSIVE OUT_RC
-    !insertmacro _iCaclsExec `${PATH} /remove:d ${SID}` ${RECURSIVE} ${OUT_RC}
-!macroend
-
-!macro iCacls_IntegrityLevel PATH LVL INHERTOPTS RECURSIVE
-    ${IF} INHERTOPTS == ""
-        !insertmacro _iCaclsExec `${PATH} /setintegritylevel ${LVL}` ${RECURSIVE} ${OUT_RC}
-    ${Else}
-        !insertmacro _iCaclsExec `${PATH} /setintegritylevel ${INHERTOPTS}${LVL}` ${RECURSIVE} ${OUT_RC}
-    ${EndIf}
-!macroend
-
-!macro iCacls_Substitute PATH SIDOLD SIDNEW RECURSIVE
-    !insertmacro _iCaclsExec`${PATH} /substitute ${SIDOLD} ${SIDNEW}` ${RECURSIVE} ${OUT_RC}
-!macroend
-
-!macro _ServiceScExec ARGS OUT_RC
-    !insertmacro Log `Executing: $SYSDIR\sc.exe ${ARGS}`
-    ClearErrors
-
-    Push $0
-    Push $1
-
-    nsExec::ExecToStack `"$SYSDIR\sc.exe" ${ARGS}`
-    Pop $0
-    Pop $1
-    !insertmacro Log `Code: $0, Output: $1`
-    Pop $1
-
-    Push $0
-    Exch
-    Pop $0
-
-    Pop ${OUT_RC}
-
-!macroend
-
-!macro Service_Create SERVICE_NAME BIN_PATH DISPLAY_NAME START_TYPE DEPENDENCIES OUT_RC
-  !insertmacro _ServiceScExec \
-    `create "${SERVICE_NAME}" binPath= "${BIN_PATH}" DisplayName= "${DISPLAY_NAME}" start= ${START_TYPE} depend= "${DEPENDENCIES}"` \
-    ${OUT_RC}
-!macroend
-
-!macro Service_Query SERVICE_NAME OUT_RC
-  !insertmacro _ServiceScExec \
-    `query "${SERVICE_NAME}"` \
-    ${OUT_RC}
-!macroend
-
-!macro Service_Update SERVICE_NAME BIN_PATH DISPLAY_NAME START_TYPE DEPENDENCIES OUT_RC
-  !insertmacro _ServiceScExec \
-    `config "${SERVICE_NAME}" binPath= "${BIN_PATH}" DisplayName= "${DISPLAY_NAME}" start= ${START_TYPE} depend= "${DEPENDENCIES}"`  \
-    ${OUT_RC}
-!macroend
-
-!macro Service_Start SERVICE_NAME OUT_RC
-  !insertmacro _ServiceScExec \
-    `start "${SERVICE_NAME}"` \
-    ${OUT_RC}
-!macroend
-
-!macro Service_Stop SERVICE_NAME OUT_RC
-  !insertmacro _ServiceScExec \
-    `stop "${SERVICE_NAME}"` \
-    ${OUT_RC}
-!macroend
-
-!macro Service_Delete SERVICE_NAME OUT_RC
-  !insertmacro _ServiceScExec \
-    `delete "${SERVICE_NAME}"` \
-    ${OUT_RC}
-!macroend
-
-!macro Service_SetDescription SERVICE_NAME DESCRIPTION OUT_RC
-    !insertmacro _ServiceScExec \
-        `description "${SERVICE_NAME}" "${DESCRIPTION}"` ${OUT_RC}
-!macroend
 
 ; ---------------------
 ; Installer
@@ -901,7 +646,7 @@ Section "-Core Installation"
         Push "DisplayIcon"
         Push ""
         Push "${UN_REG_KEY}"
-        Call AddToRegistry
+        Call oddToRegistry
     ${EndIf}
 
     #${If} "$INSTALL_STARTMENU" == "1"
@@ -922,121 +667,6 @@ SectionEnd
 #  !insertmacro MUI_INSTALLOPTIONS_DISPLAY "NSIS(ds "in").InstallOptions.ini"
 #FunctionEnd
 
-!macro TrimQuotes Input Output
-    Push "${Input}"
-    Call TrimQuotes
-    Pop ${Output}
-!macroend
-
-Function TrimQuotes
-    Exch $R0
-    Push $R1
-
-    StrCpy $R1 $R0 1
-    StrCmp $R1 `"` 0 +2
-        StrCpy $R0 $R0 `` 1
-
-    StrCpy $R1 $R0 1 -1
-    StrCmp $R1 `"` 0 +2
-        StrCpy $R0 $R0 -1
-
-    Pop $R1
-    Exch $R0
-FunctionEnd
-
-!macro UninstallExisting appkey exitcode
-    Push "${appkey}"
-    Call UninstallExisting
-    Pop ${exitcode}
-!macroend
-
-Function UninstallExisting #(appkey: str) -> int:
-    Exch $0
-
-    Push $1
-
-    Push "UninstallString"
-    Push "Software\Microsoft\Windows\CurrentVersion\Uninstall\$0"
-    Call GetFromRegistry
-    Pop $1
-
-    !insertmacro TrimQuotes $1 $1
-    ${If} "$1" == ""
-        !insertmacro Log "No uninstall path for id: $0"
-        Pop $1
-        Pop $0
-        Push 0
-        Return
-    ${EndIf}
-    !insertmacro Log "$0 has uninstall path: $1"
-
-    IfFileExists "$1" exists notexist
-notexist:
-    !insertmacro Log "Uninstall file $1 does not exist"
-    # If not exist
-    Pop $1
-    Pop $0
-    Push 0
-    Return
-
-exists:
-    Push $2
-    Push $3
-
-    Push "InstallLocation"
-    Push "Software\Microsoft\Windows\CurrentVersion\Uninstall\$0"
-    Call GetFromRegistry
-    Pop $3
-    !insertmacro TrimQuotes $3 $3
-    ${If} "$3" == ""
-        !insertmacro Log "App $0 has no ${REG_KEY_INSTLOC} path. Please uninstall manually first."
-        MessageBox MB_ICONSTOP "App $0 has no ${REG_KEY_INSTLOC} path defined. Please uninstall manually first." /SD IDOK
-        Pop $3
-        Pop $2
-        Pop $1
-        Pop $0
-        Push 1
-        Return
-    ${EndIf}
-
-    Push $4
-    Push $5
-
-    ${If} $TestId == ""
-        nsExec::ExecToStack `"$1" /S _?=$3`
-        Pop $4
-        Pop $5
-    ${Else}
-        StrCpy $2 "$TestId"
-        nsExec::ExecToStack `"$1" /S /TESTID=$2 _?=$3`
-        Pop $4
-        Pop $5
-    ${EndIf}
-    !insertmacro Log `Result of uninstall existing: Code: $4, Output: $5`
-    IntOp $2 $4 + 0
-    Pop $5
-    Pop $4
-
-
-    ${If} $2 = 0
-        !insertmacro Log `Successful uninstall: Deleting '$1', Removind '$3'`
-        Delete "$1"
-        RMDir "$3"
-        Pop $3
-        Pop $2
-        Pop $1
-        Pop $0
-        Push 0
-        Return
-    ${EndIf}
-
-    Pop $3
-    Exch $2
-    Exch
-    Pop $1
-    Exch
-    Pop $0
-FunctionEnd
 
 Function .onInit
     {{ if (ds "in").HasPreInit }}

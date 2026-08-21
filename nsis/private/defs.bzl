@@ -753,7 +753,7 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
     )
 
     inputs = depset(
-        direct = [script, options_file],
+        direct = [script, options_file, ctx.file._includes],
         transitive = [
             user_scripts,
             makensis_dir,
@@ -1360,12 +1360,37 @@ def _read_stamp_values(ctx, stamp):
     if not stamp:
         return None
 
+def _add_includes(ctx, toolchain, script):
+    outfile = _get_render_file(ctx, "nsis-with-include", script)
+    ctx.actions.run_shell(
+        outputs = [outfile],
+        inputs = [script, ctx.file._includes],
+        arguments = [
+            script.path,
+            outfile.path,
+            ctx.file._includes.path,
+        ],
+        command = """
+infile="$1"
+outfile="$2"
+includes="$3"
+
+touch "$outfile"
+echo "!addincludedir \\"$3\\"" > "$outfile"
+cat - "$1" >> "$outfile"
+"""
+    )
+
+    return outfile
+
 
 def _nsis_installer_impl(ctx):
     toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
 
     srcs = _all_files(ctx)
     script, options, user_scripts = _build_rendered_templates(ctx, toolchain)
+
+    script = _add_includes(ctx, toolchain, script)
 
     return _makensis(ctx, toolchain, script, options, srcs, user_scripts) + [
         NsisInstallerInfo(
@@ -1651,6 +1676,10 @@ For more details see `post_init`.
             allow_single_file = True,
             executable = True,
             cfg = "exec",
+        ),
+        "_includes": attr.label(
+            default = Label("//nsis/private/includes:includes_dir"),
+            allow_single_file = True,
         ),
     }, **STAMP_ATTRS),
     toolchains = [

@@ -1,0 +1,12 @@
+load("//nsis/private:dirrule.bzl", "dirrule")
+
+filegroup(
+    name = "includes",
+    srcs = glob(["**/*.nsh", "*.nsh"])
+)
+
+dirrule(
+    name = "includes_dir",
+    srcs = [":includes"],
+    visibility = ["//visibility:public"],
+)
