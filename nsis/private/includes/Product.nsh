@@ -1,15 +1,14 @@
 !ifndef __INCLUDE_PRODUCT
 !define __INCLUDE_PRODUCT
 
+!include "Registry.nsh"
 !include "LogicLib.nsh"
 !include "Guid.nsh"
-!include "Registry.nsh"
 
 Var product_code
 
-!macro _UNINSTALLER_BASE_KEY "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-
-!macro _INSTALL_DETAIL_BASE_KEY "SOFTWARE"
+!define _UNINSTALLER_BASE_KEY "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+!define _INSTALL_DETAIL_BASE_KEY "SOFTWARE"
 
 !macro SetProductCode GUID
     Push $0
@@ -72,9 +71,15 @@ Var product_code
 !macroend
 
 !macro UpdateUninstallRegistry SUBKEY VALUE
-    Push $0
-    !insertmacro GetProductCode $0
-    !insertmacro SetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$0" "${SUBKEY}" ${VALUE}
+Function UpdateUninstallRegistry
+    Exch $0 ; Subkey
+    Exch
+    Exch $1 ; Value
+    Push $2
+    !insertmacro GetProductCode $2
+    !insertmacro SetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$2" "$0" $1
+    Pop $2
+    Pop $1
     Pop $0
 !macroend
 
@@ -101,6 +106,7 @@ Var product_code
 
 !define UnDisplayName "DisplayName"
 !define UnDisplayVersion "DisplayVersion"
+!define UnDisplayIcon "DisplayIcon"
 !define UnPublisher "Publisher"
 !define UnVersionMinor "VersionMinor"
 !define UnVersionMajor "VersionMajor"
@@ -109,29 +115,27 @@ Var product_code
 !define UnInstallDate "InstallDate"
 !define UnInstallDateToday "InstallDateToday"
 !define UnInstallLocation "InstallLocation"
-!define UnInstallLocationInstDir "InstallLocationInstDir"
-!define UnSourceDir "SourceDir"
-!define UnSourceDirExePath "SourceDirExePath"
+!define UnInstallSource "InstallSource"
 !define UnUrlAboutInfo "UrlAboutInfo"
 !define UnUrlUpdateInfo "UrlUpdateInfo"
 !define UnAuthorizedCdfPrefix "AuthorizedCdfPrefix"
 !define UnComments "Comments"
 !define UnContact "Contact"
 !define UnEstimatedSize "EstimatedSize"
-!define UnEstimatedSizeGetSize "EstimatedSizeGetSize"
 !define UnLanguage "Language"
 !define UnModifyPath "ModifyPath"
 !define UnReadme "Readme"
 !define UnUninstallString "UninstallString"
+!define UnQuietUninstallString "QuietUninstallString"
 !define UnSettingsIdentifier "SettingsIdentifier"
 !define UnNoModify "NoModify"
 !define UnNoRepair "NoRepair"
 !define UnNoRemove "NoRemove"
-!define UnProductIcon "ProductIcon"
+!define UnProductID "ProductID"
 !define UnSystemComponent "SystemComponent"
 
 !macro _UpdateInstallDetail PREFIX
-Function {PREFIX}UpdateInstallDetail
+Function ${PREFIX}UpdateInstallDetail
     Exch $0 ; PUB
     Exch 1
     Exch $1 ; PROD
@@ -154,7 +158,7 @@ Function {PREFIX}UpdateInstallDetail
         StrCpy $0 "$0\Components\$2"
     ${Endif}
 
-    !insertmacro SetRegistrySubKey "$0" "$3" $4
+    !insertmacro ${PREFIX}SetRegistrySubKey "$0" "$3" $4
 
     Pop $4
     Pop $0
@@ -168,7 +172,7 @@ FunctionEnd
 !insertmacro _UpdateInstallDetail "un."
 
 !macro _GetInstallDetail PREFIX
-Function {PREFIX}UpdateInstallDetail
+Function ${PREFIX}GetInstallDetail
     Exch $0 ; PUB
     Exch 1
     Exch $1 ; PROD
@@ -189,7 +193,7 @@ Function {PREFIX}UpdateInstallDetail
         StrCpy $0 "$0\Components\$2"
     ${Endif}
 
-    !insertmacro GetRegistrySubKey "$0" "$3" $2
+    !insertmacro ${PREFIX}GetRegistrySubKey "$0" "$3" $2
 
     Pop $3
     Pop $0
