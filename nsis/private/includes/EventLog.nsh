@@ -1,7 +1,7 @@
 !ifndef __INCLUDE_EVENTLOG
 !define __INCLUDE_EVENTLOG
 
-!include RegistryUtil.nsh
+!include Registry.nsh
 !include LogicLib.nsh
 
 !define _ROOT_EVENTLOG_KEY "SYSTEM\CurrentControlSet\Services\EventLog"
