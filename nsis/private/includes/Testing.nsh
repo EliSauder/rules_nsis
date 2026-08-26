@@ -5,12 +5,12 @@
 
 !ifdef TESTABLE_INSTALLER
 Var TestId
-!endif TESTABLE_INSTALLER
+!endif
 
 !macro SetTestId ID
 !ifdef TESTABLE_INSTALLER
     StrCpy $TestId "${ID}"
-!endif TESTABLE_INSTALLER
+!endif
 !macroend
 
 !macro TestIdInit
@@ -21,13 +21,13 @@ Var TestId
     ${GetOptions} $0 "/TESTID=" $TestId
     ClearErrors
     Pop $0
-!endif TESTABLE_INSTALLER
+!endif
 !macroend
 
 !macro GetTestId DST
 !ifdef TESTABLE_INSTALLER
     StrCpy ${DST} $TestId
-!endif TESTABLE_INSTALLER
+!endif
 !macroend
 
 !ifdef TESTABLE_INSTALLER

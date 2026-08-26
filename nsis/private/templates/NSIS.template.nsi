@@ -4,7 +4,6 @@ Unicode True
 
 !include LogicLib.nsh
 !include MUI2.nsh
-!include x64.nsh
 !include Sections.nsh
 !include Logging.nsh
 !include Utility.nsh
@@ -16,8 +15,6 @@ Unicode True
 {{- range (ds "in").IncludeFiles }}
 !include "{{.}}"
 {{- end }}
-
-!define IsNativeARM32 '${IsNativeMachineArchitecture} 448'
 
 !define PRODUCT_ID "{{ (ds "in").Id }}"
 
@@ -73,11 +70,6 @@ Unicode True
 !define PRODUCT_KEY_PATH "${PRODUCT}"
 {{- end}}
 
-!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_ID}"
-!define REG_KEY "Software\${PRODUCT_KEY_PATH}"
-
-!define REG_KEY_INSTLOC "InstallDir"
-
 Name "${PRODUCT}"
 OutFile "${OUTFILE_NAME}"
 InstallDir "${INSTALL_ROOT}\${SUB_PATH}"
@@ -107,16 +99,15 @@ VIAddVersionKey "FileDescription" "${PRODUCT_DESCRIPTION}"
 VIAddVersionKey "LegalCopyright" "${PRODUCT_COPYRIGHT}"
 VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
 
-#Var INSTALL_DESKTOP
-#Var INSTALL_STARTMENU
-#var StartMenuFolder
+!define MUI_ABORTWARNING
 
+; ---------------------
+; Handle Images
+; ---------------------
 {{- if (ds "in").Icon }}
 !define MUI_ICON "${ICON_FILE}"
 !define MUI_UNICON "${ICON_FILE}"
 {{ end }}
-
-!define MUI_ABORTWARNING
 
 {{- if (ds "in").HeaderImage }}
 !define MUI_HEADERIMAGE
@@ -127,57 +118,35 @@ VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
 !define MUI_WELCOMEFINISHPAGE_BITMAP "{{ (ds "in").MenuImage }}"
 {{- end }}
 
+; ---------------------
+; Define Install Types
+; ---------------------
+{{- range (ds "in").InstallTypes }}
+InstType "{{.}}"
+{{- end }}
+
+; ---------------------
+; Define pages
+; ---------------------
 !insertmacro MUI_PAGE_WELCOME
+
 {{- if (ds "in").LicenseFile }}
 !insertmacro MUI_PAGE_LICENSE "{{ (ds "in").LicenseFile }}"
 {{- end }}
 
-#Var Dialog
-#Var StartMenuCheckbox
-#Var StartMenuCheckboxState
-#Var CreateShortcuts
-#
-#Function InstallOptionsPageCreate
-#    nsDialogs::Create 1018
-#    Pop $Dialog
-#    ${If} $Dialog == error
-#        Abort
-#    ${EndIf}
-#
-#    ${NSD_CreateCheckbox} 0 30u 100% 10u "&Create Start Menu Entries"
-#    Pop $StartMenuCheckbox
-#
-#    ${NSD_Checked} $StartMenuCheckbox
-#    ${NSD_GetState} $StartMenuCheckbox $StartMenuCheckboxState
-#
-#    nsDialogs::Show
-#FunctionEnd
-#
-#Function InstallOptionsPageLeave
-#    ${NSD_GetState} $StartMenuCheckbox $StartMenuCheckboxState
-#FunctionEnd
-
 !insertmacro MUI_PAGE_DIRECTORY
-
-#!define MUI_STARTMENUPAGE_REGISTRY_ROOT "SHCTX"
-#!define MUI_STARTMENUPAGE_REGISTRY_KEY "${REG_KEY}"
-#!define MUI_STARTMENUPAGE_REGISTRY_VALUENAME "Start Menu Folder"
-#!insertmacro MUI_PAGE_STARTMENU Application $StartMenuFolder
 
 !insertmacro MUI_PAGE_COMPONENTS
 
-#Page custom InstallOptionsPageCreate InstallOptionsPageLeave
-
 !insertmacro MUI_PAGE_INSTFILES
 
-#!insertmacro MUI_PAGE_FINISH
-
 !insertmacro MUI_UNPAGE_CONFIRM
+
 !insertmacro MUI_UNPAGE_INSTFILES
-#!insertmacro MUI_UNPAGE_FINISH
 
 ;--------------------------------
-;Languages
+; Languages
+;--------------------------------
 
 !insertmacro MUI_LANGUAGE "English" ;first language is the default language
 !insertmacro MUI_LANGUAGE "Afrikaans"
@@ -244,84 +213,9 @@ VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
 !insertmacro MUI_LANGUAGE "Vietnamese"
 !insertmacro MUI_LANGUAGE "Welsh"
 
-Var Is64BitInstall
-Var IsArmInstall
-
-!macro _SetRegView
-{{- if eq (ds "in").Architecture "x86_64" }}
-    ${IfNot} ${IsNativeAMD64}
-        !insertmacro Log "Not AMD64, Aborting"
-        MessageBox MB_ICONSTOP "This installer requires a 64-bit x86 version of Windows." /SD IDOK
-        SetErrorLevel 3
-        Abort
-    ${EndIf}
-
-    SetRegView 64
-    StrCpy $Is64BitInstall "1"
-    StrCpy $IsArmInstall "0"
-{{- else if eq (ds "in").Architecture "x86_32" }}
-    {{- if not (ds "in").ArchitectureAllow32On64 }}
-    ${IfNot} ${IsNativeIA32}
-        !insertmacro Log "Not IA32, Aborting"
-        MessageBox MB_ICONSTOP "This installer requires a 32-bit x86 version of Windows." /SD IDOK
-        SetErrorLevel 3
-        Abort
-    ${EndIf}
-    {{- end }}
-
-    SetRegView 32
-    StrCpy $Is64BitInstall "0"
-    StrCpy $IsArmInstall "0"
-{{- else if eq (ds "in").Architecture "arm64" }}
-    ${IfNot} ${IsNativeARM64}
-        !insertmacro Log "Not ARM64, Aborting"
-        MessageBox MB_ICONSTOP "This installer requires a 64-bit ARM version of Windows." /SD IDOK
-        SetErrorLevel 3
-        Abort
-    ${EndIf}
-
-    SetRegView 64
-    StrCpy $Is64BitInstall "1"
-    StrCpy $IsArmInstall "1"
-{{- else if eq (ds "in").Architecture "arm32" }}
-    {{- if not (ds "in").ArchitectureAllow32On64 }}
-    ${IfNot} ${IsNativeARM32}
-        !insertmacro Log "Not ARM32, Aborting"
-        MessageBox MB_ICONSTOP "This installer requires a 32-bit ARM version of Windows." /SD IDOK
-        SetErrorLevel 3
-        Abort
-    ${EndIf}
-    {{- end}}
-
-    SetRegView 32
-    StrCpy $Is64BitInstall "0"
-    StrCpy $IsArmInstall "1"
-{{- else }}
-    ${If} ${IsNativeX64}
-        SetRegView 64
-        StrCpy $Is64BitInstall "1"
-        StrCpy $IsArmInstall "0"
-    ${ElseIf} ${IsNativeIA32}
-        StrCpy $Is64BitInstall "0"
-        StrCpy $IsArmInstall "0"
-    ${ElseIf} ${IsNativeARM64}
-        StrCpy $Is64BitInstall "1"
-        StrCpy $IsArmInstall "1"
-    ${ElseIf} ${IsNativeARM32}
-        StrCpy $Is64BitInstall "0"
-        StrCpy $IsArmInstall "1"
-    ${ElseIf} ${RunningX64}
-        SetRegView 64
-        StrCpy $Is64BitInstall "1"
-        StrCpy $IsArmInstall "0"
-    ${Else}
-        SetRegView 32
-        StrCpy $Is64BitInstall "0"
-        StrCpy $IsArmInstall "0"
-    ${EndIf}
-{{- end }}
-!macroend
-
+; ----------------------------------------------------
+; Define templates for setting up component variables
+; ----------------------------------------------------
 
 {{define "sectionSelChangeVar"}}
 Var SelectRefCnt_{{.Name}}
@@ -361,33 +255,9 @@ Var SectionSelected_{{.Name}}
 {{- end}}
 {{end}}
 
-#Function CheckPreviousInstall
-#  ReadRegStr $R0 HKLM "${REG_KEY}" "InstallDir"
-#
-#  ${If} $R0 != ""
-#    ${If} ${FileExists} "$R0\Uninstall.exe"
-#      MessageBox MB_YESNO|MB_ICONQUESTION \
-#        "A previous version of ${PRODUCT} was found. Do you want to uninstall it first?" \
-#        IDYES do_uninstall IDNO skip_uninstall
-#
-#      do_uninstall:
-#        ExecWait '"$R0\Uninstall.exe" /S _?=$R0'
-#        Goto done
-#
-#      skip_uninstall:
-#        Goto done
-#
-#      done:
-#    ${EndIf}
-#  ${EndIf}
-#FunctionEnd
-
-; ---------------------
-; Installer
-; ---------------------
-{{- range (ds "in").InstallTypes }}
-InstType "{{.}}"
-{{- end }}
+; ----------------------------------------------------
+; Define templates for uninstalling components
+; ----------------------------------------------------
 
 {{define "sectionGroupDelete"}}
 {{- range .ComponentGroups }}
@@ -397,19 +267,6 @@ InstType "{{.}}"
     {{ template "sectionDelete" . }}
 {{- end }}
 {{ end }}
-
-{{define "sectionGroup"}}
-SectionGroup {{if .Expanded}}"/e"{{end}}"{{if .Bold}}!{{end}}{{.DisplayName}}" "{{.Name}}"
-{{- range .Components }}
-    {{ template "section" . }}
-{{- end }}
-{{- range .ComponentGroups }}
-    {{ template "sectionGroup" . }}
-{{- end}}
-SectionGroupEnd
-{{ end }}
-
-#Var RootPath
 
 {{ define "sectionDelete" }}
 {{ if .HasPreUninstall }}
@@ -463,8 +320,21 @@ ${EndIf}
 {{ end }}
 {{ end }}
 
-; ------------------------
-; SECTIONS
+; ----------------------------------------------------
+; Define templates for installing components
+; ----------------------------------------------------
+
+{{define "sectionGroup"}}
+SectionGroup {{if .Expanded}}"/e"{{end}}"{{if .Bold}}!{{end}}{{.DisplayName}}" "{{.Name}}"
+{{- range .Components }}
+    {{ template "section" . }}
+{{- end }}
+{{- range .ComponentGroups }}
+    {{ template "sectionGroup" . }}
+{{- end}}
+SectionGroupEnd
+{{ end }}
+
 {{ define "section" }}
 Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayName}}" "{{.Name}}"
     {{ if .HasPreInstall }}
@@ -473,11 +343,9 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
 
     Push $0
     !insertmacro Log "Entering Section {{.Name}}-{{.DisplayName}}"
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-        SetShellVarContext all
-    ${Else}
-        SetShellVarContext current
-    ${EndIf}
+
+    !insertmacro SetShellContext
+    !insertmacro DefineRegView
 
     {{- if or .InstallCategories .Required}}
     SectionIn {{if .Required}}RO {{end}}{{ .InstallCategories}}
@@ -534,31 +402,7 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
 
     {{- if .EventLog }}
     {{- with .EventLog}}
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-
-        Push "TypesSupported"
-        Push "{{.SupportedTypes}}"
-        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
-        Call AddToRegistry
-
-        Push "EventMessageFile"
-        Push "{{.EventMessageFile}}"
-        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
-        Call AddToRegistry
-
-        {{- if .CategoryMessageFile}}
-        Push "CategoryMessageFile"
-        Push "{{.CategoryMessageFile}}"
-        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
-        Call AddToRegistry
-        {{- end}}
-        {{- if .ParameterMessageFile}}
-        Push "ParameterMessageFile"
-        Push "{{.ParameterMessageFile}}"
-        Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
-        Call AddToRegistry
-        {{- end}}
-    ${EndIf}
+    !insertmacro EventLog_AddSource "{{.Key}}" "{{.Source}}" "{{.SupportedTypes}}" "{{.EventMessageFile}}" "{{.CategoryMessageFile}}" "{{.ParameterMessageFile}}"
     {{- end}}
     {{- end}}
 
@@ -570,6 +414,10 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
 SectionEnd
 {{ end }}
 
+; ----------------------------------------------------
+; Define component install sections
+; ----------------------------------------------------
+
 {{- range (ds "in").Components }}
 {{template "section" .}}
 {{- end}}
@@ -577,6 +425,10 @@ SectionEnd
 {{- range (ds "in").ComponentGroups }}
 {{template "sectionGroup" .}}
 {{- end }}
+
+; ----------------------------------------------------
+; Define uninstall macro
+; ----------------------------------------------------
 
 !macro RemoveComponents
 {{- range (ds "in").Components }}
@@ -588,11 +440,8 @@ SectionEnd
 !macroend
 
 Section "-Core Installation"
-    ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-        SetShellVarContext all
-    ${Else}
-        SetShellVarContext current
-    ${EndIf}
+    !insertmacro SetShellContext
+    !insertmacro DefineRegView
 
     SetOutPath "$INSTDIR"
 
@@ -608,81 +457,76 @@ Section "-Core Installation"
 
     WriteUninstaller "$INSTDIR\${UNINSTALLER_NAME}"
 
-    Push "InstallLocation"
-    Push "$INSTDIR"
-    Push "${UN_REG_KEY}"
-    Call AddToRegistry
-    Push "DisplayName"
-    Push "${PRODUCT}"
-    Push "${UN_REG_KEY}"
-    Call AddToRegistry
-    Push "DisplayVersion"
-    Push "${PRODUCT_VERSION}"
-    Push "${UN_REG_KEY}"
-    Call AddToRegistry
-    Push "Publisher"
-    Push "${PUBLISHER}"
-    Push "${UN_REG_KEY}"
-    Call AddToRegistry
-    Push "UninstallString"
-    Push "$INSTDIR\${UNINSTALLER_NAME}"
-    Push "${UN_REG_KEY}"
-    Call AddToRegistry
-    Push "NoRepair"
-    Push "1"
-    Push "${UN_REG_KEY}"
-    Call AddToRegistry
-    Push "NoModify"
-    Push "1"
-    Push "${UN_REG_KEY}"
-    Call AddToRegistry
+    Push $0
+    !insertmacro NormalizeGuid "${PRODUCT_ID}" $0
+
+    !insertmacro UpdateUninstallRegistry "${UnInstallLocation}" "$INSTDIR"
+    !insertmacro UpdateUninstallRegistry "${UnDisplayName}" "${PRODUCT}"
+    !insertmacro UpdateUninstallRegistry "${UnDisplayVersion}" "${PRODUCT_VERSION}"
+    !insertmacro UpdateUninstallRegistry "${UnPublisher}" "${PUBLISHER}"
+    !insertmacro UpdateUninstallRegistry "${UnUninstallString}" "$INSTDIR\${UNINSTALLER_NAME}"
+    !insertmacro UpdateUninstallRegistry "${UnQuietUninstallString}" "$INSTDIR\${UNINSTALLER_NAME} /S"
+    !insertmacro UpdateUninstallRegistry "${UnNoRepair}" "1"
+    !insertmacro UpdateUninstallRegistry "${UnNoModify}" "1"
+    !insertmacro UpdateUninstallRegistry "${UnNoRemove}" "0"
+    !insertmacro UpdateUninstallRegistry "${UnProductID}" "$0"
+    !insertmacro UpdateUninstallRegistry "${UnComments}" "${PRODUCT_DESCRIPTION}"
+    !insertmacro UpdateUninstallRegistry "${UnInstallSource}" "$EXEPATH"
 
     ${If} "${ICON_FILE}" != ""
-        Push "DisplayIcon"
-        Push "$INSTDIR\${ICON_FILE}"
-        Push "${UN_REG_KEY}"
-        Call AddToRegistry
-    ${Else}
-        Push "DisplayIcon"
-        Push ""
-        Push "${UN_REG_KEY}"
-        Call oddToRegistry
+        !insertmacro UpdateUninstallRegistry "${UnDisplayIcon}" "$INSTDIR\${ICON_FILE}"
     ${EndIf}
 
-    #${If} "$INSTALL_STARTMENU" == "1"
-    #!insertmacro MUI_STARTMENU_WRITE_BEGIN Application
-    #    CreateDirectory "$SMPROGRAMS\$StartMenuFolder"
-    #    CreateShortCut "$SMPROGRAMS\$StartMenuFolder\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
+    SetOutPath "$TEMP"
+    File "8ffe12fa-a0cf-4319-913a-9da6efa60efc.txt"
+    SetOutPath "$INSTDIR"
 
-    #    Push "StartMenu"
-    #    Push "$StartMenuFolder"
-    #    Call AddToRegistry
-    #!insertmacro MUI_STARTMENU_WRITE_END
-    #${EndIf}
+    Push $R0
+    Push $R1
+    Push $R2
+    Push $R3
+    Push $R4
+    Push $R5
+    Push $R6
 
+    ${GetTime} "$TEMP\8ffe12fa-a0cf-4319-913a-9da6efa60efc.txt" "CS" $R0 $R1 $R2 $R3 $R4 $R5 $R6
+    Delete "$TEMP\8ffe12fa-a0cf-4319-913a-9da6efa60efc.txt"
+    !insertmacro UpdateUninstallRegistry "${UnInstallDate}" "$R2-$R1-$R0T$3:$4:$5Z"
+
+    Pop $R6
+    Pop $R5
+    Pop $R4
+    Pop $R3
+
+    ${GetSize} "$INSTDIR" "/S=0K" $R0 $R1 $R2
+    IntFmt $0 "0x%08X" $0
+    IntOp $R0 $R0 * 1024
+    !insertmacro UpdateUninstallRegistry "${UnEstimatedSize}" $R0
+
+    Pop $R2
+    Pop $R1
+    Pop $R0
 SectionEnd
-
-#Function InstallOptionsPage
-#  !insertmacro MUI_HEADER_TEXT "Install Options" "Choose options for installing ${PRODUCT}"
-#  !insertmacro MUI_INSTALLOPTIONS_DISPLAY "NSIS(ds "in").InstallOptions.ini"
-#FunctionEnd
-
 
 Function .onInit
     {{ if (ds "in").HasPreInit }}
     !insertmacro PreInit
     {{ end }}
 
+    !insertmacro SetShellContext
+    !insertmacro DefineRegView
+
+    {{ if not (ds "in").ArchitectureAllow32On64 }}
+    !insertmacro ValidateArch "{{ (ds "in").Architecture }}"
+    {{ else }}
+    !insertmacro ValidateISA "{{ (ds "in").Architecture }}"
+    {{ end }}
+
+    !insertmacro ValidateMutex "${PRODUCT_ID}Install"
+
+    !insertmacro SetProductCode "${PRODUCT_ID}"
+
     Push $0
-    ${GetParameters} $0
-    ClearErrors
-    ${GetOptions} $0 "/TESTID=" $TestId
-    ClearErrors
-
-    !insertmacro SetVarCtx
-    !insertmacro _SetRegView
-    !insertmacro ValidateMutex "Install"
-
     !insertmacro UninstallExisting "${PRODUCT_ID}" $0
     ${If} $0 <> 0
         MessageBox MB_YESNO|MB_ICONSTOP "Failed to uninstall previous, continue anyway?" /SD IDYES IDYES +2
@@ -703,21 +547,23 @@ Function .onInit
     {{ end }}
 FunctionEnd
 
-
 Function un.onInit
     {{ if (ds "in").HasPreUninit }}
     !insertmacro PreUnInit
     {{ end }}
 
-    Push $0
-    ${GetParameters} $0
-    ClearErrors
-    ${GetOptions} $0 "/TESTID=" $TestId
-    ClearErrors
+    !insertmacro un.SetShellContext
+    !insertmacro un.DefineRegView
 
-    !insertmacro SetVarCtx
-    !insertmacro _SetRegView
-    !insertmacro ValidateMutex "Uninstall"
+    !insertmacro un.SetProductCode "${PRODUCT_ID}"
+
+    {{ if not (ds "in").ArchitectureAllow32On64 }}
+    !insertmacro un.ValidateArch "{{ (ds "in").Architecture }}"
+    {{ else }}
+    !insertmacro un.ValidateISA "{{ (ds "in").Architecture }}"
+    {{ end }}
+
+    !insertmacro un.ValidateMutex "${PRODUCT_ID}Uninstall"
 
     Push "InstallLocation"
     Push "${UN_REG_KEY}"
@@ -817,21 +663,8 @@ Function .onSelChange
 FunctionEnd
 
 Section "Uninstall"
-  ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-      SetShellVarContext all
-  ${Else}
-      SetShellVarContext current
-  ${EndIf}
-
-  !insertmacro _SetRegView
-
-  #ReadRegStr $StartMenuFolder SHCTX "${UN_REG_KEY}" "StartMenu"
-  #${Unless} ${Errors}
-  #  !insertmacro MUI_STARTMENU_GETFOLDER Application $StartMenuFolder
-  #  Delete "$SMPROGRAMS\$StartMenuFolder\Uninstall.lnk"
-  #  RMDir $SMPROGRAMS\$StartMenuFolder
-  #${EndUnless}
-  #ClearErrors
+  !insertmacro SetShellContext
+  !insertmacro DefineRegView
 
   !insertmacro RemoveComponents
 

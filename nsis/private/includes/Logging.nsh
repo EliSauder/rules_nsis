@@ -99,3 +99,5 @@ Var LogLevel
     ${EndIf}
 !endif
 !macroend
+
+!endif

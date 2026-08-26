@@ -5,10 +5,34 @@
 !include ShellContext.nsh
 !include Testing.nsh
 !include Logging.nsh
+!include Arch.nsh
+
+!macro DefineRegView
+    Push $0
+    !insertmacro Is64Bit $0
+    ${If} $0 == "1"
+        SetRegView 64
+    ${Else}
+        SetRegView 32
+    ${EndIf}
+    Pop $0
+!macroend
+
+!macro un.DefineRegView
+    Push $0
+    !insertmacro un.Is64Bit $0
+    ${If} $0 == "1"
+        SetRegView 64
+    ${Else}
+        SetRegView 32
+    ${EndIf}
+    Pop $0
+!macroend
 
 !macro _RemoveRegistryKeyFunction PREFIX
 Function ${PREFIX}RemoveRegistryKey
-    !insertmacro SetVarContext
+    !insertmacro ${PREFIX}SetShellContext
+    !insertmacro ${PREFIX}DefineRegView
     Exch $0
 
 !ifdef TESTABLE_INSTALLER
@@ -44,9 +68,67 @@ FunctionEnd
     Call un.RemoveRegistryKey
 !macroend
 
-!macro _SetRegistrySubKey PREFIX
-Function ${PREFIX}SetRegistrySubKey
-    !insertmacro SetVarContext
+!macro _FormatStrToDWORD PREFIX
+Function ${PREFIX}FormatStrToDWORD
+    Exch $0
+
+    ${CharToASCII} "$0" $0
+    IntFmt $0 "0x%X" $0
+
+    Exch $0
+FunctionEnd
+!macroend
+
+!insertmacro _FormatStrToDWORD ""
+!insertmacro _FormatStrToDWORD "un."
+
+!macro FormatStrToDWORD VAL OUT
+    Push "${VAL}"
+    Call FormatStrToDWORD
+    Pop ${OUT}
+!macroend
+
+!macro un.FormatStrToDWORD VAL OUT
+    Push "${VAL}"
+    Call un.FormatStrToDWORD
+    Pop ${OUT}
+!macroend
+
+!macro _FormatStrToBin PREFIX
+Function ${PREFIX}FormatStrToBin
+    Exch $0
+
+    ${CharToASCII} "$0" $0
+    IntFmt $0 "0x%X" $0
+
+    Push $0
+    Call Hex2Bin
+    ;Pop $0
+    ;Push $0
+FunctionEnd
+!macroend
+
+!insertmacro _FormatStrToBin ""
+!insertmacro _FormatStrToBin "un."
+
+!macro FormatStrToBin VAL ISINT OUT
+    Push "${VAL}"
+    Push ${ISINT}
+    Call FormatStrToBin
+    Pop ${OUT}
+!macroend
+
+!macro un.FormatStrToBin VAL ISINT OUT
+    Push "${VAL}"
+    Push ${ISINT}
+    Call un.FormatStrToBin
+    Pop ${OUT}
+!macroend
+
+!macro _SetRegistrySubKey PREFIX TYP
+Function ${PREFIX}SetRegistrySubKey${TYP}
+    !insertmacro ${PREFIX}SetShellContext
+    !insertmacro ${PREFIX}DefineRegView
     Exch $0 ; Key
     Exch 1
     Exch $1 ; Value
@@ -62,8 +144,8 @@ Function ${PREFIX}SetRegistrySubKey
     ${EndIf}
     !endif
 
-    WriteRegStr SHCTX "$0" "$2" $1
-    !insertmacro LogInfo "Set registry entry: '$0'.'$2'=$1"
+    WriteReg${TYP} SHCTX "$0" "$2" $1
+    !insertmacro LogInfo "Set ${TYP} registry entry: '$0'.'$2'=$1"
 
     Pop $2
     Pop $0
@@ -71,26 +153,33 @@ Function ${PREFIX}SetRegistrySubKey
 FunctionEnd
 !macroend
 
-!insertmacro _SetRegistrySubKey ""
-!insertmacro _SetRegistrySubKey "un."
+!insertmacro _SetRegistrySubKey "" "Str"
+!insertmacro _SetRegistrySubKey "un." "Str"
 
-!macro SetRegistrySubKey KEY SUBKEY VALUE
+!insertmacro _SetRegistrySubKey "" "Bin"
+!insertmacro _SetRegistrySubKey "un." "Bin"
+
+!insertmacro _SetRegistrySubKey "" "DWORD"
+!insertmacro _SetRegistrySubKey "un." "DWORD"
+
+!macro SetRegistrySubKeyStr KEY SUBKEY VALUE
     Push "${SUBKEY}"
     Push ${VALUE}
     PUSH "${KEY}"
-    Call SetRegistrySubKey
+    Call SetRegistrySubKeyStr
 !macroend
 
-!macro un.RemoveRegistryKey KEY SUBKEY VALUE
+!macro un.SetRegistrySubKeyStr KEY SUBKEY VALUE
     Push "${SUBKEY}"
     Push ${VALUE}
     PUSH "${KEY}"
-    Call un.SetRegistrySubKey
+    Call un.SetRegistrySubKeyStr
 !macroend
 
 !macro _GetRegistrySubKey PREFIX
 Function ${PREFIX}GetRegistrySubKey
-    !insertmacro SetVarContext
+    !insertmacro ${PREFIX}SetShellContext
+    !insertmacro ${PREFIX}DefineRegView
     Exch $0
     Exch
     Exch $1
@@ -126,5 +215,4 @@ FunctionEnd
     Call un.GetRegistrySubKey
     Pop ${OUT}
 !macroend
-
 !endif
