@@ -173,10 +173,13 @@ def _make_unix_path(value):
     return v
 
 def _make_win_path(value):
-    v = str(value).replace("/", "\\")
-    if v.startswith("C:"):
+    v = str(value)
+
+    # The drive letter has to be added before the separators are flipped,
+    # otherwise the leading separator is no longer recognisable.
+    if v.startswith("/"):
         v = "C:{}".format(v)
-    return v
+    return v.replace("/", "\\")
 
 def _make_sys_path(toolchain, value):
     if value == None:
@@ -188,7 +191,24 @@ def _make_sys_path(toolchain, value):
 def _quote_nsi_string(value):
     if value == None:
         return None
-    return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
+    # NSIS has no backslash escape; the only escape sequence understood inside a
+    # quoted string is $\". Doubling backslashes here would corrupt every
+    # Windows path, so only the quote character is escaped.
+    return str(value).replace('"', '$\\"')
+
+def _quote_nsi_arg(value):
+    """Wraps a single command argument in NSIS-escaped double quotes.
+
+    The result is embedded in a define that gets expanded inside an already
+    quoted !finalize argument, so the quotes have to survive NSIS tokenization
+    and still be present once the command reaches cmd.exe or /bin/sh.
+    """
+    return '$\\"{}$\\"'.format(value)
+
+# Stands in for the file being signed while the argv is converted to the host
+# path style, so that the %1 placeholder is not mangled by separator rewriting.
+_SIGN_INFILE_SENTINEL = "nsis_sign_infile_sentinel"
 
 def _nsis_flag(args_style, name):
     if args_style == "slash":
@@ -754,13 +774,26 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
         require = ["osslsigncode"],
         require_reason = "NSIS always produces a windows PE binary.",
     )
-    cmd = signing_argv(sctx, infile = "'%1'")
+
+    # signing_argv() returns an argv list but NSIS needs a single command
+    # string, and that string is handed to cmd.exe on Windows and /bin/sh
+    # elsewhere. Only double quotes are understood by both, so every argument is
+    # wrapped in NSIS-escaped double quotes. %1 is the placeholder makensis
+    # replaces with the file to sign; it is routed through a sentinel so that it
+    # survives path-separator conversion.
+    sign_argv = signing_argv(sctx, infile = _SIGN_INFILE_SENTINEL)
+    sign_cmd = " ".join([
+        _quote_nsi_arg(
+            _make_sys_path(toolchain, arg).replace(_SIGN_INFILE_SENTINEL, "%1"),
+        )
+        for arg in sign_argv
+    ])
 
     args.add(
         _nsis_define_raw(
             toolchain.args_style,
             "SIGN_CMD",
-            " ".join(cmd),
+            sign_cmd,
         ),
     )
 
@@ -793,6 +826,22 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
         ]
     )
 
+    env = dict({
+        "NSISDIR": _make_sys_path(toolchain, makensis_dir.to_list()[0].path),
+        "LANG": "en_US.UTF-8",
+        "LC_ALL": "en_US.UTF-8",
+        "LC_CTYPE": "en_US.UTF-8",
+    }, **sctx.env)
+
+    # makensis.exe runs !finalize/!uninstfinalize commands through the
+    # interpreter named by COMSPEC and builds that string without a NULL check,
+    # so the action crashes with an access violation when the variable is
+    # missing. Bazel never puts COMSPEC in an action environment, so it has to
+    # be set here. The unqualified name is what makensis itself falls back to,
+    # and CreateProcess always searches System32, so no host path is needed.
+    if toolchain.path_style == "windows":
+        env["COMSPEC"] = "cmd.exe"
+
     ctx.actions.run(
         mnemonic = "MakeNSIS",
         progress_message = "Building NSIS installer {}".format(outfile.short_path),
@@ -801,12 +850,7 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
         inputs = inputs,
         tools = tools,
         outputs = [outfile],
-        env = dict({
-            "NSISDIR": _make_sys_path(toolchain, makensis_dir.to_list()[0].path),
-            "LANG": "en_US.UTF-8",
-            "LC_ALL": "en_US.UTF-8",
-            "LC_CTYPE": "en_US.UTF-8",
-        }, **sctx.env),
+        env = env,
         use_default_shell_env = False,
     )
 
@@ -1148,7 +1192,7 @@ def _get_component_ds(toolchain, component, inst_cat):
 
     for file in component.shortcuts:
         data["Shortcuts"].append({
-            "Name": str(_make_win_path(toolchain, file.basename)),
+            "Name": str(_make_win_path(file.basename)),
             "Source": str(_make_sys_path(toolchain, file.path)),
         })
 
