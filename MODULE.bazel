@@ -13,7 +13,7 @@ register_toolchains(
 )
 
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5", dev_dependency = True)
-bazel_dep(name = "bazel_lib", version = "3.7.1")
+bazel_dep(name = "bazel_lib", version = "3.7.2")
 bazel_dep(name = "package_metadata", version = "0.0.13")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "platforms", version = "1.1.0")
@@ -21,7 +21,7 @@ bazel_dep(name = "platforms", version = "1.1.0")
 ############################
 # SETUP PYTHON
 ############################
-bazel_dep(name = "rules_python", version = "2.3.1")
+bazel_dep(name = "rules_python", version = "2.3.2")
 
 rules_python_config = use_extension("@rules_python//python/extensions:config.bzl", "config")
 rules_python_config.explicit_init_py(default = True)
