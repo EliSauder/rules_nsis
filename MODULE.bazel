@@ -24,19 +24,22 @@ bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "rules_signing", version = "0.1.0")
 archive_override(
     module_name = "rules_signing",
-    sha256 = "e3dc6f94ba892c492068c0447fe9aed1c2cd82c340d9e03a468bfdb1d63437dd",
-    strip_prefix = "rules_signing-6899c45ce49d2502d837a00a3dd4d160d274aff9",
-    urls = ["https://github.com/EliSauder/rules_signing/archive/6899c45ce49d2502d837a00a3dd4d160d274aff9.tar.gz"],
+    sha256 = "77c377302115e9085895020ab7ac6624b5e6137be4212768f7750c453de08026",
+    strip_prefix = "rules_signing-cff627405684fb5775992a716163aa5b4c5e6f61",
+    urls = ["https://github.com/EliSauder/rules_signing/archive/cff627405684fb5775992a716163aa5b4c5e6f61.tar.gz"],
 )
 
 signing_tools = use_extension("@rules_signing//signing:extensions.bzl", "signing_tools")
+signing_tools.openssl(path = "openssl")
 use_repo(
     signing_tools,
     "signing_cosign",
+    "signing_openssl",
     "signing_osslsigncode",
 )
 
 register_toolchains(
+    "@signing_openssl//:openssl_toolchain",
     "@signing_cosign//:cosign_toolchain",
     "@signing_osslsigncode//:osslsigncode_toolchain",
 )

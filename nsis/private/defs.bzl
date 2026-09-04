@@ -186,6 +186,8 @@ def _make_sys_path(toolchain, value):
     return _make_unix_path(value)
 
 def _quote_nsi_string(value):
+    if value == None:
+        return None
     return str(value).replace("\\", "\\\\").replace('"', '\\"')
 
 def _nsis_flag(args_style, name):
@@ -193,13 +195,16 @@ def _nsis_flag(args_style, name):
         return "/" + name
     return "-" + name
 
-def _nsis_define(args_style, key, value = None):
+def _nsis_define_raw(args_style, key, value = None):
     prefix = "/D" if args_style == "slash" else "-D"
 
     if not value:
         return prefix + key
 
-    return prefix + key + "=" + _quote_nsi_string(value)
+    return prefix + key + "=" + value
+
+def _nsis_define(args_style, key, value = None):
+    return _nsis_define_raw(args_style, key, _quote_nsi_string(value))
 
 def _nsis_eventlog_source_impl(ctx):
     return NsisEventLogSourceInfo(
@@ -723,7 +728,7 @@ def _make_nsis_args(ctx, toolchain, outfile):
 
     args.add(_nsis_flag(args_style, "NOCD"))
 
-    args.add(_nsis_define(args_style, "OUTFILE", _quote_nsi_string(outfile.path)))
+    args.add(_nsis_define(args_style, "OUTFILE", outfile.path))
 
     return args
 
@@ -739,7 +744,23 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
         _nsis_define(
             toolchain.args_style,
             "INSTALL_OPTIONS_FILE",
-            _quote_nsi_string(_make_sys_path(toolchain, options_file.path)),
+            _make_sys_path(toolchain, options_file.path),
+        ),
+    )
+
+    sctx = signing_context(
+        ctx,
+        tool = "osslsigncode",
+        require = ["osslsigncode"],
+        require_reason = "NSIS always produces a windows PE binary.",
+    )
+    cmd = signing_argv(sctx, infile = "'%1'")
+
+    args.add(
+        _nsis_define_raw(
+            toolchain.args_style,
+            "SIGN_CMD",
+            " ".join(cmd),
         ),
     )
 
@@ -753,20 +774,6 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
         fail("makensis dir is None")
     if makensis_files == None:
         fail("makensis files is None")
-
-    sctx = signing_context(
-        ctx,
-        require = ["osslsigncode"],
-        require_reason = "NSIS always produces a windows PE binary.",
-    )
-    cmd = signing_argv(sctx, infile = "%1")
-    args.add(
-        _nsis_define(
-            toolchain.args_style,
-            "UNINSTALL_SIGN_CMD",
-            _quote_nsi_string(cmd),
-        ),
-    )
 
     tools = depset(
         direct = [makensis] + sctx.tools,
@@ -1386,7 +1393,6 @@ def _read_stamp_values(ctx, stamp):
 
 
 def _nsis_installer_impl(ctx):
-
     toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
 
     srcs = _all_files(ctx)

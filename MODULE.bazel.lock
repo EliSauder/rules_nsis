@@ -322,10 +322,16 @@
     },
     "@@rules_signing+//signing:extensions.bzl%signing_tools": {
       "general": {
-        "bzlTransitiveDigest": "VM3bR139Qa2YUluZyWtvQYBfkbwL118P36rzTIGq6BA=",
-        "usagesDigest": "ngnhi9293rs6/5VFDAfV32mGa7jMTNHAYSIykXmkFsI=",
+        "bzlTransitiveDigest": "NNbJoYbjxlvu1NdHZEVnWxMd2jfgLimNLWPA4YJD9+A=",
+        "usagesDigest": "A14hnMPLiFXJqiASHONgXrkT0XOM+IHrqJDuQ8qJapU=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
+          "signing_openssl": {
+            "repoRuleId": "@@rules_signing+//signing/toolchains:repositories.bzl%openssl_local_repo",
+            "attributes": {
+              "path": "openssl"
+            }
+          },
           "signing_cosign": {
             "repoRuleId": "@@rules_signing+//signing/toolchains:repositories.bzl%cosign_repo",
             "attributes": {
@@ -341,6 +347,7 @@
         },
         "moduleExtensionMetadata": {
           "explicitRootModuleDirectDeps": [
+            "signing_openssl",
             "signing_cosign",
             "signing_osslsigncode"
           ],
