@@ -1,5 +1,12 @@
 load("//nsis/private:transitions.bzl", "windows_source_transition")
 load("@bazel_lib//lib:stamping.bzl", "STAMP_ATTRS", "maybe_stamp")
+load(
+    "@rules_signing//signing:actions.bzl",
+    "SIGNING_ATTRS",
+    "SIGNING_TOOLCHAINS",
+    "signing_argv",
+    "signing_context",
+)
 
 _NSIS_TOOLCHAIN_TYPE = "//nsis/toolchain:toolchain_type"
 
@@ -747,9 +754,25 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
     if makensis_files == None:
         fail("makensis files is None")
 
+    sctx = signing_context(
+        ctx,
+        require = ["osslsigncode"],
+        require_reason = "NSIS always produces a windows PE binary.",
+    )
+    cmd = signing_argv(sctx, infile = "%1")
+    args.add(
+        _nsis_define(
+            toolchain.args_style,
+            "UNINSTALL_SIGN_CMD",
+            _quote_nsi_string(cmd),
+        ),
+    )
+
     tools = depset(
-        direct = [makensis],
-        transitive = [makensis_files],
+        direct = [makensis] + sctx.tools,
+        transitive = [
+            makensis_files,
+        ],
     )
 
     inputs = depset(
@@ -759,6 +782,7 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
             makensis_dir,
             inputs,
             makensis_files,
+            sctx.inputs,
         ]
     )
 
@@ -770,12 +794,12 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
         inputs = inputs,
         tools = tools,
         outputs = [outfile],
-        env = {
+        env = dict({
             "NSISDIR": _make_sys_path(toolchain, makensis_dir.to_list()[0].path),
             "LANG": "en_US.UTF-8",
             "LC_ALL": "en_US.UTF-8",
             "LC_CTYPE": "en_US.UTF-8",
-        },
+        }, **sctx.env),
         use_default_shell_env = False,
     )
 
@@ -1362,6 +1386,7 @@ def _read_stamp_values(ctx, stamp):
 
 
 def _nsis_installer_impl(ctx):
+
     toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
 
     srcs = _all_files(ctx)
@@ -1652,8 +1677,8 @@ For more details see `post_init`.
             executable = True,
             cfg = "exec",
         ),
-    }, **STAMP_ATTRS),
+    }, **dict(SIGNING_ATTRS, **STAMP_ATTRS)),
     toolchains = [
         _NSIS_TOOLCHAIN_TYPE,
-    ],
+    ] + SIGNING_TOOLCHAINS,
 )

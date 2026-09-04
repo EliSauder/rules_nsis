@@ -8,6 +8,7 @@ bzl_library(
     visibility = ["//visibility:public"],
     deps = [
         "@bazel_lib//lib:stamping",
+        "@rules_signing//signing:actions_bzl",
         "//nsis/private:defs.bzl",
         "//nsis/private:transitions.bzl",
     ],
