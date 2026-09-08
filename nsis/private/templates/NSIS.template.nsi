@@ -48,6 +48,10 @@ Unicode True
 !endif
 
 !define UNINSTALLER_NAME "Uninstall.exe"
+!ifdef SIGN_CMD
+!uninstfinalize "${SIGN_CMD}" = 0
+!finalize "${SIGN_CMD}" = 0
+!endif
 
 {{- if (ds "in").Icon }}
 !define ICON_FILE "{{ (ds "in").Icon }}"

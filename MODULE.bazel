@@ -13,15 +13,42 @@ register_toolchains(
 )
 
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5", dev_dependency = True)
-bazel_dep(name = "bazel_lib", version = "3.7.1")
+bazel_dep(name = "bazel_lib", version = "3.7.2")
 bazel_dep(name = "package_metadata", version = "0.0.13")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "platforms", version = "1.1.0")
 
 ############################
+# SETUP SIGNING
+############################
+bazel_dep(name = "rules_signing", version = "0.1.0")
+archive_override(
+    module_name = "rules_signing",
+    sha256 = "77c377302115e9085895020ab7ac6624b5e6137be4212768f7750c453de08026",
+    strip_prefix = "rules_signing-cff627405684fb5775992a716163aa5b4c5e6f61",
+    urls = ["https://github.com/EliSauder/rules_signing/archive/cff627405684fb5775992a716163aa5b4c5e6f61.tar.gz"],
+)
+
+signing_tools = use_extension("@rules_signing//signing:extensions.bzl", "signing_tools")
+signing_tools.openssl(path = "openssl")
+use_repo(
+    signing_tools,
+    "signing_cosign",
+    "signing_openssl",
+    "signing_osslsigncode",
+)
+
+register_toolchains(
+    "@signing_openssl//:openssl_toolchain",
+    "@signing_cosign//:cosign_toolchain",
+    "@signing_osslsigncode//:osslsigncode_toolchain",
+)
+
+
+############################
 # SETUP PYTHON
 ############################
-bazel_dep(name = "rules_python", version = "2.3.1")
+bazel_dep(name = "rules_python", version = "2.3.2")
 
 rules_python_config = use_extension("@rules_python//python/extensions:config.bzl", "config")
 rules_python_config.explicit_init_py(default = True)

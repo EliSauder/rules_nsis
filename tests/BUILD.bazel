@@ -9,6 +9,8 @@ load(
 )
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_signing//signing:defs.bzl", "self_signed_certificate")
+
 
 exports_files([
     "__init__.py",
@@ -42,6 +44,23 @@ nsis_installer(
     components = [":minimal_component"],
     product = "Minimal Installer",
     product_path = "Minimal Installer",
+)
+
+
+self_signed_certificate(
+    name = "selfsigned_cert",
+    common_name = "Development (DO NOT TRUST)",
+    organization = "Development",
+)
+
+
+nsis_installer(
+    name = "minimal_installer_signed",
+    id = "918aef5c-7a60-41db-8db9-5c19caea5d60",
+    components = [":minimal_component"],
+    product = "Minimal Installer Signed",
+    product_path = "Minimal Installer Signed",
+    signing_certificate = ":selfsigned_cert"
 )
 
 nsis_installer(

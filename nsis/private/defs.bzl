@@ -1,5 +1,12 @@
 load("//nsis/private:transitions.bzl", "windows_source_transition")
 load("@bazel_lib//lib:stamping.bzl", "STAMP_ATTRS", "maybe_stamp")
+load(
+    "@rules_signing//signing:actions.bzl",
+    "SIGNING_ATTRS",
+    "SIGNING_TOOLCHAINS",
+    "signing_argv",
+    "signing_context",
+)
 
 _NSIS_TOOLCHAIN_TYPE = "//nsis/toolchain:toolchain_type"
 
@@ -166,10 +173,13 @@ def _make_unix_path(value):
     return v
 
 def _make_win_path(value):
-    v = str(value).replace("/", "\\")
-    if v.startswith("C:"):
+    v = str(value)
+
+    # The drive letter has to be added before the separators are flipped,
+    # otherwise the leading separator is no longer recognisable.
+    if v.startswith("/"):
         v = "C:{}".format(v)
-    return v
+    return v.replace("/", "\\")
 
 def _make_sys_path(toolchain, value):
     if value == None:
@@ -179,20 +189,42 @@ def _make_sys_path(toolchain, value):
     return _make_unix_path(value)
 
 def _quote_nsi_string(value):
-    return str(value).replace("\\", "\\\\").replace('"', '\\"')
+    if value == None:
+        return None
+
+    # NSIS has no backslash escape; the only escape sequence understood inside a
+    # quoted string is $\". Doubling backslashes here would corrupt every
+    # Windows path, so only the quote character is escaped.
+    return str(value).replace('"', '$\\"')
+
+def _quote_nsi_arg(value):
+    """Wraps a single command argument in NSIS-escaped double quotes.
+
+    The result is embedded in a define that gets expanded inside an already
+    quoted !finalize argument, so the quotes have to survive NSIS tokenization
+    and still be present once the command reaches cmd.exe or /bin/sh.
+    """
+    return '$\\"{}$\\"'.format(value)
+
+# Stands in for the file being signed while the argv is converted to the host
+# path style, so that the %1 placeholder is not mangled by separator rewriting.
+_SIGN_INFILE_SENTINEL = "nsis_sign_infile_sentinel"
 
 def _nsis_flag(args_style, name):
     if args_style == "slash":
         return "/" + name
     return "-" + name
 
-def _nsis_define(args_style, key, value = None):
+def _nsis_define_raw(args_style, key, value = None):
     prefix = "/D" if args_style == "slash" else "-D"
 
     if not value:
         return prefix + key
 
-    return prefix + key + "=" + _quote_nsi_string(value)
+    return prefix + key + "=" + value
+
+def _nsis_define(args_style, key, value = None):
+    return _nsis_define_raw(args_style, key, _quote_nsi_string(value))
 
 def _nsis_eventlog_source_impl(ctx):
     return NsisEventLogSourceInfo(
@@ -716,7 +748,7 @@ def _make_nsis_args(ctx, toolchain, outfile):
 
     args.add(_nsis_flag(args_style, "NOCD"))
 
-    args.add(_nsis_define(args_style, "OUTFILE", _quote_nsi_string(outfile.path)))
+    args.add(_nsis_define(args_style, "OUTFILE", outfile.path))
 
     return args
 
@@ -732,7 +764,36 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
         _nsis_define(
             toolchain.args_style,
             "INSTALL_OPTIONS_FILE",
-            _quote_nsi_string(_make_sys_path(toolchain, options_file.path)),
+            _make_sys_path(toolchain, options_file.path),
+        ),
+    )
+
+    sctx = signing_context(
+        ctx,
+        tool = "osslsigncode",
+        require = ["osslsigncode"],
+        require_reason = "NSIS always produces a windows PE binary.",
+    )
+
+    # signing_argv() returns an argv list but NSIS needs a single command
+    # string, and that string is handed to cmd.exe on Windows and /bin/sh
+    # elsewhere. Only double quotes are understood by both, so every argument is
+    # wrapped in NSIS-escaped double quotes. %1 is the placeholder makensis
+    # replaces with the file to sign; it is routed through a sentinel so that it
+    # survives path-separator conversion.
+    sign_argv = signing_argv(sctx, infile = _SIGN_INFILE_SENTINEL)
+    sign_cmd = " ".join([
+        _quote_nsi_arg(
+            _make_sys_path(toolchain, arg).replace(_SIGN_INFILE_SENTINEL, "%1"),
+        )
+        for arg in sign_argv
+    ])
+
+    args.add(
+        _nsis_define_raw(
+            toolchain.args_style,
+            "SIGN_CMD",
+            sign_cmd,
         ),
     )
 
@@ -748,8 +809,10 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
         fail("makensis files is None")
 
     tools = depset(
-        direct = [makensis],
-        transitive = [makensis_files],
+        direct = [makensis] + sctx.tools,
+        transitive = [
+            makensis_files,
+        ],
     )
 
     inputs = depset(
@@ -759,8 +822,25 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
             makensis_dir,
             inputs,
             makensis_files,
+            sctx.inputs,
         ]
     )
+
+    env = dict({
+        "NSISDIR": _make_sys_path(toolchain, makensis_dir.to_list()[0].path),
+        "LANG": "en_US.UTF-8",
+        "LC_ALL": "en_US.UTF-8",
+        "LC_CTYPE": "en_US.UTF-8",
+    }, **sctx.env)
+
+    # makensis.exe runs !finalize/!uninstfinalize commands through the
+    # interpreter named by COMSPEC and builds that string without a NULL check,
+    # so the action crashes with an access violation when the variable is
+    # missing. Bazel never puts COMSPEC in an action environment, so it has to
+    # be set here. The unqualified name is what makensis itself falls back to,
+    # and CreateProcess always searches System32, so no host path is needed.
+    if toolchain.path_style == "windows":
+        env["COMSPEC"] = "cmd.exe"
 
     ctx.actions.run(
         mnemonic = "MakeNSIS",
@@ -770,12 +850,7 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
         inputs = inputs,
         tools = tools,
         outputs = [outfile],
-        env = {
-            "NSISDIR": _make_sys_path(toolchain, makensis_dir.to_list()[0].path),
-            "LANG": "en_US.UTF-8",
-            "LC_ALL": "en_US.UTF-8",
-            "LC_CTYPE": "en_US.UTF-8",
-        },
+        env = env,
         use_default_shell_env = False,
     )
 
@@ -1117,7 +1192,7 @@ def _get_component_ds(toolchain, component, inst_cat):
 
     for file in component.shortcuts:
         data["Shortcuts"].append({
-            "Name": str(_make_win_path(toolchain, file.basename)),
+            "Name": str(_make_win_path(file.basename)),
             "Source": str(_make_sys_path(toolchain, file.path)),
         })
 
@@ -1652,8 +1727,8 @@ For more details see `post_init`.
             executable = True,
             cfg = "exec",
         ),
-    }, **STAMP_ATTRS),
+    }, **dict(SIGNING_ATTRS, **STAMP_ATTRS)),
     toolchains = [
         _NSIS_TOOLCHAIN_TYPE,
-    ],
+    ] + SIGNING_TOOLCHAINS,
 )
