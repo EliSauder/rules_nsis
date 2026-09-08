@@ -2,6 +2,26 @@ module(
     name = "rules_nsis-usagetest",
 )
 
+############################
+# SETUP SIGNING
+############################
+bazel_dep(name = "rules_signing", version = "0.1.0")
+archive_override(
+    module_name = "rules_signing",
+    sha256 = "77c377302115e9085895020ab7ac6624b5e6137be4212768f7750c453de08026",
+    strip_prefix = "rules_signing-cff627405684fb5775992a716163aa5b4c5e6f61",
+    urls = ["https://github.com/EliSauder/rules_signing/archive/cff627405684fb5775992a716163aa5b4c5e6f61.tar.gz"],
+)
+
+signing_tools = use_extension("@rules_signing//signing:extensions.bzl", "signing_tools")
+signing_tools.openssl(path = "openssl")
+use_repo(
+    signing_tools,
+    "signing_cosign",
+    "signing_openssl",
+    "signing_osslsigncode",
+)
+
 bazel_dep(name = "rules_nsis", version = "0.1.0")
 local_path_override(
     module_name = "rules_nsis",
