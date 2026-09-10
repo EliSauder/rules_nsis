@@ -29,7 +29,7 @@ archive_override(
     urls = ["https://github.com/EliSauder/rules_signing/archive/34d8885b1a7d339314f8eb677384a2bd422926c0.tar.gz"],
 )
 
-signing_tools = use_extension("@rules_signing//signing:extensions.bzl", "signing_tools")
+signing_tools = use_extension("@rules_signing//signing:extensions.bzl", "signing_tools", dev_dependency=True)
 signing_tools.openssl(path = "openssl")
 use_repo(
     signing_tools,
@@ -42,6 +42,7 @@ register_toolchains(
     "@signing_openssl//:openssl_toolchain",
     "@signing_cosign//:cosign_toolchain",
     "@signing_osslsigncode//:osslsigncode_toolchain",
+    dev_dependency=True,
 )
 
 
