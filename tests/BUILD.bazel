@@ -63,6 +63,28 @@ nsis_installer(
     signing_certificate = ":selfsigned_cert"
 )
 
+nsis_component(
+    name = "minimal_component_signed",
+    srcs = [":nsis_files"],
+    selection_mode = "default",
+    signing_certificate = ":selfsigned_cert",
+)
+
+nsis_installer(
+    name = "minimal_installer_signed_srcs",
+    id = "0a5a2f0e-6a7b-4c1a-9e6a-5b9e6c9c0b1a",
+    components = [":minimal_component_signed"],
+    product = "Minimal Installer Signed Srcs",
+    product_path = "Minimal Installer Signed Srcs",
+    signing_certificate = ":selfsigned_cert",
+)
+
+nsis_installer_test(
+    name = "minimal_installer_signed_srcs_test",
+    installer = ":minimal_installer_signed_srcs",
+    must_have_files = ["README.md"],
+)
+
 nsis_installer(
     name = "minimal_installer_outfile",
     id = "e6885d94-b532-4a03-970a-7d37283945b2",

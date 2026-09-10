@@ -30,6 +30,14 @@ def _get_installer_test_details(ctx, inst, target):
             numcomp = numcomp + 1
             cmp = dep[NsisComponentInfo]
             for f in cmp.srcs.to_list():
+                if f.is_directory:
+                    # Directory artifacts (e.g. a signed component's output)
+                    # can't be enumerated at analysis time - Bazel doesn't
+                    # know their contents until the action that produces them
+                    # runs. Callers that need to assert specific files exist
+                    # inside such a directory should list them explicitly via
+                    # `must_have_files` instead.
+                    continue
                 if cmp.directory:
                     files.add("{}\\{}".format(cmp.directory, f.basename))
                 else:
@@ -67,6 +75,8 @@ def _get_installer_test_details(ctx, inst, target):
                 numcomp = numcomp + 1
 
                 for f in cmp.srcs.to_list():
+                    if f.is_directory:
+                        continue
                     if cmp.directory:
                         files.add("{}\\{}".format(cmp.directory, f.basename))
                     else:

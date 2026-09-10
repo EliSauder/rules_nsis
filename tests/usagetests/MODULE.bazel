@@ -21,6 +21,11 @@ use_repo(
     "signing_openssl",
     "signing_osslsigncode",
 )
+register_toolchains(
+    "@signing_openssl//:openssl_toolchain",
+    "@signing_cosign//:cosign_toolchain",
+    "@signing_osslsigncode//:osslsigncode_toolchain",
+)
 
 bazel_dep(name = "rules_nsis", version = "0.1.0")
 local_path_override(

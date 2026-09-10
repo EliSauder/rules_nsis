@@ -8,3 +8,12 @@ py_binary(
     ],
     visibility = ["//visibility:public"],
 )
+
+py_binary(
+    name = "resolve_signed_dir",
+    srcs = [
+        "resolve_signed_dir.py",
+        "__init__.py",
+    ],
+    visibility = ["//visibility:public"],
+)
