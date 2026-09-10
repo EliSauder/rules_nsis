@@ -348,12 +348,61 @@ Represents a section group inside of a NSIS section group.
     },
 )
 
+def _sign_component_files(ctx, files):
+    """Signs `files` into a single flattened, signed directory artifact.
+
+    All of the files are written into one output directory keyed by
+    basename (rather than their bazel short_path) so the resulting layout
+    matches how unsigned files are installed by `_get_component_ds`, which
+    also only ever uses `file.basename`. Bundling everything into one
+    signing action, rather than one per file, keeps this to a single
+    directory-artifact `Directories` entry instead of many.
+
+    Returns a list containing the single output directory `File`, or an
+    empty list if there is nothing to sign.
+    """
+    if not files:
+        return []
+
+    lines = ["{}\t{}\n".format(f.basename, f.path) for f in files]
+    manifest = ctx.actions.declare_file(
+        "{}.signing_manifest".format(ctx.label.name),
+    )
+    ctx.actions.write(manifest, "".join(lines))
+
+    out_dir = ctx.actions.declare_directory(
+        "{}_signed".format(ctx.label.name),
+    )
+
+    sctx = signing_context(ctx, srcs = files)
+    argv = signing_argv(sctx, rel_src_manifest = manifest, out_dir = out_dir.path)
+
+    ctx.actions.run(
+        executable = sctx.executable,
+        # argv[0] is the executable itself, which ctx.actions.run supplies.
+        arguments = argv[1:],
+        inputs = depset(files + [manifest], transitive = [sctx.inputs]),
+        tools = sctx.tools,
+        outputs = [out_dir],
+        mnemonic = "SignComponentSrcs",
+        progress_message = "Signing sources for {}".format(ctx.label),
+    )
+
+    return [out_dir]
+
 def _nsis_component_impl(ctx):
-    rf = ctx.runfiles(files = ctx.files.srcs)
-    rfs = ctx.runfiles(files = ctx.files.service_executable)
-    files = depset(
-        direct = ctx.files.srcs + ctx.files.service_executable,
-        transitive = [rf.files, rfs.files])
+    if ctx.attr.signing_certificate:
+        # Sign everything this component ships: srcs, the service
+        # executable, and the backing files of any shortcuts, so nothing
+        # unsigned ends up in the installer.
+        to_sign = ctx.files.srcs + ctx.files.service_executable + ctx.files.shortcuts
+        files = depset(_sign_component_files(ctx, to_sign))
+    else:
+        rf = ctx.runfiles(files = ctx.files.srcs)
+        rfs = ctx.runfiles(files = ctx.files.service_executable)
+        files = depset(
+            direct = ctx.files.srcs + ctx.files.service_executable,
+            transitive = [rf.files, rfs.files])
 
     return NsisComponentInfo(
         name = str(ctx.label.name),
@@ -383,7 +432,7 @@ nsis_component = rule(
     doc = """
 Represents a NSIS installer section.
 """,
-    attrs = {
+    attrs = dict({
         "directory": attr.string(
             mandatory = False,
             default = "",
@@ -590,7 +639,8 @@ The script should properly handle the stack and not overwrite values.
 For more details see `post_install`.
 """,
         ),
-    },
+    }, **dict(SIGNING_ATTRS, **STAMP_ATTRS)),
+    toolchains = SIGNING_TOOLCHAINS,
 )
 
 def _nsis_directory_impl(ctx):
