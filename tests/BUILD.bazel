@@ -72,10 +72,10 @@ nsis_component(
 
 nsis_component(
     name = "minimal_component_signed_2",
-    srcs = [":nsis_files"],
+    srcs = ["//tests/testdata:dup_service"],
     selection_mode = "default",
     service = True,
-    service_executable = "//tests/testdata:README.md",
+    service_executable = "//tests/testdata:dup_service",
     signing_certificate = ":selfsigned_cert",
 )
 
