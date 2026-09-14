@@ -297,7 +297,7 @@ def _nsis_component_group_impl(ctx):
         description = str(ctx.attr.description),
         bold = bool(ctx.attr.bold),
         expanded = bool(ctx.attr.expanded),
-        display_name = str(ctx.attr.display_name),
+        display_name = _resolve_displayname(ctx.attr.display_name, ctx.label.name),
         components = edges
     )
 
@@ -372,7 +372,17 @@ def _sign_component_files(ctx, files):
     if not files:
         return []
 
-    lines = ["{}\t{}\n".format(f.basename, f.path) for f in files]
+    dedup_tmp = {}
+
+    for f in files:
+        tmp = dedup_tmp.get(f.basename)
+        if tmp == f.path:
+            continue
+        if tmp != None:
+            fail("Multiple paths link to the same base name {}: {} and {}".format(f.basename, tmp, f.path))
+        dedup_tmp[f.basename] = f.path
+
+    lines = ["{}\t{}\n".format(k, v) for k, v in dedup_tmp.items()]
     manifest = ctx.actions.declare_file(
         "{}.signing_manifest".format(ctx.label.name),
     )
@@ -426,7 +436,7 @@ def _nsis_component_impl(ctx):
         service_dependencies = [str(x) for x in ctx.attr.service_dependencies],
         description = str(ctx.attr.description),
         selection_mode = str(ctx.attr.selection_mode),
-        display_name = str(ctx.attr.display_name),
+        display_name = _resolve_displayname(ctx.attr.display_name, ctx.label.name),
         install_categories = [str(x) for x in ctx.attr.install_categories],
         shortcuts = ctx.attr.shortcuts,
         srcs = files,
@@ -937,6 +947,18 @@ def _name_to_displayname(val):
         fin = fin + " " + v
     return fin
 
+def _resolve_displayname(display_name, name):
+    """Returns the display name to show, applying the documented default.
+
+    `display_name` defaults to the rule name in Title Case. Resolving it at
+    provider construction keeps the rendered installer and every consumer of
+    the provider reading one value; leaving it to the renderer meant the
+    provider published an empty string that did not match what was installed.
+    """
+    if display_name == None or not display_name.strip():
+        return _name_to_displayname(name)
+    return str(display_name)
+
 def _add_dep_key(deps, rev_deps, source, dest):
     if source not in deps:
         deps[source] = set()
@@ -1162,9 +1184,7 @@ def _get_installer_ds(ctx, toolchain):
     return data
 
 def _get_group_ds(toolchain, group, inst_cat):
-    dispname = group.display_name
-    if dispname == None or len(dispname.strip()) == 0:
-        dispname = _name_to_displayname(group.name)
+    dispname = _resolve_displayname(group.display_name, group.name)
 
     return {
         "Name": str(group.name),
@@ -1210,9 +1230,7 @@ def _get_eventlog_ds(eventlog):
     }
 
 def _get_component_ds(toolchain, component, inst_cat):
-    dispname = component.display_name
-    if dispname == None or len(dispname.strip()) == 0:
-        dispname = _name_to_displayname(component.name)
+    dispname = _resolve_displayname(component.display_name, component.name)
 
     data = {
         "Name": str(component.name),

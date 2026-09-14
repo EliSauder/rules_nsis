@@ -1,3 +1,15 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
 exports_files([
     "README.md",
 ])
+
+# Built rather than checked in so the signing tests have a genuine PE
+# executable: the duplicate-signing path is only exercised by osslsigncode,
+# which is selected by the `.exe` extension that a cc_binary picks up under
+# the Windows transition `nsis_installer` applies.
+cc_binary(
+    name = "dup_service",
+    srcs = ["dup_service.cc"],
+    visibility = ["//tests:__pkg__"],
+)
