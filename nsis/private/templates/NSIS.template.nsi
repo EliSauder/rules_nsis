@@ -73,6 +73,12 @@ Unicode True
 !define PRODUCT_KEY_PATH "${PRODUCT}"
 {{- end}}
 
+{{- if (ds "in").Vendor}}
+!define SERVICE_DISPLAY_PREFIX "${PUBLISHER} ${PRODUCT}"
+{{- else}}
+!define SERVICE_DISPLAY_PREFIX "${PRODUCT}"
+{{- end}}
+
 !define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_ID}"
 !define REG_KEY "Software\${PRODUCT_KEY_PATH}"
 
@@ -759,10 +765,10 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     {{- if .Service }}
     !insertmacro Service_Query "{{.Name}}" $0
     ${If} $0 = 0
-        !insertmacro Service_Update "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PUBLISHER} ${PRODUCT} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
+        !insertmacro Service_Update "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${SERVICE_DISPLAY_PREFIX} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
         !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
     ${Else}
-        !insertmacro Service_Create "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${PUBLISHER} ${PRODUCT} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
+        !insertmacro Service_Create "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${SERVICE_DISPLAY_PREFIX} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
         !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
     ${EndIf}
     {{- end }}
