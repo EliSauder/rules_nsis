@@ -372,7 +372,17 @@ def _sign_component_files(ctx, files):
     if not files:
         return []
 
-    lines = ["{}\t{}\n".format(f.basename, f.path) for f in files]
+    dedup_tmp = {}
+
+    for f in files:
+        tmp = dedup_tmp.get(f.basename)
+        if tmp == f.path:
+            continue
+        if tmp != None:
+            fail("Multiple paths link to the same base name {}: {} and {}".format(f.basename, tmp, f.path))
+        dedup_tmp[f.basename] = f.path
+
+    lines = ["{}\t{}\n".format(k, v) for k, v in dedup_tmp.items()]
     manifest = ctx.actions.declare_file(
         "{}.signing_manifest".format(ctx.label.name),
     )

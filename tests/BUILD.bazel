@@ -70,10 +70,22 @@ nsis_component(
     signing_certificate = ":selfsigned_cert",
 )
 
+nsis_component(
+    name = "minimal_component_signed_2",
+    srcs = [":nsis_files"],
+    selection_mode = "default",
+    service = True,
+    service_executable = "//tests/testdata:README.md",
+    signing_certificate = ":selfsigned_cert",
+)
+
 nsis_installer(
     name = "minimal_installer_signed_srcs",
     id = "0a5a2f0e-6a7b-4c1a-9e6a-5b9e6c9c0b1a",
-    components = [":minimal_component_signed"],
+    components = [
+        ":minimal_component_signed",
+        ":minimal_component_signed_2",
+    ],
     product = "Minimal Installer Signed Srcs",
     product_path = "Minimal Installer Signed Srcs",
     signing_certificate = ":selfsigned_cert",
