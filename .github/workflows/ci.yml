@@ -8,7 +8,7 @@ jobs:
   build-and-test:
     strategy:
       matrix:
-        bazel_version: ["8.*", "9.*"]
+        bazel_version: ["8.*", "9.2.0"]
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
     runs-on: ${{ matrix.os }}
     env:
@@ -31,7 +31,7 @@ jobs:
     needs: build-and-test
     strategy:
       matrix:
-        bazel_version: ["8.*", "9.*"]
+        bazel_version: ["8.*", "9.2.0"]
         os: ["windows-latest"]
     runs-on: ${{ matrix.os }}
     env:
@@ -52,7 +52,7 @@ jobs:
     needs: build-and-test
     strategy:
       matrix:
-        bazel_version: ["8.*", "9.*"]
+        bazel_version: ["8.*", "9.2.0"]
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
     runs-on: ${{ matrix.os }}
     env:
