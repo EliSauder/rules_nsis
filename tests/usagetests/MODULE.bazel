@@ -8,9 +8,9 @@ module(
 bazel_dep(name = "rules_signing", version = "0.1.0")
 archive_override(
     module_name = "rules_signing",
-    sha256 = "77c377302115e9085895020ab7ac6624b5e6137be4212768f7750c453de08026",
-    strip_prefix = "rules_signing-cff627405684fb5775992a716163aa5b4c5e6f61",
-    urls = ["https://github.com/EliSauder/rules_signing/archive/cff627405684fb5775992a716163aa5b4c5e6f61.tar.gz"],
+    sha256 = "003ff01e635345e71bd38d0e186b6cfe1bac7ee4df1e4044400f2162f41a01b4",
+    strip_prefix = "rules_signing-191325984aa0444588179abbf84e7abc06639825",
+    urls = ["https://github.com/EliSauder/rules_signing/archive/191325984aa0444588179abbf84e7abc06639825.tar.gz"],
 )
 
 signing_tools = use_extension("@rules_signing//signing:extensions.bzl", "signing_tools")
