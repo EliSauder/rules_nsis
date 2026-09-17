@@ -4,6 +4,9 @@ build --enable_runfiles
 common --enable_bzlmod
 common --incompatible_enable_proto_toolchain_resolution
 
-build --workspace_status_command="./tools/workspace_status.sh"
+build --enable_platform_specific_config
+build:linux --workspace_status_command="./tools/workspace_status.py"
+build:macos --workspace_status_command="./tools/workspace_status.py"
+build:windows --workspace_status_command="./tools/workspace_status.bat"
 build --incompatible_default_to_explicit_init_py
 build --copt=-D_CRT_RAND_S
