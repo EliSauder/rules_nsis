@@ -25,9 +25,9 @@ bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "rules_signing", version = "0.1.0")
 archive_override(
     module_name = "rules_signing",
-    sha256 = "d201d5174401b510b40de218e43447ecc5aacf68b0ab69ea6292d04788cca128",
-    strip_prefix = "rules_signing-34d8885b1a7d339314f8eb677384a2bd422926c0",
-    urls = ["https://github.com/EliSauder/rules_signing/archive/34d8885b1a7d339314f8eb677384a2bd422926c0.tar.gz"],
+    sha256 = "003ff01e635345e71bd38d0e186b6cfe1bac7ee4df1e4044400f2162f41a01b4",
+    strip_prefix = "rules_signing-191325984aa0444588179abbf84e7abc06639825",
+    urls = ["https://github.com/EliSauder/rules_signing/archive/191325984aa0444588179abbf84e7abc06639825.tar.gz"],
 )
 
 signing_tools = use_extension("@rules_signing//signing:extensions.bzl", "signing_tools", dev_dependency=True)

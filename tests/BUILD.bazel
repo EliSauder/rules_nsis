@@ -7,9 +7,10 @@ load(
     "nsis_directory",
     "nsis_eventlog_source",
 )
+load("//nsis/private:transitions.bzl", "windows_source")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 load("@rules_python//python:py_binary.bzl", "py_binary")
-load("@rules_signing//signing:defs.bzl", "self_signed_certificate")
+load("@rules_signing//signing:defs.bzl", "self_signed_certificate", "sign")
 
 
 exports_files([
@@ -63,20 +64,35 @@ nsis_installer(
     signing_certificate = ":selfsigned_cert"
 )
 
+sign(
+    name = "nsis_files_signed",
+    src = ":nsis_files",
+    certificate = ":selfsigned_cert",
+)
+
 nsis_component(
     name = "minimal_component_signed",
-    srcs = [":nsis_files"],
+    srcs = [":nsis_files_signed"],
     selection_mode = "default",
-    signing_certificate = ":selfsigned_cert",
+)
+
+windows_source(
+    name = "dup_service_windows",
+    srcs = ["//tests/testdata:dup_service"],
+)
+
+sign(
+    name = "dup_service_signed",
+    src = ":dup_service_windows",
+    certificate = ":selfsigned_cert",
 )
 
 nsis_component(
     name = "minimal_component_signed_2",
-    srcs = ["//tests/testdata:dup_service"],
+    srcs = [":dup_service_signed"],
     selection_mode = "default",
     service = True,
-    service_executable = "//tests/testdata:dup_service",
-    signing_certificate = ":selfsigned_cert",
+    service_executable = ":dup_service_signed",
 )
 
 nsis_installer(
