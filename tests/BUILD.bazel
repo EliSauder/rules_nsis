@@ -79,12 +79,14 @@ nsis_component(
 windows_source(
     name = "dup_service_windows",
     srcs = ["//tests/testdata:dup_service"],
+    target_compatible_with = ["@platforms//os:windows"],
 )
 
 sign(
     name = "dup_service_signed",
     src = ":dup_service_windows",
     certificate = ":selfsigned_cert",
+    target_compatible_with = ["@platforms//os:windows"],
 )
 
 nsis_component(
@@ -93,6 +95,7 @@ nsis_component(
     selection_mode = "default",
     service = True,
     service_executable = ":dup_service_signed",
+    target_compatible_with = ["@platforms//os:windows"],
 )
 
 nsis_installer(
@@ -105,6 +108,7 @@ nsis_installer(
     product = "Minimal Installer Signed Srcs",
     product_path = "Minimal Installer Signed Srcs",
     signing_certificate = ":selfsigned_cert",
+    target_compatible_with = ["@platforms//os:windows"],
 )
 
 nsis_installer_test(
