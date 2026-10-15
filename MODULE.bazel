@@ -22,7 +22,7 @@ bazel_dep(name = "platforms", version = "1.1.0")
 ############################
 # SETUP SIGNING
 ############################
-bazel_dep(name = "rules_signing", version = "0.1.0")
+bazel_dep(name = "rules_signing", version = "0.2.0")
 archive_override(
     module_name = "rules_signing",
     sha256 = "d201d5174401b510b40de218e43447ecc5aacf68b0ab69ea6292d04788cca128",
