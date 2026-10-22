@@ -297,9 +297,10 @@ def _nsis_api_test_binary_impl(ctx):
     script = ctx.actions.declare_file(ctx.label.name + "_wrapper.nsi")
     ctx.actions.write(
         output = script,
-        content = '!addincludedir "{}"\n!include "{}"\n'.format(
+        content = '!addincludedir "{}"\n!addincludedir "{}"\n!include "{}"\n'.format(
             ctx.file._includes.path,
-            ctx.file.src.path,
+            ctx.file.src.dirname,
+            ctx.file.src.basename,
         ),
     )
     args = ctx.actions.args()
