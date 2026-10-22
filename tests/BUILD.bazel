@@ -9,7 +9,7 @@ load(
 )
 load("//nsis/private:transitions.bzl", "windows_source")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
-load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_cc//cc:defs.bzl", "cc_binary")
 load("@rules_signing//signing:defs.bzl", "self_signed_certificate", "sign")
 
 
@@ -351,13 +351,9 @@ nsis_installer(
     stamp = 1,
 )
 
-py_binary(
+cc_binary(
     name = "bin_with_runfiles",
-    main = "dummy.py",
-    srcs = [
-        "dummy.py",
-        "__init__.py",
-    ],
+    srcs = ["dummy.c"],
     data = [
         ":nsis_files",
     ],
@@ -385,8 +381,7 @@ nsis_installer_test(
     installer = ":minimal_installer_runfiles",
     must_have_files = [
         "README.md",
-        "__init__.py",
-        "dummy.py",
+        "bin_with_runfiles.exe",
     ],
 )
 
