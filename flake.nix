@@ -60,7 +60,7 @@
               pkgs.gopls
               pkgs.go-swag
               pkgs.go-task
-              pkgs-unstable.bazel_9
+              pkgs.bazelisk
             ];
           };
       });
