@@ -648,3 +648,18 @@ nsis_installer_test(
     installer = ":minimal_installer_user",
     must_have_files = ["README.md"],
 )
+
+nsis_installer(
+    name = "includes_api_installer",
+    id = "f5b047cf-30eb-4ee7-bfef-9fe6c4de5f78",
+    components = [":minimal_component"],
+    product = "Includes API Installer",
+    product_path = "Includes API Installer",
+    pre_init = ":includes_api.nsh",
+    pre_uninit = ":includes_api.nsh",
+)
+
+nsis_installer_test(
+    name = "includes_api_installer_test",
+    installer = ":includes_api_installer",
+)
