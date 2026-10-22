@@ -5,7 +5,6 @@
 !insertmacro Locate
 
 Var /GLOBAL switch_overwrite
-StrCpy $switch_overwrite 0
 
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ; MoveFile and MoveFolder macros
@@ -176,9 +175,7 @@ Pop $R0
 !macroend
 !define MoveFolder `!insertmacro MoveFolder`
 
-===============
-veFolder macro's ${Locate} callback functions
-===============
+; ${Locate} callback functions for MoveFolder.
 
 Function _MoveFolder_Locate_createDir
 

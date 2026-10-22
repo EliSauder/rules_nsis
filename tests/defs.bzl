@@ -8,6 +8,7 @@ load(
     "NsisEventLogSourceInfo",
 )
 load("@aspect_bazel_lib//lib:paths.bzl", "to_rlocation_path")
+load("//nsis/private:transitions.bzl", "windows_source_transition")
 
 def _get_installer_test_details(ctx, inst, target):
     outfile = ""
@@ -269,3 +270,113 @@ nsis_installer_test = macro(
         ),
     },
 )
+
+def _nsis_api_test_binary_impl(ctx):
+    toolchain = ctx.toolchains["//nsis/toolchain:toolchain_type"].nsis
+    outfile = ctx.actions.declare_file(ctx.label.name + ".exe")
+    script = ctx.actions.declare_file(ctx.label.name + "_wrapper.nsi")
+    ctx.actions.write(
+        output = script,
+        content = '!addincludedir "{}"\n!include "{}"\n'.format(
+            ctx.file._includes.path,
+            ctx.file.src.path,
+        ),
+    )
+    args = ctx.actions.args()
+
+    flag_prefix = "/" if toolchain.args_style == "slash" else "-"
+    args.add(flag_prefix + "V4")
+    args.add(flag_prefix + "WX")
+    args.add(flag_prefix + "NOCD")
+    define_prefix = "/D" if toolchain.args_style == "slash" else "-D"
+    args.add(define_prefix + "OUTFILE=" + outfile.path)
+    args.add(define_prefix + "API_TEST_CASE=" + ctx.attr.test_case)
+    args.add(script.path)
+
+    nsis_dir = toolchain.nsis_dir.files.to_list()[0]
+    env = {
+        "NSISDIR": nsis_dir.path,
+        "LANG": "en_US.UTF-8",
+        "LC_ALL": "en_US.UTF-8",
+        "LC_CTYPE": "en_US.UTF-8",
+    }
+    if toolchain.path_style == "windows":
+        env["COMSPEC"] = "cmd.exe"
+
+    ctx.actions.run(
+        mnemonic = "MakeNSISApiTest",
+        progress_message = "Building NSIS API test {}".format(ctx.label.name),
+        executable = toolchain.makensis,
+        arguments = [args],
+        inputs = depset(
+            direct = [script, ctx.file.src, ctx.file._includes],
+            transitive = [toolchain.nsis_dir.files, toolchain.nsis_files],
+        ),
+        tools = [toolchain.makensis],
+        outputs = [outfile],
+        env = env,
+        use_default_shell_env = False,
+    )
+
+    return [DefaultInfo(files = depset([outfile]), executable = outfile)]
+
+_nsis_api_test_binary = rule(
+    implementation = _nsis_api_test_binary_impl,
+    attrs = {
+        "src": attr.label(mandatory = True, allow_single_file = [".nsi"]),
+        "test_case": attr.string(mandatory = True),
+        "arch": attr.string(default = "x86_64", values = ["x86_64"]),
+        "_includes": attr.label(
+            default = Label("//nsis/private/includes:includes_dir"),
+            allow_single_file = True,
+        ),
+        "_allowlist_function_transition": attr.label(
+            default = Label("@bazel_tools//tools/allowlists/function_transition_allowlist"),
+        ),
+    },
+    cfg = windows_source_transition,
+    executable = True,
+    toolchains = ["//nsis/toolchain:toolchain_type"],
+)
+
+def nsis_api_test(name, test_case):
+    binary = name + "_binary"
+    _nsis_api_test_binary(
+        name = binary,
+        src = "includes_api_test.nsi",
+        test_case = test_case,
+    )
+
+    py_test(
+        name = name,
+        srcs = ["nsis_api_test.py"],
+        main = "nsis_api_test.py",
+        data = [":" + binary],
+        args = [
+            "$(rlocationpath :{})".format(binary),
+        ],
+        target_compatible_with = ["@platforms//os:windows"],
+        timeout = "short",
+        deps = ["@rules_python//python/runfiles"],
+    )
+
+def nsis_api_tests(test_cases):
+    tests = []
+    binaries = []
+    for test_case in test_cases:
+        name = "include_api_" + test_case
+        nsis_api_test(
+            name = name,
+            test_case = test_case,
+        )
+        tests.append(":" + name)
+        binaries.append(":" + name + "_binary")
+
+    native.test_suite(
+        name = "include_api_tests",
+        tests = tests,
+    )
+    native.filegroup(
+        name = "include_api_test_binaries",
+        srcs = binaries,
+    )
