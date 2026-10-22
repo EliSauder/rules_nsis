@@ -30,6 +30,9 @@ signing_env_test = analysistest.make(
 )
 
 def _get_installer_test_details(ctx, inst, target):
+    if not inst.testable:
+        fail("installer {} must set testable = True to be used by nsis_installer_test".format(inst.name))
+
     outfile = ""
     if inst.outfile:
         outfile = inst.outfile

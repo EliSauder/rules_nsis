@@ -57,6 +57,7 @@ installed as a user, defaults to $LOCALAPPDATA\\Programs.
 The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
 """,
         "install_path": "Overrides product_path and vendor_path with a specific path.",
+        "testable": "Whether test-ID based isolation is enabled.",
         "execution_level": "Set the execution level for the installer.",
         "compressor": "Set the compressor to be used for building the installer.",
         "compressor_dictsize": "Set the compressor dict size for the lzma compression alg.",
@@ -1102,6 +1103,7 @@ def _get_installer_ds(ctx, toolchain):
         "InstallTypes": [str(x) for x in ctx.attr.install_categories],
         "Compressor": str(ctx.attr.compressor),
         "CompressorDictSize": int(ctx.attr.compressor_dictsize),
+        "TestableInstaller": bool(ctx.attr.testable),
         "Icon": (
             str(_make_sys_path(toolchain, ctx.attr.icon.path))
             if ctx.attr.icon != None
@@ -1519,6 +1521,7 @@ def _nsis_installer_impl(ctx):
             components = ctx.attr.components,
             outfile = ctx.attr.outfile,
             arch = ctx.attr.arch,
+            testable = ctx.attr.testable,
             post_init = ctx.file.post_init,
             pre_init = ctx.file.post_init,
             post_uninit = ctx.file.post_uninit,
@@ -1644,6 +1647,11 @@ user: Install software as user.
             mandatory = False,
             default = {},
             doc = "A list of additional defines to include in the installer.",
+        ),
+        "testable": attr.bool(
+            mandatory = False,
+            default = False,
+            doc = "Enable test-ID based isolation for installer tests.",
         ),
         "components": attr.label_list(
             mandatory = False,

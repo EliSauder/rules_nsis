@@ -128,6 +128,7 @@ nsis_component(
 
 nsis_installer(
     name = "minimal_installer_signed_srcs",
+    testable = True,
     id = "0a5a2f0e-6a7b-4c1a-9e6a-5b9e6c9c0b1a",
     components = [
         ":minimal_component_signed",
@@ -146,6 +147,7 @@ nsis_installer_test(
 
 nsis_installer(
     name = "minimal_installer_outfile",
+    testable = True,
     id = "e6885d94-b532-4a03-970a-7d37283945b2",
     components = [":minimal_component"],
     product = "Minimal Installer",
@@ -186,6 +188,7 @@ nsis_component(
 
 nsis_installer(
     name = "minimal_installer_deps",
+    testable = True,
     id = "54929554-846d-45fb-b2f4-05da614053ce",
     components = [
         ":minimal_component",
@@ -217,6 +220,7 @@ nsis_component(
 
 nsis_installer(
     name = "single_service_installer",
+    testable = True,
     id = "93061bb4-387d-4653-aef0-396ea6573afc",
     product = "Single Service Installer",
     product_path = "SSI",
@@ -250,6 +254,7 @@ nsis_component_group(
 
 nsis_installer(
     name = "minimal_installer_with_group",
+    testable = True,
     id = "0ba7fe50-2dc5-4d43-8c7d-309ce7f0d28c",
     components = [":minimal_group"],
     product = "Minimal Installer Group",
@@ -270,6 +275,7 @@ nsis_component(
 
 nsis_installer(
     name = "minimal_installer_with_dir",
+    testable = True,
     id = "053d27a9-f532-4b69-9ede-42bb634de08b",
     components = [":minimal_component_with_dir"],
     product = "Minimal Installer Dir",
@@ -304,6 +310,7 @@ nsis_component_group(
 
 nsis_installer(
     name = "ssc_with_group_and_dir",
+    testable = True,
     id = "7cb8f799-ce8b-41d8-94d1-717e9fd56217",
     product = "Single Service Installer GrpDir",
     product_path = "SSI",
@@ -330,6 +337,7 @@ nsis_installer_test(
 
 nsis_installer(
     name = "minimal_installer_with_nostamp",
+    testable = True,
     id = "e7598904-2a8f-4f07-a7b8-c56472237744",
     components = [":minimal_component"],
     product = "Minimal Installer STAMP",
@@ -346,6 +354,7 @@ nsis_installer_test(
 
 nsis_installer(
     name = "minimal_installer_with_stamp_default",
+    testable = True,
     id = "a66e7e6c-7f1c-421f-b10d-54b2af0db5a6",
     components = [":minimal_component"],
     product = "Minimal Installer STAMP2",
@@ -401,6 +410,7 @@ nsis_component(
 
 nsis_installer(
     name = "minimal_installer_runfiles",
+    testable = True,
     id = "e517ee24-7f00-4b34-96e7-1c59ea712988",
     components = [":minimal_component_runfiles"],
     product = "Minimal Installer Runfiles",
@@ -418,6 +428,7 @@ nsis_installer_test(
 
 nsis_installer(
     name = "minimal_installerA",
+    testable = True,
     id = "8d5d6365-eccc-48aa-9dff-4baf9e206fc0",
     components = [":minimal_component"],
     product = "Minimal Installer A",
@@ -426,6 +437,7 @@ nsis_installer(
 
 nsis_installer(
     name = "minimal_installerB",
+    testable = True,
     id = "8d5d6365-eccc-48aa-9dff-4baf9e206fc0",
     components = [":minimal_component_with_dir"],
     product = "Minimal Installer B",
@@ -440,6 +452,7 @@ nsis_installer_test(
 
 nsis_installer(
     name = "minimal_installer_arch32_allowed_on64",
+    testable = True,
     id = "b540e991-9102-4082-b9aa-37c4d3e21817",
     components = [":minimal_component"],
     product = "Minimal Installer 32 allowed 64",
@@ -455,6 +468,7 @@ nsis_installer_test(
 
 nsis_installer(
     name = "minimal_installer_arch32_not_allowed_on64",
+    testable = True,
     id = "325cae94-81e8-4442-8d2b-6846edde35a7",
     components = [":minimal_component"],
     product = "Minimal Installer 32 not allowed 64",
@@ -488,6 +502,7 @@ nsis_component(
 
 nsis_installer(
     name = "create_root_dir_installer",
+    testable = True,
     id = "887a81fc-cf67-42d9-aebb-9fab608f759c",
     components = [":create_root_dir_component"],
     product = "Create Root Dir Installer",
@@ -514,6 +529,7 @@ nsis_component(
 
 nsis_installer(
     name = "minimal_installer_eventlog",
+    testable = True,
     id = "7e5787c2-c4fb-4c59-bc9b-9e89790f016d",
     components = [":minimal_component_eventlog"],
     product = "Minimal Installer Eventlog",
@@ -527,6 +543,7 @@ nsis_installer_test(
 
 nsis_installer(
     name = "minimal_installer_withpostinit",
+    testable = True,
     id = "72a4d1ed-532b-434d-833c-a0edb32ed4a7",
     components = [":minimal_component"],
     product = "Minimal Installer PostInit",
