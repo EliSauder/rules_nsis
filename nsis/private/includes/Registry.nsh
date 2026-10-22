@@ -2,6 +2,7 @@
 !define __INCLUDE_REGISTRY
 
 !include LogicLib.nsh
+!include Formatting.nsh
 !include ShellContext.nsh
 !include Testing.nsh
 !include Logging.nsh
@@ -72,7 +73,7 @@ FunctionEnd
 Function ${PREFIX}FormatStrToDWORD
     Exch $0
 
-    ${CharToASCII} "$0" $0
+    !insertmacro ${PREFIX}CharToASCII "$0" $0
     IntFmt $0 "0x%X" $0
 
     Exch $0
@@ -98,11 +99,11 @@ FunctionEnd
 Function ${PREFIX}FormatStrToBin
     Exch $0
 
-    ${CharToASCII} "$0" $0
+    !insertmacro ${PREFIX}CharToASCII "$0" $0
     IntFmt $0 "0x%X" $0
 
     Push $0
-    Call Hex2Bin
+    Call ${PREFIX}Hex2Bin
     ;Pop $0
     ;Push $0
 FunctionEnd
@@ -156,11 +157,16 @@ FunctionEnd
 !insertmacro _SetRegistrySubKey "" "Str"
 !insertmacro _SetRegistrySubKey "un." "Str"
 
-!insertmacro _SetRegistrySubKey "" "Bin"
-!insertmacro _SetRegistrySubKey "un." "Bin"
-
 !insertmacro _SetRegistrySubKey "" "DWORD"
 !insertmacro _SetRegistrySubKey "un." "DWORD"
+
+!macro SetRegistrySubKeyBin KEY SUBKEY VALUE
+    WriteRegBin SHCTX "${KEY}" "${SUBKEY}" ${VALUE}
+!macroend
+
+!macro un.SetRegistrySubKeyBin KEY SUBKEY VALUE
+    WriteRegBin SHCTX "${KEY}" "${SUBKEY}" ${VALUE}
+!macroend
 
 !macro SetRegistrySubKeyStr KEY SUBKEY VALUE
     Push "${SUBKEY}"
@@ -174,6 +180,20 @@ FunctionEnd
     Push ${VALUE}
     PUSH "${KEY}"
     Call un.SetRegistrySubKeyStr
+!macroend
+
+!macro SetRegistrySubKeyDWORD KEY SUBKEY VALUE
+    Push "${SUBKEY}"
+    Push ${VALUE}
+    PUSH "${KEY}"
+    Call SetRegistrySubKeyDWORD
+!macroend
+
+!macro un.SetRegistrySubKeyDWORD KEY SUBKEY VALUE
+    Push "${SUBKEY}"
+    Push ${VALUE}
+    PUSH "${KEY}"
+    Call un.SetRegistrySubKeyDWORD
 !macroend
 
 !macro _GetRegistrySubKey PREFIX

@@ -54,13 +54,9 @@ Var isx86
     StrCpy ${OUT} $is32bit
 !macroend
 
-!macro un.GetArch OUT
-    StrCpy ${OUT} $current_arch
-!macroend
-
 !macro _DetectArch PREFIX
 Function ${PREFIX}DetectArch
-    ${If} ${IsNativeX64}
+    ${If} ${IsNativeAMD64}
         StrCpy $is64bit "1"
         StrCpy $isArm "0"
         StrCpy $is32bit "0"
@@ -106,7 +102,6 @@ FunctionEnd
 !define IfBitWdithMatch `${If} `
 
 !macro ValidateArch EXPECTED
-    !insertmacro
     ${If} $current_arch == ""
         Call DetectArch
     ${EndIf}
@@ -121,14 +116,13 @@ FunctionEnd
 !macroend
 
 !macro un.ValidateArch EXPECTED
-    !insertmacro
     ${If} $current_arch == ""
         Call un.DetectArch
     ${EndIf}
     ${If} "${EXPECTED}" != $current_arch
         Push $0
         StrCpy $0 $current_arch
-        !insertmacro un.LogError "Current architecture '$0' is not expected ${EXPECTED}"
+        !insertmacro LogError "Current architecture '$0' is not expected ${EXPECTED}"
         MessageBox MB_ICONSTOP "This installer requires a ${EXPECTED} version of windows. You are running with $0." /SD IDOK
         Abort 3
         Pop $0
@@ -136,72 +130,68 @@ FunctionEnd
 !macroend
 
 !macro ValidateBitwdth EXPECTED
-    !insertmacro
     ${If} $current_arch == ""
         Call DetectArch
     ${EndIf}
     ${If} ${EXPECTED} = 64
     ${AndIf} $is64Bit == "0"
-        !insertmacro un.LogError "Installer must be run on a 64 bit computer."
+        !insertmacro LogError "Installer must be run on a 64 bit computer."
         MessageBox MB_ICONSTOP "Installer must be run on a 64 bit computer." /SD IDOK
         Abort 3
     ${ElseIf} ${EXPECTED} = 32
     ${AndIf} $is32bit == "0"
-        !insertmacro un.LogError "Installer must be run on a 32 bit computer."
+        !insertmacro LogError "Installer must be run on a 32 bit computer."
         MessageBox MB_ICONSTOP "Installer must be run on a 32 bit computer." /SD IDOK
         Abort 3
     ${EndIf}
 !macroend
 
 !macro un.ValidateBitwdth EXPECTED
-    !insertmacro
     ${If} $current_arch == ""
         Call un.DetectArch
     ${EndIf}
     ${If} ${EXPECTED} = 64
     ${AndIf} $is64Bit == "0"
-        !insertmacro un.LogError "Installer must be run on a 64 bit computer."
+        !insertmacro LogError "Installer must be run on a 64 bit computer."
         MessageBox MB_ICONSTOP "Installer must be run on a 64 bit computer." /SD IDOK
         Abort 3
     ${ElseIf} ${EXPECTED} = 32
     ${AndIf} $is32bit == "0"
-        !insertmacro un.LogError "Installer must be run on a 32 bit computer."
+        !insertmacro LogError "Installer must be run on a 32 bit computer."
         MessageBox MB_ICONSTOP "Installer must be run on a 32 bit computer." /SD IDOK
         Abort 3
     ${EndIf}
 !macroend
 
 !macro ValidateISA EXPECTED
-    !insertmacro
     ${If} $current_arch == ""
         Call DetectArch
     ${EndIf}
     ${If} ${EXPECTED} == "arm"
     ${AndIf} $isArm == "0"
-        !insertmacro un.LogError "Installer must be run on an arm computer."
+        !insertmacro LogError "Installer must be run on an arm computer."
         MessageBox MB_ICONSTOP "Installer must be run on an arm computer." /SD IDOK
         Abort 3
     ${ElseIf} ${EXPECTED} == "x86"
     ${AndIf} $isx86 == "0"
-        !insertmacro un.LogError "Installer must be run on a x86 computer."
+        !insertmacro LogError "Installer must be run on a x86 computer."
         MessageBox MB_ICONSTOP "Installer must be run on a x86 computer." /SD IDOK
         Abort 3
     ${EndIf}
 !macroend
 
 !macro un.ValidateISA EXPECTED
-    !insertmacro
     ${If} $current_arch == ""
         Call un.DetectArch
     ${EndIf}
     ${If} ${EXPECTED} == "arm"
     ${AndIf} $isArm == "0"
-        !insertmacro un.LogError "Installer must be run on an arm computer."
+        !insertmacro LogError "Installer must be run on an arm computer."
         MessageBox MB_ICONSTOP "Installer must be run on an arm computer." /SD IDOK
         Abort 3
     ${ElseIf} ${EXPECTED} == "x86"
     ${AndIf} $isx86 == "0"
-        !insertmacro un.LogError "Installer must be run on a x86 computer."
+        !insertmacro LogError "Installer must be run on a x86 computer."
         MessageBox MB_ICONSTOP "Installer must be run on a x86 computer." /SD IDOK
         Abort 3
     ${EndIf}

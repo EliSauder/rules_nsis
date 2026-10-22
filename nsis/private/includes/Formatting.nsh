@@ -3,34 +3,45 @@
 
 !include LogicLib.nsh
 
-!define CharToASCII "!insertmacro CharToASCII"
+!macro _CharToASCII PREFIX
+Function ${PREFIX}CharToASCII
+  Exch $0 ; given character
+  Push $1 ; current character
+  Push $2 ; current Ascii Code
 
+  StrCpy $2 1 ; right from start
+${PREFIX}CharToASCIILoop:
+  IntFmt $1 %c $2 ; Get character from current ASCII code
+  ${If} $1 S== $0 ; case sensitive string comparison
+     StrCpy $0 $2
+     Goto ${PREFIX}CharToASCIIDone
+  ${EndIf}
+  IntOp $2 $2 + 1
+  StrCmp $2 255 0 ${PREFIX}CharToASCIILoop ; ascii from 1 to 255
+  StrCpy $0 0 ; ASCII code wasn't found -> return 0
+${PREFIX}CharToASCIIDone:
+  Pop $2
+  Pop $1
+  Exch $0
+FunctionEnd
+!macroend
+
+!insertmacro _CharToASCII ""
+!insertmacro _CharToASCII "un."
+
+!define CharToASCII "!insertmacro CharToASCII"
 !macro CharToASCII STR DST
   Push "${STR}"
   Call CharToASCII
   Pop ${DST}
 !macroend
 
-Function CharToASCII
-  Exch $0 ; given character
-  Push $1 ; current character
-  Push $2 ; current Ascii Code
-
-  StrCpy $2 1 ; right from start
-Loop:
-  IntFmt $1 %c $2 ; Get character from current ASCII code
-  ${If} $1 S== $0 ; case sensitive string comparison
-     StrCpy $0 $2
-     Goto Done
-  ${EndIf}
-  IntOp $2 $2 + 1
-  StrCmp $2 255 0 Loop ; ascii from 1 to 255
-  StrCpy $0 0 ; ASCII code wasn't found -> return 0
-Done:
-  Pop $2
-  Pop $1
-  Exch $0
-FunctionEnd
+!define un.CharToASCII "!insertmacro un.CharToASCII"
+!macro un.CharToASCII STR DST
+  Push "${STR}"
+  Call un.CharToASCII
+  Pop ${DST}
+!macroend
 
 ;Hex2Bin
 
@@ -39,7 +50,8 @@ FunctionEnd
 ;Push "HexadecimalNumber"
 ;Call bin2dec
 ;Pop "BinaryNumberVariable"
-Function Hex2Bin
+!macro _Hex2Bin PREFIX
+Function ${PREFIX}Hex2Bin
     Push $0
     Exch
     Exch $1
@@ -56,11 +68,11 @@ Function Hex2Bin
     StrCpy $3 $0
 
     ; loop - Get 1 Letter per loop from right for process
-NextLetter:
+${PREFIX}Hex2BinNextLetter:
     StrCpy $4 '$5 $4'
     StrCpy $5 ''
 
-    StrCmp $3 '0' End
+    StrCmp $3 '0' ${PREFIX}Hex2BinEnd
 
     IntOP $3 $3 - 1
     StrCpy $2 $1 1 $3
@@ -71,9 +83,9 @@ NextLetter:
     IntCmp $7 '0' +2
         StrCpy $7 '1'
     StrCpy $5 '$5$7'
-    StrCmp $6 '1' NextLetter -5
+    StrCmp $6 '1' ${PREFIX}Hex2BinNextLetter -5
 
-End:
+${PREFIX}Hex2BinEnd:
 
     StrCpy $1 $4 "" 4
     StrCpy $1 $1 4
@@ -87,5 +99,9 @@ End:
     Pop $0
     Exch $1
 FunctionEnd
+!macroend
+
+!insertmacro _Hex2Bin ""
+!insertmacro _Hex2Bin "un."
 
 !endif

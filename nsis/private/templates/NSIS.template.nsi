@@ -1,6 +1,8 @@
 !pragma warning disable 6010 ; Because we are using templates, some installers
                              ; don't use everything defined.
 Unicode True
+SetCompressor {{ (ds "in").Compressor }}
+SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 
 !include LogicLib.nsh
 !include MUI2.nsh
@@ -8,6 +10,9 @@ Unicode True
 !include Logging.nsh
 !include Utility.nsh
 !include Sc.nsh
+!include EventLog.nsh
+!include Mutex.nsh
+!include iCacls.nsh
 !include Uninstall.nsh
 
 !include FileFunc.nsh
@@ -102,9 +107,6 @@ InstallDirRegKey HKLM "${REG_KEY}" "${REG_KEY_INSTLOC}"
 InstallDirRegKey HKCU "${REG_KEY}" "${REG_KEY_INSTLOC}"
 !define IS_ADMIN_EXECUTION_LEVEL 0
 {{- end}}
-
-SetCompressor {{ (ds "in").Compressor }}
-SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 
 VIProductVersion "${PRODUCT_VERSION}"
 VIAddVersionKey "ProductName" "${PRODUCT}"
@@ -324,8 +326,7 @@ RMDir "{{.Path}}"
 {{- if .EventLog }}
 {{- with .EventLog}}
 ${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-    Push "${ROOT_EVENTLOG_KEY}\{{.Key}}\{{.Source}}"
-    Call un.RemoveRegistry
+    !insertmacro un.EventLog_RemoveSource "{{.Key}}" "{{.Source}}"
 ${EndIf}
 {{- end}}
 {{- end}}
@@ -460,15 +461,8 @@ Section "-Core Installation"
 
     SetOutPath "$INSTDIR"
 
-    Push "${REG_KEY_INSTLOC}"
-    Push "$INSTDIR"
-    Push "${REG_KEY}"
-    Call AddToRegistry
-
-    Push "Version"
-    Push "${PRODUCT_VERSION}"
-    Push "${REG_KEY}"
-    Call AddToRegistry
+    !insertmacro SetRegistrySubKeyStr "${REG_KEY}" "${REG_KEY_INSTLOC}" "$INSTDIR"
+    !insertmacro SetRegistrySubKeyStr "${REG_KEY}" "Version" "${PRODUCT_VERSION}"
 
     WriteUninstaller "$INSTDIR\${UNINSTALLER_NAME}"
 
@@ -492,10 +486,6 @@ Section "-Core Installation"
         !insertmacro UpdateUninstallRegistry "${UnDisplayIcon}" "$INSTDIR\${ICON_FILE}"
     ${EndIf}
 
-    SetOutPath "$TEMP"
-    File "8ffe12fa-a0cf-4319-913a-9da6efa60efc.txt"
-    SetOutPath "$INSTDIR"
-
     Push $R0
     Push $R1
     Push $R2
@@ -504,9 +494,8 @@ Section "-Core Installation"
     Push $R5
     Push $R6
 
-    ${GetTime} "$TEMP\8ffe12fa-a0cf-4319-913a-9da6efa60efc.txt" "CS" $R0 $R1 $R2 $R3 $R4 $R5 $R6
-    Delete "$TEMP\8ffe12fa-a0cf-4319-913a-9da6efa60efc.txt"
-    !insertmacro UpdateUninstallRegistry "${UnInstallDate}" "$R2-$R1-$R0T$3:$4:$5Z"
+    ${GetTime} "" "L" $R0 $R1 $R2 $R3 $R4 $R5 $R6
+    !insertmacro UpdateUninstallRegistry "${UnInstallDate}" "$R0$R1$R2"
 
     Pop $R6
     Pop $R5
@@ -580,10 +569,7 @@ Function un.onInit
 
     !insertmacro un.ValidateMutex "${PRODUCT_ID}Uninstall"
 
-    Push "InstallLocation"
-    Push "${UN_REG_KEY}"
-    Call un.GetFromRegistry
-    Pop $0
+    !insertmacro un.GetRegistrySubKey "${UN_REG_KEY}" "${UnInstallLocation}" $0
 
     ${If} "$0" == ""
         !insertmacro Log "No install exists."
@@ -678,15 +664,13 @@ Function .onSelChange
 FunctionEnd
 
 Section "Uninstall"
-  !insertmacro SetShellContext
-  !insertmacro DefineRegView
+  !insertmacro un.SetShellContext
+  !insertmacro un.DefineRegView
 
   !insertmacro RemoveComponents
 
-  Push "${UN_REG_KEY}"
-  Call un.RemoveRegistry
-  Push "${REG_KEY}"
-  Call un.RemoveRegistry
+  !insertmacro un.RemoveRegistryKey "${UN_REG_KEY}"
+  !insertmacro un.RemoveRegistryKey "${REG_KEY}"
 
   ;Remove the uninstaller itself.
   SetFileAttributes "$INSTDIR\${UNINSTALLER_NAME}" NORMAL

@@ -30,15 +30,15 @@ Function ${PREFIX}EventLog_AddSource
         StrCpy $3 "${_DEFAULT_EVENTMESSAGEFILE}"
     ${EndIf}
 
-    !insertmacro SetRegistrySubKey "$0" "TypesSupported" "$2"
-    !insertmacro SetRegistrySubKey "$0" "EventMessageFile" "$3"
+    !insertmacro ${PREFIX}SetRegistrySubKeyDWORD "$0" "TypesSupported" $2
+    !insertmacro ${PREFIX}SetRegistrySubKeyStr "$0" "EventMessageFile" "$3"
 
     ${If} "$4" != ""
-        !insertmacro SetRegistrySubKey "$0" "CategoryMessageFile" "$4"
+        !insertmacro ${PREFIX}SetRegistrySubKeyStr "$0" "CategoryMessageFile" "$4"
     ${EndIf}
 
     ${If} "$5" != ""
-        !insertmacro SetRegistrySubKey "$0" "ParameterMessageFile" "$5"
+        !insertmacro ${PREFIX}SetRegistrySubKeyStr "$0" "ParameterMessageFile" "$5"
     ${EndIf}
 
     Pop $5
