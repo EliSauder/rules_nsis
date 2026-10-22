@@ -126,7 +126,8 @@ FunctionEnd
         StrCpy $0 $current_arch
         !insertmacro LogError "Current arch '$0' is not expected ${EXPECTED}"
         MessageBox MB_ICONSTOP "This installer requires a ${EXPECTED} version of windows. You are running with $0." /SD IDOK
-        Abort 3
+        SetErrorLevel 3
+        Abort
         Pop $0
     ${EndIf}
 !macroend
@@ -141,7 +142,8 @@ FunctionEnd
         StrCpy $0 $current_arch
         !insertmacro LogError "Current architecture '$0' is not expected ${EXPECTED}"
         MessageBox MB_ICONSTOP "This installer requires a ${EXPECTED} version of windows. You are running with $0." /SD IDOK
-        Abort 3
+        SetErrorLevel 3
+        Abort
         Pop $0
     ${EndIf}
 !macroend
@@ -155,12 +157,14 @@ FunctionEnd
     ${AndIf} $is64Bit == "0"
         !insertmacro LogError "Installer must be run on a 64 bit computer."
         MessageBox MB_ICONSTOP "Installer must be run on a 64 bit computer." /SD IDOK
-        Abort 3
+        SetErrorLevel 3
+        Abort
     ${ElseIf} ${EXPECTED} = 32
     ${AndIf} $is32bit == "0"
         !insertmacro LogError "Installer must be run on a 32 bit computer."
         MessageBox MB_ICONSTOP "Installer must be run on a 32 bit computer." /SD IDOK
-        Abort 3
+        SetErrorLevel 3
+        Abort
     ${EndIf}
 !macroend
 !define ValidateBitwdth `!insertmacro ValidateBitwdth`
@@ -173,12 +177,14 @@ FunctionEnd
     ${AndIf} $is64Bit == "0"
         !insertmacro LogError "Installer must be run on a 64 bit computer."
         MessageBox MB_ICONSTOP "Installer must be run on a 64 bit computer." /SD IDOK
-        Abort 3
+        SetErrorLevel 3
+        Abort
     ${ElseIf} ${EXPECTED} = 32
     ${AndIf} $is32bit == "0"
         !insertmacro LogError "Installer must be run on a 32 bit computer."
         MessageBox MB_ICONSTOP "Installer must be run on a 32 bit computer." /SD IDOK
-        Abort 3
+        SetErrorLevel 3
+        Abort
     ${EndIf}
 !macroend
 !define un.ValidateBitwdth `!insertmacro un.ValidateBitwdth`
@@ -191,12 +197,14 @@ FunctionEnd
     ${AndIf} $isArm == "0"
         !insertmacro LogError "Installer must be run on an arm computer."
         MessageBox MB_ICONSTOP "Installer must be run on an arm computer." /SD IDOK
-        Abort 3
+        SetErrorLevel 3
+        Abort
     ${ElseIf} ${EXPECTED} == "x86"
     ${AndIf} $isx86 == "0"
         !insertmacro LogError "Installer must be run on a x86 computer."
         MessageBox MB_ICONSTOP "Installer must be run on a x86 computer." /SD IDOK
-        Abort 3
+        SetErrorLevel 3
+        Abort
     ${EndIf}
 !macroend
 !define ValidateISA `!insertmacro ValidateISA`
@@ -209,12 +217,14 @@ FunctionEnd
     ${AndIf} $isArm == "0"
         !insertmacro LogError "Installer must be run on an arm computer."
         MessageBox MB_ICONSTOP "Installer must be run on an arm computer." /SD IDOK
-        Abort 3
+        SetErrorLevel 3
+        Abort
     ${ElseIf} ${EXPECTED} == "x86"
     ${AndIf} $isx86 == "0"
         !insertmacro LogError "Installer must be run on a x86 computer."
         MessageBox MB_ICONSTOP "Installer must be run on a x86 computer." /SD IDOK
-        Abort 3
+        SetErrorLevel 3
+        Abort
     ${EndIf}
 !macroend
 !define un.ValidateISA `!insertmacro un.ValidateISA`

@@ -85,7 +85,6 @@ SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 !define SERVICE_DISPLAY_PREFIX "${PRODUCT}"
 {{- end}}
 
-!define UN_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_ID}"
 !define REG_KEY "Software\${PRODUCT_KEY_PATH}"
 
 !define REG_KEY_INSTLOC "InstallDir"
@@ -569,7 +568,7 @@ Function un.onInit
 
     !insertmacro un.ValidateMutex "${PRODUCT_ID}Uninstall"
 
-    !insertmacro un.GetRegistrySubKey "${UN_REG_KEY}" "${UnInstallLocation}" $0
+    !insertmacro un.GetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$product_code" "${UnInstallLocation}" $0
 
     ${If} "$0" == ""
         !insertmacro Log "No install exists."
@@ -669,7 +668,7 @@ Section "Uninstall"
 
   !insertmacro RemoveComponents
 
-  !insertmacro un.RemoveRegistryKey "${UN_REG_KEY}"
+  !insertmacro un.RemoveRegistryKey "${_UNINSTALLER_BASE_KEY}\$product_code"
   !insertmacro un.RemoveRegistryKey "${REG_KEY}"
 
   ;Remove the uninstaller itself.

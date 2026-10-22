@@ -73,8 +73,8 @@ def _get_sub_path(product_path, vendor_path, install_path) -> str:
 
 def _get_reg_paths(subpath, appkey) -> (str, str):
     return (
-        f"Software\\{subpath}\\{TEST_ID}",
-        f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{appkey}\\{TEST_ID}"
+        f"Software\\{subpath}",
+        f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{{{appkey.upper()}}}"
     )
 
 def _get_reg_db(execution_level: str) -> int:
@@ -180,7 +180,7 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, subpath: st
         pass
 
 def _get_eventlog_registry_path(key: str, src: str) -> str:
-    return f"SYSTEM\\CurrentControlSet\\Services\\EventLog\\{key}\\{src}\\{TEST_ID}"
+    return f"SYSTEM\\CurrentControlSet\\Services\\EventLog\\{key}\\{src}"
 
 def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
     exlvl = (config["expected_execution_level"] or "admin")
