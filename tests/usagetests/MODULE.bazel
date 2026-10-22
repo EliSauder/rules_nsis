@@ -5,14 +5,7 @@ module(
 ############################
 # SETUP SIGNING
 ############################
-bazel_dep(name = "rules_signing", version = "0.1.0")
-archive_override(
-    module_name = "rules_signing",
-    sha256 = "53567d86d25c66e696f7ba96348a333490896b28d3322c32dccf8adb07f410ed",
-    strip_prefix = "rules_signing-a2c724832a55767a9aa4aec51ed2338bb9168c4b",
-    urls = ["https://github.com/EliSauder/rules_signing/archive/a2c724832a55767a9aa4aec51ed2338bb9168c4b.tar.gz"],
-)
-
+bazel_dep(name = "rules_signing", version = "0.3.1")
 signing_tools = use_extension("@rules_signing//signing:extensions.bzl", "signing_tools")
 signing_tools.openssl(path = "openssl")
 use_repo(
