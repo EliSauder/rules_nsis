@@ -132,10 +132,12 @@ FunctionEnd
     Call NormalizeGuid
     Pop ${OUT}
 !macroend
+!define NormalizeGuid `!insertmacro NormalizeGuid`
 
 !macro un.NormalizeGuid TEXT OUT
     Push "${TEXT}"
         Call un.NormalizeGuid
     Pop ${OUT}
 !macroend
+!define un.NormalizeGuid `!insertmacro un.NormalizeGuid`
 !endif

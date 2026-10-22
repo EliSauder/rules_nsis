@@ -12,6 +12,7 @@ Var TestId
     StrCpy $TestId "${ID}"
 !endif
 !macroend
+!define SetTestId `!insertmacro SetTestId`
 
 !macro TestIdInit
 !ifdef TESTABLE_INSTALLER
@@ -23,12 +24,14 @@ Var TestId
     Pop $0
 !endif
 !macroend
+!define TestIdInit `!insertmacro TestIdInit`
 
 !macro GetTestId DST
 !ifdef TESTABLE_INSTALLER
     StrCpy ${DST} $TestId
 !endif
 !macroend
+!define GetTestId `!insertmacro GetTestId`
 
 !ifdef TESTABLE_INSTALLER
 !define IfTest `${If} $TestId != ""`

@@ -23,6 +23,7 @@ Var product_code
     StrCpy $product_code "$0"
     Pop $0
 !macroend
+!define SetProductCode `!insertmacro SetProductCode`
 
 !macro un.SetProductCode GUID
     Push $0
@@ -37,6 +38,7 @@ Var product_code
     StrCpy $product_code "$0"
     Pop $0
 !macroend
+!define un.SetProductCode `!insertmacro un.SetProductCode`
 
 !macro GetProductCode OUT
     ${If} $product_code == ""
@@ -45,6 +47,7 @@ Var product_code
     ${EndIf}
     StrCpy ${OUT} $product_code
 !macroend
+!define GetProductCode `!insertmacro GetProductCode`
 
 !macro un.GetProductCode OUT
     ${If} $product_code == ""
@@ -53,6 +56,7 @@ Var product_code
     ${EndIf}
     StrCpy ${OUT} $product_code
 !macroend
+!define un.GetProductCode `!insertmacro un.GetProductCode`
 
 !macro GetUninstallRegistry SUBKEY OUT
     Push $0
@@ -60,6 +64,7 @@ Var product_code
     !insertmacro GetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$0" "${SUBKEY}" ${OUT}
     Pop $0
 !macroend
+!define GetUninstallRegistry `!insertmacro GetUninstallRegistry`
 
 !macro un.GetUninstallRegistry SUBKEY OUT
     Push $0
@@ -67,6 +72,7 @@ Var product_code
     !insertmacro un.GetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$0" "${SUBKEY}" ${OUT}
     Pop $0
 !macroend
+!define un.GetUninstallRegistry `!insertmacro un.GetUninstallRegistry`
 
 !macro _UpdateUninstallRegistry PREFIX
 Function ${PREFIX}UpdateUninstallRegistry
@@ -90,12 +96,14 @@ FunctionEnd
     Push "${SUBKEY}"
     Call UpdateUninstallRegistry
 !macroend
+!define UpdateUninstallRegistry `!insertmacro UpdateUninstallRegistry`
 
 !macro un.UpdateUninstallRegistry SUBKEY VALUE
     Push "${VALUE}"
     Push "${SUBKEY}"
     Call un.UpdateUninstallRegistry
 !macroend
+!define un.UpdateUninstallRegistry `!insertmacro un.UpdateUninstallRegistry`
 
 !macro RemoveUninstallRegistry
     Push $0
@@ -103,6 +111,7 @@ FunctionEnd
     !insertmacro RemoveRegistryKey "${_UNINSTALLER_BASE_KEY}\$0"
     Pop $0
 !macroend
+!define RemoveUninstallRegistry `!insertmacro RemoveUninstallRegistry`
 
 !macro un.RemoveUninstallRegistry
     Push $0
@@ -110,6 +119,7 @@ FunctionEnd
     !insertmacro un.RemoveRegistryKey "${_UNINSTALLER_BASE_KEY}\$0"
     Pop $0
 !macroend
+!define un.RemoveUninstallRegistry `!insertmacro un.RemoveUninstallRegistry`
 
 !define UnDisplayName "DisplayName"
 !define UnDisplayVersion "DisplayVersion"
@@ -178,6 +188,26 @@ FunctionEnd
 !insertmacro _UpdateInstallDetail ""
 !insertmacro _UpdateInstallDetail "un."
 
+!macro UpdateInstallDetail PUBLISHER PRODUCT COMPONENT SUBKEY VALUE
+    Push "${VALUE}"
+    Push "${SUBKEY}"
+    Push "${COMPONENT}"
+    Push "${PRODUCT}"
+    Push "${PUBLISHER}"
+    Call UpdateInstallDetail
+!macroend
+!define UpdateInstallDetail `!insertmacro UpdateInstallDetail`
+
+!macro un.UpdateInstallDetail PUBLISHER PRODUCT COMPONENT SUBKEY VALUE
+    Push "${VALUE}"
+    Push "${SUBKEY}"
+    Push "${COMPONENT}"
+    Push "${PRODUCT}"
+    Push "${PUBLISHER}"
+    Call un.UpdateInstallDetail
+!macroend
+!define un.UpdateInstallDetail `!insertmacro un.UpdateInstallDetail`
+
 !macro _GetInstallDetail PREFIX
 Function ${PREFIX}GetInstallDetail
     Exch $0 ; PUB
@@ -211,6 +241,26 @@ FunctionEnd
 
 !insertmacro _GetInstallDetail ""
 !insertmacro _GetInstallDetail "un."
+
+!macro GetInstallDetail PUBLISHER PRODUCT COMPONENT SUBKEY OUT
+    Push "${SUBKEY}"
+    Push "${COMPONENT}"
+    Push "${PRODUCT}"
+    Push "${PUBLISHER}"
+    Call GetInstallDetail
+    Pop ${OUT}
+!macroend
+!define GetInstallDetail `!insertmacro GetInstallDetail`
+
+!macro un.GetInstallDetail PUBLISHER PRODUCT COMPONENT SUBKEY OUT
+    Push "${SUBKEY}"
+    Push "${COMPONENT}"
+    Push "${PRODUCT}"
+    Push "${PUBLISHER}"
+    Call un.GetInstallDetail
+    Pop ${OUT}
+!macroend
+!define un.GetInstallDetail `!insertmacro un.GetInstallDetail`
 
 !define InsInstallLocation "InstallLocation"
 !define InsInstalled "Installed"

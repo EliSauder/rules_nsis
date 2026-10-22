@@ -27,11 +27,13 @@ FunctionEnd
     Call TrimQuotes
     Pop ${Output}
 !macroend
+!define TrimQuotes `!insertmacro TrimQuotes`
 
 !macro un.TrimQuotes Input Output
     Push "${Input}"
     Call un.TrimQuotes
     Pop ${Output}
 !macroend
+!define un.TrimQuotes `!insertmacro un.TrimQuotes`
 
 !endif

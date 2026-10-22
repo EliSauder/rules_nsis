@@ -21,13 +21,13 @@ StrCpy $switch_overwrite 0
 
 !macro MoveFile sourceFile destinationFile
 
-!define MOVEFILE_JUMP ${__LINE__}
+!define _MOVEFILE_JUMP ${__LINE__}
 
 ; Check source actually exists
 
     IfFileExists "${sourceFile}" +3 0
     SetErrors
-    goto done_${MOVEFILE_JUMP}
+    goto done_${_MOVEFILE_JUMP}
 
 ; Add message to details-view/install-log
 
@@ -37,7 +37,7 @@ StrCpy $switch_overwrite 0
 
     IfFileExists "${destinationFile}" +3 0
     rename "${sourceFile}" "${destinationFile}"
-    goto done_${MOVEFILE_JUMP}
+    goto done_${_MOVEFILE_JUMP}
 
 ; If overwriting without 'ifnewer' check
 
@@ -45,7 +45,7 @@ StrCpy $switch_overwrite 0
 	delete "${destinationFile}"
 	rename "${sourceFile}" "${destinationFile}"
 	delete "${sourceFile}"
-	goto done_${MOVEFILE_JUMP}
+	goto done_${_MOVEFILE_JUMP}
     ${EndIf}
 
 ; If destination already exists
@@ -58,30 +58,31 @@ StrCpy $switch_overwrite 0
     GetFileTime "${sourceFile}" $R0 $R1
     GetFileTime "${destinationFile}" $R2 $R3
 
-    IntCmp $R0 $R2 0 older_${MOVEFILE_JUMP} newer_${MOVEFILE_JUMP}
-    IntCmp $R1 $R3 older_${MOVEFILE_JUMP} older_${MOVEFILE_JUMP} newer_${MOVEFILE_JUMP}
+    IntCmp $R0 $R2 0 older_${_MOVEFILE_JUMP} newer_${_MOVEFILE_JUMP}
+    IntCmp $R1 $R3 older_${_MOVEFILE_JUMP} older_${_MOVEFILE_JUMP} newer_${_MOVEFILE_JUMP}
 
-older_${MOVEFILE_JUMP}:
+older_${_MOVEFILE_JUMP}:
     delete "${sourceFile}"
-    goto time_check_done_${MOVEFILE_JUMP}
+    goto time_check_done_${_MOVEFILE_JUMP}
 
-newer_${MOVEFILE_JUMP}:
+newer_${_MOVEFILE_JUMP}:
     delete "${destinationFile}"
     rename "${sourceFile}" "${destinationFile}"
     delete "${sourceFile}" ;incase above failed!
 
-time_check_done_${MOVEFILE_JUMP}:
+time_check_done_${_MOVEFILE_JUMP}:
 
     Pop $R3
     Pop $R2
     Pop $R1
     Pop $R0
 
-done_${MOVEFILE_JUMP}:
+done_${_MOVEFILE_JUMP}:
 
-!undef MOVEFILE_JUMP
+!undef _MOVEFILE_JUMP
 
 !macroend
+!define MoveFile `!insertmacro MoveFile`
 
 ;==================
 ; MoveFolder macro
@@ -89,7 +90,7 @@ done_${MOVEFILE_JUMP}:
 
 !macro MoveFolder source destination mask
 
-    !define MOVEFOLDER_JUMP ${__LINE__}
+    !define _MOVEFOLDER_JUMP ${__LINE__}
 
     Push $R0
     Push $R1
@@ -132,28 +133,28 @@ done_${MOVEFILE_JUMP}:
 
 ; Duplicate dir structure (to preserve empty folders and such)
 
-    ${Locate} "$R0" "/L=D" ".MoveFolder_Locate_createDir"
+    ${Locate} "$R0" "/L=D" "_MoveFolder_Locate_createDir"
 
 ; Locate files and move (via callback function)
 
-    ${Locate} "$R0" "/L=F /M=${mask} /S= /G=1" ".MoveFolder_Locate_moveFile"
+    ${Locate} "$R0" "/L=F /M=${mask} /S= /G=1" "_MoveFolder_Locate_moveFile"
 
 ; Delete subfolders left over after move
 
     Push $R2
-deldir_loop_${MOVEFOLDER_JUMP}:
+deldir_loop_${_MOVEFOLDER_JUMP}:
     StrCpy $R2 0
-    ${Locate} "$R0" "/L=DE" ".MoveFolder_Locate_deleteDir"
-    StrCmp $R2 0 0 deldir_loop_${MOVEFOLDER_JUMP}
+    ${Locate} "$R0" "/L=DE" "_MoveFolder_Locate_deleteDir"
+    StrCmp $R2 0 0 deldir_loop_${_MOVEFOLDER_JUMP}
     Pop $R2
 
 ; Delete empty subfolders moved - say the user just wanted to move *.apm files, they now also have a load of empty dir's from dir structure duplication!
 
     Push $R2
-delnewdir_loop_${MOVEFOLDER_JUMP}:
+delnewdir_loop_${_MOVEFOLDER_JUMP}:
     StrCpy $R2 0
-    ${Locate} "$R1" "/L=DE" ".MoveFolder_Locate_deleteDir"
-    StrCmp $R2 0 0 delnewdir_loop_${MOVEFOLDER_JUMP}
+    ${Locate} "$R1" "/L=DE" "_MoveFolder_Locate_deleteDir"
+    StrCmp $R2 0 0 delnewdir_loop_${_MOVEFOLDER_JUMP}
     Pop $R2
 
 ; Pop registers used by ${Locate} off the stack again
@@ -170,15 +171,16 @@ delnewdir_loop_${MOVEFOLDER_JUMP}:
 Pop $R1
 Pop $R0
 
-!undef MOVEFOLDER_JUMP
+!undef _MOVEFOLDER_JUMP
 
 !macroend
+!define MoveFolder `!insertmacro MoveFolder`
 
 ===============
 veFolder macro's ${Locate} callback functions
 ===============
 
-Function .MoveFolder_Locate_createDir
+Function _MoveFolder_Locate_createDir
 
     ${If} $R6 == ""
 	Push $R2
@@ -192,7 +194,7 @@ Function .MoveFolder_Locate_createDir
 
 FunctionEnd
 
-Function .MoveFolder_Locate_moveFile
+Function _MoveFolder_Locate_moveFile
 
     Push $R2
 
@@ -254,7 +256,7 @@ Function .MoveFolder_Locate_moveFile
 
 FunctionEnd
 
-Function .MoveFolder_Locate_deleteDir
+Function _MoveFolder_Locate_deleteDir
 
     ${If} $R6 == ""
 	RMDir $R9

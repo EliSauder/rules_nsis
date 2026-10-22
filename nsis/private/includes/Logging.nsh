@@ -38,6 +38,7 @@ Var LogLevel
     !insertmacro Log `DEBUG: ${TEXT}`
 !endif
 !macroend
+!define LogDebug `!insertmacro LogDebug`
 
 !macro LogInfo TEXT
 !ifdef LOGLEVEL_DEBUG
@@ -47,6 +48,7 @@ Var LogLevel
     !insertmacro Log `INFO: ${TEXT}`
 !endif
 !macroend
+!define LogInfo `!insertmacro LogInfo`
 
 !macro LogWarn TEXT
 !ifdef LOGLEVEL_DEBUG
@@ -59,6 +61,7 @@ Var LogLevel
     !insertmacro Log `WARN: ${TEXT}`
 !endif
 !macroend
+!define LogWarn `!insertmacro LogWarn`
 
 !macro LogError TEXT
 !ifdef LOGLEVEL_DEBUG
@@ -74,6 +77,7 @@ Var LogLevel
     !insertmacro Log `ERROR: ${TEXT}`
 !endif
 !macroend
+!define LogError `!insertmacro LogError`
 
 !macro Log TEXT
 !ifdef LOGGING_ENABLE
@@ -99,5 +103,6 @@ Var LogLevel
     ${EndIf}
 !endif
 !macroend
+!define Log `!insertmacro Log`
 
 !endif

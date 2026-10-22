@@ -43,6 +43,20 @@ FunctionEnd
   Pop ${DST}
 !macroend
 
+!macro Hex2Bin VALUE OUT
+  Push "${VALUE}"
+  Call Hex2Bin
+  Pop ${OUT}
+!macroend
+!define Hex2Bin `!insertmacro Hex2Bin`
+
+!macro un.Hex2Bin VALUE OUT
+  Push "${VALUE}"
+  Call un.Hex2Bin
+  Pop ${OUT}
+!macroend
+!define un.Hex2Bin `!insertmacro un.Hex2Bin`
+
 ;Hex2Bin
 
 ;Converts a hexadecimal number string to binary.
@@ -52,10 +66,8 @@ FunctionEnd
 ;Pop "BinaryNumberVariable"
 !macro _Hex2Bin PREFIX
 Function ${PREFIX}Hex2Bin
-    Push $0
-    Exch
-    Exch $1
-    Exch
+    Exch $0
+    Push $1
     Push $2
     Push $3
     Push $4
@@ -63,41 +75,44 @@ Function ${PREFIX}Hex2Bin
     Push $6
     Push $7
 
-    ; Set/Get Source Hex Number
-    StrLen $0 $1
-    StrCpy $3 $0
-
-    ; loop - Get 1 Letter per loop from right for process
-${PREFIX}Hex2BinNextLetter:
-    StrCpy $4 '$5 $4'
-    StrCpy $5 ''
-
-    StrCmp $3 '0' ${PREFIX}Hex2BinEnd
-
-    IntOP $3 $3 - 1
-    StrCpy $2 $1 1 $3
-    StrCpy $6 '256'
-
-    IntOP $6 $6 / 2
-    IntOP $7 0x$2 & $6
-    IntCmp $7 '0' +2
-        StrCpy $7 '1'
-    StrCpy $5 '$5$7'
-    StrCmp $6 '1' ${PREFIX}Hex2BinNextLetter -5
-
-${PREFIX}Hex2BinEnd:
-
-    StrCpy $1 $4 "" 4
-    StrCpy $1 $1 4
-
+    StrCpy $1 ""
+    StrLen $2 $0
+    StrCpy $3 0
+${PREFIX}Hex2BinNextChar:
+    StrCmp $3 $2 ${PREFIX}Hex2BinDone
+    StrCpy $4 $0 1 $3
+    ClearErrors
+    IntOp $4 0x$4 & 0xF
+    IfErrors ${PREFIX}Hex2BinInvalid
+    StrCpy $5 8
+    StrCpy $6 ""
+${PREFIX}Hex2BinNextBit:
+    IntOp $7 $4 & $5
+    ${If} $7 == 0
+        StrCpy $7 "0"
+    ${Else}
+        StrCpy $7 "1"
+    ${EndIf}
+    StrCpy $6 "$6$7"
+    IntOp $5 $5 / 2
+    StrCmp $5 0 ${PREFIX}Hex2BinNextNibble
+    Goto ${PREFIX}Hex2BinNextBit
+${PREFIX}Hex2BinNextNibble:
+    StrCpy $1 "$1$6"
+    IntOp $3 $3 + 1
+    Goto ${PREFIX}Hex2BinNextChar
+${PREFIX}Hex2BinInvalid:
+    StrCpy $1 ""
+${PREFIX}Hex2BinDone:
+    StrCpy $0 $1
     Pop $7
     Pop $6
     Pop $5
     Pop $4
     Pop $3
     Pop $2
-    Pop $0
-    Exch $1
+    Pop $1
+    Exch $0
 FunctionEnd
 !macroend
 

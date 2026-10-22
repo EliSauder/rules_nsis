@@ -11,6 +11,7 @@
     Call UninstallExisting
     Pop ${exitcode}
 !macroend
+!define UninstallExisting `!insertmacro UninstallExisting`
 
 Function UninstallExisting #(appkey: str) -> int:
     Exch $0

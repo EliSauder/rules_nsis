@@ -18,6 +18,7 @@
     ${EndIf}
     Pop $0
 !macroend
+!define DefineRegView `!insertmacro DefineRegView`
 
 !macro un.DefineRegView
     Push $0
@@ -29,6 +30,7 @@
     ${EndIf}
     Pop $0
 !macroend
+!define un.DefineRegView `!insertmacro un.DefineRegView`
 
 !macro _RemoveRegistryKeyFunction PREFIX
 Function ${PREFIX}RemoveRegistryKey
@@ -63,11 +65,13 @@ FunctionEnd
     Push "${KEY}"
     Call RemoveRegistryKey
 !macroend
+!define RemoveRegistryKey `!insertmacro RemoveRegistryKey`
 
 !macro un.RemoveRegistryKey KEY
     Push "${KEY}"
     Call un.RemoveRegistryKey
 !macroend
+!define un.RemoveRegistryKey `!insertmacro un.RemoveRegistryKey`
 
 !macro _FormatStrToDWORD PREFIX
 Function ${PREFIX}FormatStrToDWORD
@@ -88,24 +92,35 @@ FunctionEnd
     Call FormatStrToDWORD
     Pop ${OUT}
 !macroend
+!define FormatStrToDWORD `!insertmacro FormatStrToDWORD`
 
 !macro un.FormatStrToDWORD VAL OUT
     Push "${VAL}"
     Call un.FormatStrToDWORD
     Pop ${OUT}
 !macroend
+!define un.FormatStrToDWORD `!insertmacro un.FormatStrToDWORD`
 
 !macro _FormatStrToBin PREFIX
 Function ${PREFIX}FormatStrToBin
+    Exch $1 ; whether the input is already numeric
+    Exch 1
+    Exch $0 ; input value
+    Push $2
+
+    ${If} $1 == "1"
+        StrCpy $2 $0
+    ${Else}
+        !insertmacro ${PREFIX}CharToASCII "$0" $2
+    ${EndIf}
+    IntFmt $2 "0x%X" $2
+
+    !insertmacro ${PREFIX}Hex2Bin "$2" $0
+
+    Pop $2
     Exch $0
-
-    !insertmacro ${PREFIX}CharToASCII "$0" $0
-    IntFmt $0 "0x%X" $0
-
-    Push $0
-    Call ${PREFIX}Hex2Bin
-    ;Pop $0
-    ;Push $0
+    Exch 1
+    Pop $1
 FunctionEnd
 !macroend
 
@@ -118,6 +133,7 @@ FunctionEnd
     Call FormatStrToBin
     Pop ${OUT}
 !macroend
+!define FormatStrToBin `!insertmacro FormatStrToBin`
 
 !macro un.FormatStrToBin VAL ISINT OUT
     Push "${VAL}"
@@ -125,6 +141,7 @@ FunctionEnd
     Call un.FormatStrToBin
     Pop ${OUT}
 !macroend
+!define un.FormatStrToBin `!insertmacro un.FormatStrToBin`
 
 !macro _SetRegistrySubKey PREFIX TYP
 Function ${PREFIX}SetRegistrySubKey${TYP}
@@ -163,10 +180,12 @@ FunctionEnd
 !macro SetRegistrySubKeyBin KEY SUBKEY VALUE
     WriteRegBin SHCTX "${KEY}" "${SUBKEY}" ${VALUE}
 !macroend
+!define SetRegistrySubKeyBin `!insertmacro SetRegistrySubKeyBin`
 
 !macro un.SetRegistrySubKeyBin KEY SUBKEY VALUE
     WriteRegBin SHCTX "${KEY}" "${SUBKEY}" ${VALUE}
 !macroend
+!define un.SetRegistrySubKeyBin `!insertmacro un.SetRegistrySubKeyBin`
 
 !macro SetRegistrySubKeyStr KEY SUBKEY VALUE
     Push "${SUBKEY}"
@@ -174,6 +193,7 @@ FunctionEnd
     PUSH "${KEY}"
     Call SetRegistrySubKeyStr
 !macroend
+!define SetRegistrySubKeyStr `!insertmacro SetRegistrySubKeyStr`
 
 !macro un.SetRegistrySubKeyStr KEY SUBKEY VALUE
     Push "${SUBKEY}"
@@ -181,6 +201,7 @@ FunctionEnd
     PUSH "${KEY}"
     Call un.SetRegistrySubKeyStr
 !macroend
+!define un.SetRegistrySubKeyStr `!insertmacro un.SetRegistrySubKeyStr`
 
 !macro SetRegistrySubKeyDWORD KEY SUBKEY VALUE
     Push "${SUBKEY}"
@@ -188,6 +209,7 @@ FunctionEnd
     PUSH "${KEY}"
     Call SetRegistrySubKeyDWORD
 !macroend
+!define SetRegistrySubKeyDWORD `!insertmacro SetRegistrySubKeyDWORD`
 
 !macro un.SetRegistrySubKeyDWORD KEY SUBKEY VALUE
     Push "${SUBKEY}"
@@ -195,6 +217,7 @@ FunctionEnd
     PUSH "${KEY}"
     Call un.SetRegistrySubKeyDWORD
 !macroend
+!define un.SetRegistrySubKeyDWORD `!insertmacro un.SetRegistrySubKeyDWORD`
 
 !macro _GetRegistrySubKey PREFIX
 Function ${PREFIX}GetRegistrySubKey
@@ -228,6 +251,7 @@ FunctionEnd
     Call GetRegistrySubKey
     Pop ${OUT}
 !macroend
+!define GetRegistrySubKey `!insertmacro GetRegistrySubKey`
 
 !macro un.GetRegistrySubKey KEY SUBKEY OUT
     Push "${SUBKEY}"
@@ -235,4 +259,5 @@ FunctionEnd
     Call un.GetRegistrySubKey
     Pop ${OUT}
 !macroend
+!define un.GetRegistrySubKey `!insertmacro un.GetRegistrySubKey`
 !endif
