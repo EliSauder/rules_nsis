@@ -1,0 +1,25 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+load("@rules_python//python:py_test.bzl", "py_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["defs.bzl"])
+
+py_binary(
+    name = "generate",
+    srcs = ["generate.py"],
+    main = "generate.py",
+)
+
+py_library(
+    name = "testing",
+    srcs = ["__init__.py", "generate.py", "runner.py"],
+)
+
+py_test(
+    name = "framework_test",
+    size = "small",
+    srcs = ["framework_test.py"],
+    deps = [":testing"],
+)

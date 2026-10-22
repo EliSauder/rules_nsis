@@ -1,0 +1,50 @@
+load("@rules_python//python:py_test.bzl", "py_test")
+load("//nsis/testing:defs.bzl", "nsis_test_harness")
+
+_EXAMPLES = [
+    "macro",
+    "definition",
+    "shorthand",
+    "function",
+    "uninstaller",
+    "file",
+    "logging",
+    "registry",
+    "inout",
+    "corruption",
+    "uninstaller_corruption",
+]
+
+[
+    nsis_test_harness(
+        name = name + "_harness",
+        src = "example.nsh",
+        description = name + ".json",
+        testonly = True,
+    )
+    for name in _EXAMPLES
+]
+
+filegroup(
+    name = "binaries",
+    srcs = [name + "_harness" for name in _EXAMPLES],
+    testonly = True,
+)
+
+[
+    py_test(
+        name = name + "_test",
+        size = "small",
+        srcs = ["example_test.py"],
+        main = "example_test.py",
+        args = [
+            name,
+            "$(rlocationpath :" + name + "_harness)",
+            "$(rlocationpath " + name + ".json)",
+        ],
+        data = [":" + name + "_harness", name + ".json"],
+        deps = ["//nsis/testing", "@rules_python//python/runfiles"],
+        target_compatible_with = ["@platforms//os:windows"],
+    )
+    for name in _EXAMPLES
+]

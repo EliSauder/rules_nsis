@@ -1,0 +1,8 @@
+{
+  "symbol": "Echo",
+  "kind": "function",
+  "parameters": [
+    {"name": "text", "direction": "in"},
+    {"name": "result", "direction": "out"}
+  ]
+}

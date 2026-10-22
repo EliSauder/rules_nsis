@@ -1,0 +1,5 @@
+{
+  "symbol": "Emit",
+  "kind": "macro",
+  "parameters": [{"name": "text", "direction": "in"}]
+}
