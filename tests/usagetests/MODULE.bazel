@@ -10,13 +10,12 @@ signing_tools = use_extension("@rules_signing//signing:extensions.bzl", "signing
 signing_tools.openssl(path = "openssl")
 use_repo(
     signing_tools,
-    "signing_cosign",
     "signing_openssl",
     "signing_osslsigncode",
+    "signing_cosign",
 )
 register_toolchains(
     "@signing_openssl//:openssl_toolchain",
-    "@signing_cosign//:cosign_toolchain",
     "@signing_osslsigncode//:osslsigncode_toolchain",
 )
 
