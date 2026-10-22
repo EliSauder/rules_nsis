@@ -43,7 +43,6 @@ exists:
     Push $2
     Push $3
     !insertmacro GetUninstallRegistry "${UnInstallLocation}" $3
-    Pop $3
     !insertmacro TrimQuotes $3 $3
     ${If} "$3" == ""
         !insertmacro LogError "App $0 has no InstallDir path. Please uninstall manually first."

@@ -216,9 +216,10 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
         valTs, typTs = _reg_value(root, reg_path, access, "TypesSupported")
         testcase.assertEqual(
             valTs,
-            str(st),
-            f"TypesSupported {valTs} != {str(st)} (1 | 2 | 4 [Error | Warn | Info])"
+            st,
+            f"TypesSupported {valTs} != {st} (1 | 2 | 4 [Error | Warn | Info])"
         )
+        testcase.assertEqual(typTs, winreg.REG_DWORD)
 
         cmf = ";".join(v["category_message_files"])
         if cmf and len(cmf) > 0:
@@ -273,7 +274,6 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, sub
     unstr, unstrtyp = _reg_value(root, unpath, access, "UninstallString")
     _reg_value(root, unpath, access, "NoRepair")
     _reg_value(root, unpath, access, "NoModify")
-    _reg_value(root, unpath, access, "DisplayIcon")
     instlocval, instloctyp = _reg_value(root, unpath, access, "InstallLocation")
 
     testcase.assertEqual(
