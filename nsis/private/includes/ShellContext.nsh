@@ -30,6 +30,15 @@ Var current_context
     ${EndIf}
 !macroend
 
+!macro un.SetShellContext
+    !insertmacro __shellctx_init
+    ${IfAdmin}
+        SetShellVarContext all
+    ${Else}
+        SetShellVarContext current
+    ${EndIf}
+!macroend
+
 !macro UpdateShellContextToAdmin
     StrCpy $current_context "admin"
     StrCpy $__shellctx_init "y"

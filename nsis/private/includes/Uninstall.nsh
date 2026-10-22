@@ -45,8 +45,8 @@ exists:
     Pop $3
     !insertmacro TrimQuotes $3 $3
     ${If} "$3" == ""
-        !insertmacro LogError "App $0 has no ${REG_KEY_INSTLOC} path. Please uninstall manually first."
-        MessageBox MB_ICONSTOP "App $0 has no ${REG_KEY_INSTLOC} path defined. Please uninstall manually first." /SD IDOK
+        !insertmacro LogError "App $0 has no InstallDir path. Please uninstall manually first."
+        MessageBox MB_ICONSTOP "App $0 has no InstallDir path defined. Please uninstall manually first." /SD IDOK
         Pop $3
         Pop $2
         Pop $1

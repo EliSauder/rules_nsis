@@ -20,13 +20,13 @@ Var product_code
         Pop $0
     ${EndIf}
 
-    StrCpy $product_code "${GUID}"
+    StrCpy $product_code "$0"
     Pop $0
 !macroend
 
 !macro un.SetProductCode GUID
     Push $0
-    !insertmacro NormalizeGuid "${GUID}" $0
+    !insertmacro un.NormalizeGuid "${GUID}" $0
 
     ${If} "$0" == ""
         !insertmacro LogError "Invalid uuid/guid ${GUID}"
@@ -34,23 +34,21 @@ Var product_code
         Abort 5
     ${EndIf}
 
-    StrCpy $product_code "${GUID}"
+    StrCpy $product_code "$0"
     Pop $0
 !macroend
 
 !macro GetProductCode OUT
-    ${If} $product_code != ""
+    ${If} $product_code == ""
         !insertmacro LogError "No product code set"
-        Pop $0
         Abort 6
     ${EndIf}
     StrCpy ${OUT} $product_code
 !macroend
 
 !macro un.GetProductCode OUT
-    ${If} $product_code != ""
+    ${If} $product_code == ""
         !insertmacro LogError "No product code set"
-        Pop $0
         Abort 6
     ${EndIf}
     StrCpy ${OUT} $product_code
@@ -70,24 +68,33 @@ Var product_code
     Pop $0
 !macroend
 
-!macro UpdateUninstallRegistry SUBKEY VALUE
-Function UpdateUninstallRegistry
+!macro _UpdateUninstallRegistry PREFIX
+Function ${PREFIX}UpdateUninstallRegistry
     Exch $0 ; Subkey
-    Exch
+    Exch 1
     Exch $1 ; Value
     Push $2
-    !insertmacro GetProductCode $2
-    !insertmacro SetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$2" "$0" $1
+    !insertmacro ${PREFIX}GetProductCode $2
+    !insertmacro ${PREFIX}SetRegistrySubKeyStr "${_UNINSTALLER_BASE_KEY}\$2" "$0" $1
     Pop $2
     Pop $1
     Pop $0
+FunctionEnd
+!macroend
+
+!insertmacro _UpdateUninstallRegistry ""
+!insertmacro _UpdateUninstallRegistry "un."
+
+!macro UpdateUninstallRegistry SUBKEY VALUE
+    Push "${VALUE}"
+    Push "${SUBKEY}"
+    Call UpdateUninstallRegistry
 !macroend
 
 !macro un.UpdateUninstallRegistry SUBKEY VALUE
-    Push $0
-    !insertmacro un.GetProductCode $0
-    !insertmacro un.SetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$0" "${SUBKEY}" ${VALUE}
-    Pop $0
+    Push "${VALUE}"
+    Push "${SUBKEY}"
+    Call un.UpdateUninstallRegistry
 !macroend
 
 !macro RemoveUninstallRegistry
@@ -158,7 +165,7 @@ Function ${PREFIX}UpdateInstallDetail
         StrCpy $0 "$0\Components\$2"
     ${Endif}
 
-    !insertmacro ${PREFIX}SetRegistrySubKey "$0" "$3" $4
+    !insertmacro ${PREFIX}SetRegistrySubKeyStr "$0" "$3" $4
 
     Pop $4
     Pop $0
