@@ -9,9 +9,6 @@
 !include Arch.nsh
 
 !macro DefineRegView
-!ifdef RULES_NSIS_INSTALLER_32BIT
-    SetRegView 32
-!else
     Push $0
     !insertmacro Is64Bit $0
     ${If} $0 == "1"
@@ -20,14 +17,10 @@
         SetRegView 32
     ${EndIf}
     Pop $0
-!endif
 !macroend
 !define DefineRegView `!insertmacro DefineRegView`
 
 !macro un.DefineRegView
-!ifdef RULES_NSIS_INSTALLER_32BIT
-    SetRegView 32
-!else
     Push $0
     !insertmacro un.Is64Bit $0
     ${If} $0 == "1"
@@ -36,7 +29,6 @@
         SetRegView 32
     ${EndIf}
     Pop $0
-!endif
 !macroend
 !define un.DefineRegView `!insertmacro un.DefineRegView`
 

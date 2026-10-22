@@ -107,12 +107,6 @@ def _get_installer_test_details(ctx, inst, target):
     if numcomp == 0:
         fail("no components defined")
 
-    arch = ""
-    if inst.arch in ["x86_64", "arm64"]:
-        arch = "64"
-    else:
-        arch = "32"
-
     instf = target[DefaultInfo].files.to_list()[0]
 
     return {
@@ -127,7 +121,6 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_vendor": inst.vendor or "",
         "expected_install_path": inst.install_path or "",
         "expected_id": inst.id or "",
-        "expected_bitwidth": arch,
         "expected_execution_level": inst.execution_level,
         "expected_services": services,
         "expected_eventlog": elsrcs,

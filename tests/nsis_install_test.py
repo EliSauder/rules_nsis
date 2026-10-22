@@ -5,6 +5,7 @@ import time
 import psutil
 import json
 import pathlib
+import platform
 import shutil
 import subprocess
 import sys
@@ -97,6 +98,13 @@ def _get_reg_access(bitwidth: str) -> int:
     access = winreg.KEY_READ | winreg.KEY_QUERY_VALUE
     access |= _get_reg_view(bitwidth)
     return access
+
+def _set_expected_registry_view(config: dict):
+    machine = platform.machine().lower()
+    bitwidth = "64" if machine in ("amd64", "x86_64", "arm64", "aarch64") else "32"
+    config["expected_bitwidth"] = bitwidth
+    for installer in config.get("install_first_and_remove", []):
+        installer["expected_bitwidth"] = bitwidth
 
 def _reg_open(root_db: int, path: str, view: int):
     try:
@@ -578,6 +586,7 @@ if __name__ == "__main__":
         with open(RUNFILES.Rlocation(sys.argv[2]), "r", encoding="utf-8") as f:
             content = f.read()
             CONFIG = json.loads(content)
+            _set_expected_registry_view(CONFIG)
     except json.JSONDecodeError as e:
         raise SystemExit(f"Invalid config JSON: {e}\nFile: {sys.argv[2]}\nContent: {content}")
     except:

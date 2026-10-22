@@ -1,9 +1,6 @@
 !pragma warning disable 6010 ; Because we are using templates, some installers
                              ; don't use everything defined.
 Unicode True
-{{- if or (eq (ds "in").Architecture "x86_32") (eq (ds "in").Architecture "arm32") }}
-!define RULES_NSIS_INSTALLER_32BIT
-{{- end }}
 SetCompressor {{ (ds "in").Compressor }}
 SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 
