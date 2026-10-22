@@ -5,14 +5,15 @@
 ; Modifications:
 ;  - Now behaves like string cmpr ver1 < ver2 = -1, ver1 > ver2 = 1, ver1 == ver2 = 0
 ;
-!define VersionCompare `!insertmacro VersionCompareCall`
-
 !macro VersionCompareCall _VER1 _VER2 _RESULT
 	Push `${_VER1}`
 	Push `${_VER2}`
 	Call VersionCompare
 	Pop ${_RESULT}
 !macroend
+!define VersionCompareCall `!insertmacro VersionCompareCall`
+
+!define VersionCompare `!insertmacro VersionCompareCall`
 
 ; ____________________________________________________________________________
 ;

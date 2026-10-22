@@ -18,6 +18,7 @@ Var isx86
     ${EndIf}
     StrCpy ${OUT} $current_arch
 !macroend
+!define GetArch `!insertmacro GetArch`
 
 !macro un.GetArch OUT
     ${If} $current_arch == ""
@@ -25,6 +26,7 @@ Var isx86
     ${EndIf}
     StrCpy ${OUT} $current_arch
 !macroend
+!define un.GetArch `!insertmacro un.GetArch`
 
 !macro Is64Bit OUT
     ${If} $current_arch == ""
@@ -32,6 +34,7 @@ Var isx86
     ${EndIf}
     StrCpy ${OUT} $is64bit
 !macroend
+!define Is64Bit `!insertmacro Is64Bit`
 
 !macro un.Is64Bit OUT
     ${If} $current_arch == ""
@@ -39,6 +42,7 @@ Var isx86
     ${EndIf}
     StrCpy ${OUT} $is64bit
 !macroend
+!define un.Is64Bit `!insertmacro un.Is64Bit`
 
 !macro Is32Bit OUT
     ${If} $current_arch == ""
@@ -46,6 +50,7 @@ Var isx86
     ${EndIf}
     StrCpy ${OUT} $is32bit
 !macroend
+!define Is32Bit `!insertmacro Is32Bit`
 
 !macro un.Is32Bit OUT
     ${If} $current_arch == ""
@@ -53,6 +58,7 @@ Var isx86
     ${EndIf}
     StrCpy ${OUT} $is32bit
 !macroend
+!define un.Is32Bit `!insertmacro un.Is32Bit`
 
 !macro _DetectArch PREFIX
 Function ${PREFIX}DetectArch
@@ -99,6 +105,16 @@ FunctionEnd
 !insertmacro _DetectArch ""
 !insertmacro _DetectArch "un."
 
+!macro DetectArch
+    Call DetectArch
+!macroend
+!define DetectArch `!insertmacro DetectArch`
+
+!macro un.DetectArch
+    Call un.DetectArch
+!macroend
+!define un.DetectArch `!insertmacro un.DetectArch`
+
 !define IfBitWdithMatch `${If} `
 
 !macro ValidateArch EXPECTED
@@ -114,6 +130,7 @@ FunctionEnd
         Pop $0
     ${EndIf}
 !macroend
+!define ValidateArch `!insertmacro ValidateArch`
 
 !macro un.ValidateArch EXPECTED
     ${If} $current_arch == ""
@@ -128,6 +145,7 @@ FunctionEnd
         Pop $0
     ${EndIf}
 !macroend
+!define un.ValidateArch `!insertmacro un.ValidateArch`
 
 !macro ValidateBitwdth EXPECTED
     ${If} $current_arch == ""
@@ -145,6 +163,7 @@ FunctionEnd
         Abort 3
     ${EndIf}
 !macroend
+!define ValidateBitwdth `!insertmacro ValidateBitwdth`
 
 !macro un.ValidateBitwdth EXPECTED
     ${If} $current_arch == ""
@@ -162,6 +181,7 @@ FunctionEnd
         Abort 3
     ${EndIf}
 !macroend
+!define un.ValidateBitwdth `!insertmacro un.ValidateBitwdth`
 
 !macro ValidateISA EXPECTED
     ${If} $current_arch == ""
@@ -179,6 +199,7 @@ FunctionEnd
         Abort 3
     ${EndIf}
 !macroend
+!define ValidateISA `!insertmacro ValidateISA`
 
 !macro un.ValidateISA EXPECTED
     ${If} $current_arch == ""
@@ -196,5 +217,6 @@ FunctionEnd
         Abort 3
     ${EndIf}
 !macroend
+!define un.ValidateISA `!insertmacro un.ValidateISA`
 
 !endif

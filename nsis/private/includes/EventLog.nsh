@@ -62,6 +62,7 @@ FunctionEnd
     Push "${KEY}"
     Call EventLog_AddSource
 !macroend
+!define EventLog_AddSource `!insertmacro EventLog_AddSource`
 
 !macro un.EventLog_AddSource KEY SOURCE TYPESUPPORT EMF CMF PMF
     Push "${PMF}"
@@ -72,12 +73,15 @@ FunctionEnd
     Push "${KEY}"
     Call un.EventLog_AddSource
 !macroend
+!define un.EventLog_AddSource `!insertmacro un.EventLog_AddSource`
 
 !macro EventLog_RemoveSource KEY SOURCE
     !insertmacro RemoveRegistryKey "${_ROOT_EVENTLOG_KEY}\${KEY}\${SOURCE}"
 !macroend
+!define EventLog_RemoveSource `!insertmacro EventLog_RemoveSource`
 
 !macro un.EventLog_RemoveSource KEY SOURCE
     !insertmacro un.RemoveRegistryKey "${_ROOT_EVENTLOG_KEY}\${KEY}\${SOURCE}"
 !macroend
+!define un.EventLog_RemoveSource `!insertmacro un.EventLog_RemoveSource`
 !endif

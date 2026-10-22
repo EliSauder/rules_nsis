@@ -29,6 +29,7 @@ Var current_context
         SetShellVarContext current
     ${EndIf}
 !macroend
+!define SetShellContext `!insertmacro SetShellContext`
 
 !macro un.SetShellContext
     !insertmacro __shellctx_init
@@ -38,16 +39,19 @@ Var current_context
         SetShellVarContext current
     ${EndIf}
 !macroend
+!define un.SetShellContext `!insertmacro un.SetShellContext`
 
 !macro UpdateShellContextToAdmin
     StrCpy $current_context "admin"
     StrCpy $__shellctx_init "y"
 !macroend
+!define UpdateShellContextToAdmin `!insertmacro UpdateShellContextToAdmin`
 
 !macro UpdateShellContextToCurrent
     StrCpy $current_context "current"
     StrCpy $__shellctx_init "y"
 !macroend
+!define UpdateShellContextToCurrent `!insertmacro UpdateShellContextToCurrent`
 
 !macro ResetShellContext
 !ifdef IS_ADMIN_EXECUTION_LEVEL
@@ -57,5 +61,6 @@ Var current_context
 !endif
     StrCpy $__shellctx_init "y"
 !macroend
+!define ResetShellContext `!insertmacro ResetShellContext`
 
 !endif

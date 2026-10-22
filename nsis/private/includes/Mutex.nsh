@@ -14,6 +14,7 @@
     ${EndIf}
     Pop $R0
 !macroend
+!define ValidateMutex `!insertmacro ValidateMutex`
 
 !macro un.ValidateMutex NAME
     Push $R0
@@ -26,5 +27,6 @@
     ${EndIf}
     Pop $R0
 !macroend
+!define un.ValidateMutex `!insertmacro un.ValidateMutex`
 
 !endif
