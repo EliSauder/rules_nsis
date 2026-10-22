@@ -1520,9 +1520,9 @@ def _nsis_installer_impl(ctx):
             outfile = ctx.attr.outfile,
             arch = ctx.attr.arch,
             post_init = ctx.file.post_init,
-            pre_init = ctx.file.post_init,
+            pre_init = ctx.file.pre_init,
             post_uninit = ctx.file.post_uninit,
-            pre_uninit = ctx.file.post_uninit,
+            pre_uninit = ctx.file.pre_uninit,
         ),
     ]
 
