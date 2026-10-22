@@ -7,6 +7,7 @@ on:
 jobs:
   build-and-test:
     strategy:
+      fail-fast: false
       matrix:
         bazel_version: ["8.x", "9.x"]
         os: ["ubuntu-latest", "windows-latest", "macos-latest"]
