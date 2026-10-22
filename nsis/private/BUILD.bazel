@@ -6,7 +6,7 @@ exports_files([
 exports_files([
     "transitions.bzl",
     "dirrule.bzl",
-], ["//nsis:__subpackages__"])
+], ["//nsis:__subpackages__", "//tests:__subpackages__"])
 
 platform(
     name = "windows_x64",
@@ -14,6 +14,7 @@ platform(
         "@platforms//os:windows",
         "@platforms//cpu:x86_64",
     ],
+    visibility = ["//nsis:__subpackages__", "//tests:__subpackages__"],
 )
 
 platform(
@@ -22,6 +23,7 @@ platform(
         "@platforms//os:windows",
         "@platforms//cpu:x86_32",
     ],
+    visibility = ["//nsis:__subpackages__", "//tests:__subpackages__"],
 )
 
 platform(
@@ -30,6 +32,7 @@ platform(
         "@platforms//os:windows",
         "@platforms//cpu:arm64",
     ],
+    visibility = ["//nsis:__subpackages__", "//tests:__subpackages__"],
 )
 
 platform(
@@ -38,6 +41,7 @@ platform(
         "@platforms//os:windows",
         "@platforms//cpu:arm",
     ],
+    visibility = ["//nsis:__subpackages__", "//tests:__subpackages__"],
 )
 #
 #alias(

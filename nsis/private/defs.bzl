@@ -3,9 +3,19 @@ load("@bazel_lib//lib:stamping.bzl", "STAMP_ATTRS", "maybe_stamp")
 load(
     "@rules_signing//signing:actions.bzl",
     "SIGNING_ATTRS",
-    "SIGNING_TOOLCHAINS",
     "signing_argv",
     "signing_context",
+    "signing_toolchains",
+)
+
+# The installer's own generated .exe is always a Windows PE binary, signed
+# with a hardcoded `tool = "osslsigncode"` below, so this is the only signing
+# toolchain nsis_installer ever needs.
+_INSTALLER_SIGNING_TOOLCHAINS = signing_toolchains(
+    cosign = False,
+    codesign = False,
+    openssl = False,
+    jarsigner = False,
 )
 
 _NSIS_TOOLCHAIN_TYPE = "//nsis/toolchain:toolchain_type"
@@ -94,14 +104,11 @@ NsisComponentInfo = provider(
         "selection_mode": "How the component is selected.",
         "display_name": "The display name of the group.",
         "install_categories": "The install categories (types) the component is enabled in.",
-        "srcs": "The file sources of the component.",
-        "signed_dir": """
-The directory artifact that `srcs` was signed into, if `signing_certificate`
-is set, else None. Exposed separately from `srcs` because it's a directory
-artifact whose contents aren't known until the signing action that produced
-it has actually run; consumers that need those contents (see
-`_resolve_signed_directory` in nsis/private/render/resolve_signed_dir.py) must
-resolve it as part of a build action rather than at analysis time.
+        "srcs": """
+The file sources of the component, already signed if `signing_certificate`
+is set. Each source keeps its own shape (a directory source stays a
+directory) rather than collapsing into one signed tree artifact, so this can
+be consumed the same way whether or not the component is signed.
 """,
         "dirs": "The directories to create with the component.",
         "dependencies": "The components this one depends on.",
@@ -356,75 +363,12 @@ Represents a section group inside of a NSIS section group.
     },
 )
 
-def _sign_component_files(ctx, files):
-    """Signs `files` into a single flattened, signed directory artifact.
-
-    All of the files are written into one output directory keyed by
-    basename (rather than their bazel short_path) so the resulting layout
-    matches how unsigned files are installed by `_get_component_ds`, which
-    also only ever uses `file.basename`. Bundling everything into one
-    signing action, rather than one per file, keeps this to a single
-    directory-artifact `Directories` entry instead of many.
-
-    Returns a list containing the single output directory `File`, or an
-    empty list if there is nothing to sign.
-    """
-    if not files:
-        return []
-
-    dedup_tmp = {}
-
-    for f in files:
-        tmp = dedup_tmp.get(f.basename)
-        if tmp == f.path:
-            continue
-        if tmp != None:
-            fail("Multiple paths link to the same base name {}: {} and {}".format(f.basename, tmp, f.path))
-        dedup_tmp[f.basename] = f.path
-
-    lines = ["{}\t{}\n".format(k, v) for k, v in dedup_tmp.items()]
-    manifest = ctx.actions.declare_file(
-        "{}.signing_manifest".format(ctx.label.name),
-    )
-    ctx.actions.write(manifest, "".join(lines))
-
-    out_dir = ctx.actions.declare_directory(
-        "{}_signed".format(ctx.label.name),
-    )
-
-    sctx = signing_context(ctx, srcs = files)
-    argv = signing_argv(sctx, rel_src_manifest = manifest, out_dir = out_dir.path)
-
-    ctx.actions.run(
-        executable = sctx.executable,
-        # argv[0] is the executable itself, which ctx.actions.run supplies.
-        arguments = argv[1:],
-        inputs = depset(files + [manifest], transitive = [sctx.inputs]),
-        tools = sctx.tools,
-        outputs = [out_dir],
-        mnemonic = "SignComponentSrcs",
-        progress_message = "Signing sources for {}".format(ctx.label),
-    )
-
-    return [out_dir]
-
 def _nsis_component_impl(ctx):
-    signed_dir = None
-    if ctx.attr.signing_certificate:
-        # Sign everything this component ships: srcs, the service
-        # executable, and the backing files of any shortcuts, so nothing
-        # unsigned ends up in the installer.
-        to_sign = ctx.files.srcs + ctx.files.service_executable + ctx.files.shortcuts
-        signed = _sign_component_files(ctx, to_sign)
-        files = depset(signed)
-        if signed:
-            signed_dir = signed[0]
-    else:
-        rf = ctx.runfiles(files = ctx.files.srcs)
-        rfs = ctx.runfiles(files = ctx.files.service_executable)
-        files = depset(
-            direct = ctx.files.srcs + ctx.files.service_executable,
-            transitive = [rf.files, rfs.files])
+    rf = ctx.runfiles(files = ctx.files.srcs)
+    rfs = ctx.runfiles(files = ctx.files.service_executable)
+    files = depset(
+        direct = ctx.files.srcs + ctx.files.service_executable,
+        transitive = [rf.files, rfs.files])
 
     return NsisComponentInfo(
         name = str(ctx.label.name),
@@ -440,7 +384,6 @@ def _nsis_component_impl(ctx):
         install_categories = [str(x) for x in ctx.attr.install_categories],
         shortcuts = ctx.attr.shortcuts,
         srcs = files,
-        signed_dir = signed_dir,
         dependencies = ctx.attr.dependencies,
         dirs = [x[NsisDirectoryInfo] for x in ctx.attr.dirs if NsisDirectoryInfo in x ],
         eventlog = ctx.attr.eventlog,
@@ -468,8 +411,11 @@ Represents a NSIS installer section.
         ),
         "service_executable": attr.label(
             allow_single_file = True,
-            executable = True,
-            doc = "The executable of the service. Required if service is True.",
+            doc = "The executable of the service. Required if service is True. " +
+                  "The referenced target need not itself be a Bazel " +
+                  "\"executable\" rule - a `sign()` output, for instance, " +
+                  "works fine here too - it just has to produce the single " +
+                  "file that is the service's binary.",
             cfg = "target",
         ),
         "service_args": attr.string_list(
@@ -662,8 +608,7 @@ The script should properly handle the stack and not overwrite values.
 For more details see `post_install`.
 """,
         ),
-    }, **dict(SIGNING_ATTRS, **STAMP_ATTRS)),
-    toolchains = SIGNING_TOOLCHAINS,
+    }, **STAMP_ATTRS),
 )
 
 def _nsis_directory_impl(ctx):
@@ -1082,7 +1027,7 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
         elif NsisComponentInfo in v:
             cmp = v[NsisComponentInfo]
             cd = _get_component_ds(toolchain, cmp, inst_cat)
-            component_map[cmp.name] = struct(data = cd, signed_dir = cmp.signed_dir)
+            component_map[cmp.name] = cd
             current_components_data.append(cd)
 
         for e in es:
@@ -1279,13 +1224,6 @@ def _get_component_ds(toolchain, component, inst_cat):
 
     for file in component.srcs.to_list():
         if file.is_directory:
-            if component.signed_dir != None and file.path == component.signed_dir.path:
-                # Resolved into concrete Files entries by
-                # `_resolve_signed_directory` once the signing action that
-                # produced this directory has actually run (see
-                # `_stamp_file`/`_handle_stamping`); Bazel can't enumerate its
-                # contents here at analysis time.
-                continue
             data["Directories"].append(
                 str(_make_sys_path(toolchain, file.path)))
         else:
@@ -1449,45 +1387,6 @@ def _stamp_file(ctx, nm, data):
 
     return outfile
 
-def _resolve_signed_dir_manifest(ctx, nm, stamped_file, signed_dirs):
-    """Rewrites a stamped datafile so any component dict in it (matched by
-    its "Name" field) with a signed `srcs` directory in `signed_dirs` (a
-    dict of component name -> signed directory File) gets one `Files` entry
-    per file actually found inside that directory.
-
-    This runs as its own action (via `_resolve_signed_dir_script`) rather
-    than folding the work into `_stamp_file`, since a signed directory's real
-    contents - including any sidecar files a signing tool appends to a name
-    (e.g. cosign's detached ".sig"/".bundle.json") - are only knowable once
-    the signing action has actually produced them, not by predicting names
-    in the rule. The datafile is searched recursively (rather than assuming
-    a fixed shape) because component data is embedded in more than one
-    place: inline under the installer's own `Components`/`ComponentGroups`,
-    and as the top-level dict of each component's `component_<name>`
-    datasource (used by user pre/post-install hooks).
-    """
-    hs = "{}-{}".format(ctx.attr.name, nm)
-
-    manifest_file = ctx.actions.declare_file("data-signed-manifest-{}.json".format(hs))
-    ctx.actions.write(
-        output = manifest_file,
-        content = json.encode({name: d.path for name, d in signed_dirs.items()}),
-    )
-
-    outfile = ctx.actions.declare_file("data-resolved-{}.json".format(hs))
-
-    ctx.actions.run(
-        mnemonic = "ResolveSignedComponentFiles",
-        progress_message = "Resolving signed files for {}".format(ctx.label),
-        outputs = [outfile],
-        inputs = [stamped_file, manifest_file] + signed_dirs.values() + [ctx.executable._resolve_signed_dir_script],
-        executable = ctx.executable._resolve_signed_dir_script,
-        tools = [ctx.executable._resolve_signed_dir_script],
-        arguments = [stamped_file.path, outfile.path, manifest_file.path],
-    )
-
-    return outfile
-
 def _handle_stamping(ctx, data, component_map):
     datafiles = dict()
 
@@ -1497,32 +1396,10 @@ def _handle_stamping(ctx, data, component_map):
     for k, c in component_map.items():
         if k in datafiles:
             fail("{} was already defined once. Please use a different name. If you are using 'in' please change it as 'in' is a reserved component for rules_nsis.".format(k))
-        df = _stamp_file(ctx, k, c.data)
+        df = _stamp_file(ctx, k, c)
         datafiles[k] = df
 
     return datafiles
-
-def _resolve_signed_components(ctx, component_map, datafiles):
-    """Rewrites datafiles so components with a signed `srcs` directory show
-    real, on-disk file names instead of the placeholder directory artifact
-    `_get_component_ds` otherwise leaves out of the stamped data.
-
-    This has to touch both the "in" datafile - since the installer's main
-    install/uninstall sections are rendered from `(ds "in").Components`, a
-    separate embedded copy of each component's data, not from the
-    per-component datafiles below - and each signed component's own
-    datafile, which is what `component_<name>` resolves to for user
-    pre/post-install hooks.
-    """
-    signed_dirs = {k: c.signed_dir for k, c in component_map.items() if c.signed_dir != None}
-    if not signed_dirs:
-        return datafiles
-
-    resolved = dict(datafiles)
-    resolved["in"] = _resolve_signed_dir_manifest(ctx, "in", datafiles["in"], signed_dirs)
-    for k, signed_dir in signed_dirs.items():
-        resolved[k] = _resolve_signed_dir_manifest(ctx, k, datafiles[k], {k: signed_dir})
-    return resolved
 
 def _get_render_file(ctx, prefix, infile):
     hs = "{}-{}-{}-{}.{}".format(
@@ -1569,7 +1446,6 @@ def _build_rendered_templates(ctx, toolchain):
     data["IncludeFiles"] = [_make_sys_path(toolchain, v.path) for k, v in scripts.items()]
 
     datafiles = _handle_stamping(ctx, data, component_map)
-    datafiles = _resolve_signed_components(ctx, component_map, datafiles)
 
     files = set()
     for s, d in scripts.items():
@@ -1863,11 +1739,6 @@ For more details see `post_init`.
             executable = True,
             cfg = "exec",
         ),
-        "_resolve_signed_dir_script": attr.label(
-            default = Label("//nsis/private/render:resolve_signed_dir"),
-            executable = True,
-            cfg = "exec",
-        ),
         "_template": attr.label(
             default = Label("//nsis/private/templates:NSIS.template.nsi"),
             allow_single_file = True,
@@ -1885,5 +1756,5 @@ For more details see `post_init`.
     }, **dict(SIGNING_ATTRS, **STAMP_ATTRS)),
     toolchains = [
         _NSIS_TOOLCHAIN_TYPE,
-    ] + SIGNING_TOOLCHAINS,
+    ] + _INSTALLER_SIGNING_TOOLCHAINS,
 )
