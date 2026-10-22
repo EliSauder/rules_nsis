@@ -1,6 +1,7 @@
 !pragma warning disable 6010 ; Because we are using templates, some installers
                              ; don't use everything defined.
 Unicode True
+!define TESTABLE_INSTALLER
 SetCompressor {{ (ds "in").Compressor }}
 SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 
@@ -516,6 +517,7 @@ Function .onInit
     !insertmacro PreInit
     {{ end }}
 
+    !insertmacro TestIdInit
     !insertmacro SetShellContext
     !insertmacro DefineRegView
 
@@ -555,6 +557,7 @@ Function un.onInit
     !insertmacro PreUnInit
     {{ end }}
 
+    !insertmacro TestIdInit
     !insertmacro un.SetShellContext
     !insertmacro un.DefineRegView
 
