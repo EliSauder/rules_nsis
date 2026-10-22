@@ -61,6 +61,7 @@
               pkgs.go-swag
               pkgs.go-task
               pkgs.bazelisk
+              pkgs.python3
             ];
           };
       });
