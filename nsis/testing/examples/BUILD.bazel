@@ -1,0 +1,114 @@
+load("@rules_python//python:py_test.bzl", "py_test")
+load("//nsis/testing:defs.bzl", "nsis_symbol", "nsis_test_harness")
+
+_EXAMPLES = [
+    "macro",
+    "definition",
+    "shorthand",
+    "function",
+    "uninstaller",
+    "file",
+    "logging",
+    "registry",
+    "inout",
+    "corruption",
+    "uninstaller_corruption",
+    "typed",
+    "stack_leak",
+    "stack_consume",
+    "uninstaller_stack_leak",
+    "error_flag",
+    "function_order",
+    "uninstaller_function_order",
+    "defines",
+]
+
+_DIVMOD = ["in:dividend:int", "in:divisor:int", "out:quotient:int", "out:remainder:int"]
+
+[
+    nsis_symbol(
+        name = name + "_symbol",
+        symbol = symbol,
+        kind = kind,
+        context = context,
+        parameters = parameters,
+        invocation = invocation,
+    )
+    for name, symbol, kind, context, parameters, invocation in [
+        ("macro", "Echo", "macro", "installer", ["in:text", "out:result"], ""),
+        ("definition", "Answer", "definition", "installer", ["out:result"], "value"),
+        ("shorthand", "Echo", "definition", "installer", ["in:text", "out:result"], ""),
+        ("function", "Echo", "function", "installer", ["in:text", "out:result"], ""),
+        ("uninstaller", "un.Echo", "function", "uninstaller", ["in:text", "out:result"], ""),
+        ("file", "CreateFile", "macro", "installer", ["in:path", "out:result"], ""),
+        ("logging", "Emit", "macro", "installer", ["in:text"], ""),
+        ("registry", "Registry", "macro", "installer", ["in:key", "in:value", "out:result"], ""),
+        ("inout", "Append", "macro", "installer", ["inout:value"], ""),
+        ("corruption", "CorruptRegisters", "macro", "installer", [], ""),
+        ("uninstaller_corruption", "CorruptRegisters", "macro", "uninstaller", [], ""),
+        ("typed", "Typed", "macro", "installer", ["inout:number:int", "inout:enabled:bool"], ""),
+        ("stack_leak", "LeakStack", "macro", "installer", [], ""),
+        ("stack_consume", "ConsumeStack", "macro", "installer", [], ""),
+        ("uninstaller_stack_leak", "LeakStack", "macro", "uninstaller", [], ""),
+        ("error_flag", "SetErrorFlag", "macro", "installer", ["in:clear:bool"], ""),
+        ("function_order", "DivMod", "function", "installer", _DIVMOD, ""),
+        ("uninstaller_function_order", "un.DivMod", "function", "uninstaller", _DIVMOD, ""),
+    ]
+]
+
+[
+    nsis_test_harness(
+        name = name + "_harness",
+        src = "example.nsh",
+        description = ":" + name + "_symbol",
+        testonly = True,
+    )
+    for name in _EXAMPLES
+]
+
+filegroup(
+    name = "binaries",
+    srcs = [name + "_harness" for name in _EXAMPLES],
+    testonly = True,
+)
+
+nsis_symbol(
+    name = "defines_symbol",
+    symbol = "un.Example",
+    kind = "definition",
+    context = "uninstaller",
+    parameters = ["in:second:int", "out:first:bool", "inout:third"],
+    invocation = "call",
+    defines = {"TEST_MODE": "value with spaces"},
+    testonly = True,
+)
+
+py_test(
+    name = "description_test",
+    size = "small",
+    srcs = ["description_test.py"],
+    args = [
+        "$(rlocationpath :defines_symbol)",
+        "$(rlocationpath :definition_symbol)",
+    ],
+    data = [":defines_symbol", ":definition_symbol"],
+    deps = ["//nsis/testing", "@rules_python//python/runfiles"],
+)
+
+[
+    py_test(
+        name = name + "_test",
+        size = "small",
+        srcs = ["example_test.py"],
+        main = "example_test.py",
+        args = [
+            name,
+            "$(rlocationpath :" + name + "_harness)",
+            "$(rlocationpath :" + name + "_symbol)",
+        ],
+        data = [":" + name + "_harness", ":" + name + "_symbol"],
+        deps = ["//nsis/testing", "@rules_python//python/runfiles"],
+        target_compatible_with = ["@platforms//os:windows"],
+    )
+    for name in _EXAMPLES
+]

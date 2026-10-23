@@ -1,5 +1,6 @@
 load("//tests:defs.bzl", "nsis_installer_test", "signing_env_test")
 load("//tests:analysis_tests.bzl", "eventlog_requires_admin_test")
+load("//tests:include_api_tests.bzl", "nsis_include_api_tests")
 load(
     "//nsis:defs.bzl",
     "nsis_component",
@@ -648,3 +649,5 @@ nsis_installer_test(
     installer = ":minimal_installer_user",
     must_have_files = ["README.md"],
 )
+
+nsis_include_api_tests()
