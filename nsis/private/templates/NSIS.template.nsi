@@ -2015,12 +2015,6 @@ Function .onInit
     !insertmacro SetProductCode "${PRODUCT_ID}"
 
     Push $0
-    !insertmacro UninstallExisting "${PRODUCT_ID}" $0
-    ${If} $0 <> 0
-        MessageBox MB_YESNO|MB_ICONSTOP "Failed to uninstall previous, continue anyway?" /SD IDYES IDYES +2
-        Abort
-    ${EndIf}
-
     {{- range (ds "in").Components }}
     {{- template "sectionVarInit" .}}
     {{- end}}
@@ -2028,14 +2022,21 @@ Function .onInit
     {{- range (ds "in").ComponentGroups }}
     {{- template "sectionGroupVarInit" .}}
     {{- end}}
-    Pop $0
 
+    {{- /* Invalid arguments must fail before the existing install is removed. */}}
     Call __Components_ApplyCli
 
     {{- if (ds "in").HasOptions }}
     ${Cli_Init}
     Call __Options_ApplyCli
     {{- end }}
+
+    !insertmacro UninstallExisting "${PRODUCT_ID}" $0
+    ${If} $0 <> 0
+        MessageBox MB_YESNO|MB_ICONSTOP "Failed to uninstall previous, continue anyway?" /SD IDYES IDYES +2
+        Abort
+    ${EndIf}
+    Pop $0
 
     {{ if (ds "in").HasPostInit }}
     !insertmacro PostInit
