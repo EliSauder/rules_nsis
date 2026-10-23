@@ -2,7 +2,16 @@
 
 load(":defs.bzl", "include_api_case")
 
-_TEST_ID = ['${SetTestId} "framework-test-id"']
+_PRODUCT_KEY = {
+    "installer": ['${SetProductKey} "rules_nsis_tests"'],
+    "uninstaller": ['${un.SetProductKey} "rules_nsis_tests"'],
+}
+
+# Persisting cases also isolate the registry with a test id.
+_TEST_ID = {
+    context: ['${SetTestId} "framework-test-id"'] + lines
+    for context, lines in _PRODUCT_KEY.items()
+}
 
 def options_cases():
     cases = []

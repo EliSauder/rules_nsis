@@ -1105,6 +1105,7 @@ Function .onInit
     {{- if (ds "in").TestableInstaller }}
     !insertmacro TestIdInit
     {{- end }}
+    !insertmacro SetProductKey "${PRODUCT_KEY_PATH}"
     !insertmacro SetShellContext
     {{- if (ds "in").HasOptions }}
     Call __Options_InitDefaults
@@ -1162,6 +1163,7 @@ Function un.onInit
     {{- if (ds "in").TestableInstaller }}
     !insertmacro TestIdInit
     {{- end }}
+    !insertmacro un.SetProductKey "${PRODUCT_KEY_PATH}"
     !insertmacro un.SetShellContext
     {{- if (ds "in").HasOptions }}
     Call un.__Options_InitDefaults

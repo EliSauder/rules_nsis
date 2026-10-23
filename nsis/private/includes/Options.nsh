@@ -16,17 +16,17 @@
 ; defaults to nothing so this file compiles on its own.
 ;
 ; Persisted values are stored as REG_SZ values named `<page>.<key>` under
-; `${REG_KEY}\Options`, in the view and shell context the installer uses.
+; `<product key>\Options`, in the view and shell context the installer uses.
+; The product key must be set with ${SetProductKey} (Product.nsh) before
+; persisting or loading values.
 
 !include LogicLib.nsh
 !include Logging.nsh
+!include Product.nsh
 !include Registry.nsh
 !include ShellContext.nsh
 !include Testing.nsh
 
-!ifndef REG_KEY
-    !define REG_KEY "Software\Options"
-!endif
 
 !ifmacrondef __Options_ForEachPersisted
 !macro __Options_ForEachPersisted CALLBACK
@@ -120,7 +120,8 @@ Function ${PREFIX}Option_ReadReg
     Push $3
 
     !insertmacro ${PREFIX}SetShellContext
-    StrCpy $2 "${REG_KEY}\Options"
+    !insertmacro ${PREFIX}GetProductKey $2
+    StrCpy $2 "$2\Options"
     !insertmacro _ApplyRegTestId $2 $3
     !insertmacro ${PREFIX}DefineRegView
     ClearErrors
@@ -148,7 +149,8 @@ Function Option_WriteReg
     Push $3
 
     !insertmacro SetShellContext
-    StrCpy $2 "${REG_KEY}\Options"
+    !insertmacro GetProductKey $2
+    StrCpy $2 "$2\Options"
     !insertmacro _ApplyRegTestId $2 $3
     !insertmacro DefineRegView
     WriteRegStr SHCTX "$2" "$0" "$1"

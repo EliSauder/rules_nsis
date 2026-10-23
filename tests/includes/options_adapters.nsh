@@ -8,6 +8,12 @@ Var __opt_test_b
 
 !include "Options.nsh"
 
+!macro _HarnessOptionClear PREFIX
+    Push $0
+    !insertmacro ${PREFIX}GetProductKey $0
+    !insertmacro ${PREFIX}RemoveRegistryKey "$0\Options"
+    Pop $0
+!macroend
 
 !macro HarnessOptionRoundTrip VALUE OUT
     ${Option_Set} test a `${VALUE}`
@@ -36,26 +42,26 @@ Var __opt_test_b
 ; Persists VALUE, clobbers the option and loads it back. Another option that
 ; was never stored keeps its value.
 !macro HarnessOptionPersist VALUE OUT
-    ${RemoveRegistryKey} "${REG_KEY}\Options"
+    !insertmacro _HarnessOptionClear ""
     ${Option_Set} test a `${VALUE}`
     ${Option_Set} test b "default"
     ${Option_Persist}
     ${Option_Set} test a "clobbered"
     ${Option_LoadPersisted}
     ${Option_Get} test a ${OUT}
-    ${RemoveRegistryKey} "${REG_KEY}\Options"
+    !insertmacro _HarnessOptionClear ""
 !macroend
 
 ; With nothing stored, loading keeps the defaults.
 !macro HarnessOptionLoadMissing DEFAULT OUT
-    ${RemoveRegistryKey} "${REG_KEY}\Options"
+    !insertmacro _HarnessOptionClear ""
     ${Option_Set} test a `${DEFAULT}`
     ${Option_LoadPersisted}
     ${Option_Get} test a ${OUT}
 !macroend
 
 !macro un.HarnessOptionLoadMissing DEFAULT OUT
-    ${un.RemoveRegistryKey} "${REG_KEY}\Options"
+    !insertmacro _HarnessOptionClear un.
     ${Option_Set} test a `${DEFAULT}`
     ${un.Option_LoadPersisted}
     ${Option_Get} test a ${OUT}

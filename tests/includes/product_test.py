@@ -59,6 +59,13 @@ def run_case(case, harness, args):
     elif base == "set_product_code":
         assert harness.run(guid="aabbccdd-eeff-0011-2233-445566778899").returncode == 0
         harness.run(guid="not-a-guid", expected_exitcode=5)
+    elif base == "set_product_key":
+        assert harness.run(path="Publisher\\Product").returncode == 0
+        harness.run(path="", expected_exitcode=5)
+    elif base == "product_key":
+        harness.run().assert_outputs(value="SOFTWARE\\Publisher\\Product")
+    elif base == "product_key_unset":
+        harness.run(expected_exitcode=6)
     elif base == "product_code_unset":
         harness.run(expected_exitcode=6)
     elif base == "product_code":

@@ -6,6 +6,7 @@
 !include "Guid.nsh"
 
 Var product_code
+Var product_key
 
 !define _UNINSTALLER_BASE_KEY "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
 !define _INSTALL_DETAIL_BASE_KEY "SOFTWARE"
@@ -61,6 +62,38 @@ Var product_code
     StrCpy ${OUT} $product_code
 !macroend
 !define un.GetProductCode `!insertmacro un.GetProductCode`
+
+; The product's own registry key, `SOFTWARE\<PATH>` (e.g. PATH is
+; `Publisher\Product`). Includes such as Options.nsh store their state under it.
+!macro SetProductKey PATH
+    ${If} "${PATH}" == ""
+        !insertmacro LogError "Empty product key"
+        SetErrorLevel 5
+        Abort
+    ${EndIf}
+    StrCpy $product_key "${_INSTALL_DETAIL_BASE_KEY}\${PATH}"
+!macroend
+!define SetProductKey `!insertmacro SetProductKey`
+
+!macro un.SetProductKey PATH
+    !insertmacro SetProductKey `${PATH}`
+!macroend
+!define un.SetProductKey `!insertmacro un.SetProductKey`
+
+!macro GetProductKey OUT
+    ${If} $product_key == ""
+        !insertmacro LogError "No product key set"
+        SetErrorLevel 6
+        Abort
+    ${EndIf}
+    StrCpy ${OUT} $product_key
+!macroend
+!define GetProductKey `!insertmacro GetProductKey`
+
+!macro un.GetProductKey OUT
+    !insertmacro GetProductKey ${OUT}
+!macroend
+!define un.GetProductKey `!insertmacro un.GetProductKey`
 
 !macro GetUninstallRegistry SUBKEY OUT
     Push $0

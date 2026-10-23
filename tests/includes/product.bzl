@@ -89,6 +89,29 @@ def product_cases():
             args = product.args,
         )
 
+    cases += include_api_case(
+        name = "set_product_key",
+        api = "product",
+        include = "Product.nsh",
+        symbol = "SetProductKey",
+        parameters = ["in:path"],
+    )
+    for name, on_init in [
+        ("product_key", {
+            "installer": ['${SetProductKey} "Publisher\\Product"'],
+            "uninstaller": ['${un.SetProductKey} "Publisher\\Product"'],
+        }),
+        ("product_key_unset", []),
+    ]:
+        cases += include_api_case(
+            name = name,
+            api = "product",
+            include = "Product.nsh",
+            symbol = "GetProductKey",
+            parameters = ["out:value"],
+            on_init = on_init,
+        )
+
     # The output operand is a register the macro also uses internally.
     product = product_code("88888888-8888-4888-8888-888888888888")
     cases += include_api_case(
