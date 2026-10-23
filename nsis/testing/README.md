@@ -12,7 +12,7 @@ nsis_symbol(
     name = "echo_symbol",
     symbol = "Echo",
     kind = "macro",
-    parameters = ["in:text", "out:result"],
+    parameters = ["in:text:string", "out:result:string"],
 )
 
 nsis_test_harness(
@@ -43,23 +43,33 @@ nsis_symbol(
 )
 ```
 
-Python inputs must match the declared types: strings, signed 32-bit integers,
-or booleans. Booleans are sent to NSIS as `1`/`0`; integers as decimal strings.
-Returned values are converted to the corresponding Python types, including
-inout parameters. Invalid input types/ranges and malformed returned values
-raise `ValueError` identifying the parameter. Integer outputs must be decimal;
-boolean outputs must be exactly `0` or `1`. Python's `bool` is not accepted as
-an `int`, and `assert_outputs` distinguishes them. For standalone JSON, set
-`"type": "int"` or `"type": "bool"` on each parameter; omitted types remain
-strings for backward compatibility.
+| Declared type | Python input/output | NSIS wire value |
+|---|---|---|
+| `string` | `str` | Unchanged string |
+| `int` | `int`, from -2147483648 through 2147483647 | Decimal string, such as `-42` |
+| `bool` | `bool` | Exactly `1` for `True` or `0` for `False` |
+
+Python inputs must match the declared types. Returned values are converted to
+the corresponding Python types, including inout parameters. Invalid input
+types/ranges and malformed returned values raise `ValueError` identifying the
+parameter. Integer outputs must be decimal; hexadecimal and surrounding
+whitespace are rejected. Boolean outputs must be exactly `0` or `1`, not
+`true`/`false`. Python's `bool` is not accepted as an `int`, and
+`assert_outputs` distinguishes them. `in:text` remains equivalent to
+`in:text:string` for backward compatibility.
+
+Types describe the Python boundary; NSIS still receives and returns strings.
+The generated executable does not independently enforce types when invoked
+directly from a shell. The Python runner validates inputs before execution and
+converts outputs after reading the result file.
 
 Macros and callable definitions receive input values and output variable
 operands in that order. For constant definitions, set `invocation = "value"`
 and declare exactly one output. Definitions otherwise default to callable
 shorthand expansion, including output-only helpers. For functions, inputs are
 pushed in reverse declaration order (the first input is on top), and outputs
-are popped in declaration order (the first
-output must be on top). Stack functions use separate input and output parameters.
+are popped in declaration order (the first output must be on top).
+Stack functions use separate input and output parameters.
 Declare the actual symbol, including `un.` when appropriate.
 
 `context` defaults to `installer`. For `uninstaller`, the executable first
@@ -68,18 +78,21 @@ exit. Optional `defines` maps preprocessor names to string values defined before
 including the source. Harnesses run at user execution level; they do not elevate.
 
 Standalone JSON files remain accepted by `description` and the generator CLI.
-The equivalent standalone description for the example above is:
+The equivalent standalone description for the Echo example is:
 
 ```json
 {
   "symbol": "Echo",
   "kind": "macro",
   "parameters": [
-    {"name": "text", "direction": "in"},
-    {"name": "result", "direction": "out"}
+    {"name": "text", "direction": "in", "type": "string"},
+    {"name": "result", "direction": "out", "type": "string"}
   ]
 }
 ```
+
+For typed standalone descriptions, use `"type": "int"` or `"type": "bool"`.
+Omitting `type` defaults to `string`, just as in the Bazel rule.
 
 ## Python tests
 
@@ -95,6 +108,20 @@ with Harness(binary_path, description_path, directory=test_tmpdir) as api:
     assert result.returncode == 0
     assert result.stderr == ""
 ```
+
+For the `Typed` example, resolve the typed harness and symbol paths instead:
+
+```python
+with Harness(typed_binary_path, typed_description_path, directory=test_tmpdir) as api:
+    result = api.run(number=41, enabled=False)
+    result.assert_outputs(number=42, enabled=True)
+    assert type(result.outputs["number"]) is int
+    assert type(result.outputs["enabled"]) is bool
+```
+
+`Result.outputs` is a dictionary of `str`, `int`, or `bool` values according to
+the declaration. `assert_outputs` checks both values and exact Python types;
+expecting `1` for a declared boolean returned as `True` fails.
 
 Each harness instance owns a unique temporary directory, also used as the
 process working directory. Files remain available for inspection until context
@@ -130,10 +157,13 @@ demonstrates writing to both handles without a console.
 
 ## Generated executable protocol
 
-The executable accepts `/name=value` for each input and `/output=absolute-path`
+The executable accepts `/name=value` for each input/inout and `/output=absolute-path`
 for its output file. Quote the value, not the entire option:
 `/text="hello world"`. Uninstaller bootstrap
 accepts `/harness_uninstaller=absolute-path`. The Python runner handles both.
+For typed parameters, use decimal integers and `1`/`0` booleans, for example
+`/number=41 /enabled=0`. Output records always contain strings on disk; the
+Python runner uses the symbol description to convert them to typed values.
 Missing arguments exit with 64; changed registers exit with 65; random sentinel
 generation failures exit with 70; output creation/write errors exit with 74.
 Otherwise, the API's exit code is preserved.
@@ -155,7 +185,9 @@ bazel test //nsis/testing/examples:all
 ```
 
 Examples cover macros, shorthand and constant definitions, functions,
-uninstallers, inout parameters, filesystem and registry assertions, and captured
-stdout/stderr. Each example has its own Bazel test target.
+uninstallers, typed integer/boolean inout parameters, filesystem and registry
+assertions, and captured stdout/stderr. Each example has its own Bazel test
+target. See [`examples/BUILD.bazel`](examples/BUILD.bazel) for symbol declarations
+and [`examples/example_test.py`](examples/example_test.py) for Python usage.
 Two negative examples intentionally corrupt `$0` and `$R9` and assert that the
 framework detects both changes, in installer and uninstaller contexts.

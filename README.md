@@ -5,6 +5,7 @@
     1. [Usage](#Usage)
     2. [Features](#Features)
 2. [Generated Installer Details](#Generated-Installer-Details)
+3. [NSIS API Unit Testing](#nsis-api-unit-testing)
 
 ## Overview
 
@@ -94,6 +95,20 @@ Set `signing_certificate` on `nsis_installer` to a
 If the certificate uses `password_env`, pass that variable to the build with
 `--action_env=VARIABLE_NAME` (or `--action_env=VARIABLE_NAME=value`).
 The installer action preserves the signing environment, including on Windows.
+
+
+## NSIS API Unit Testing
+
+Use `nsis_symbol` to declare an API and `nsis_test_harness` to build a standalone
+test executable without writing JSON. Parameters use `direction:name[:type]`,
+for example `["in:count:int", "in:enabled:bool", "out:result:string"]`.
+Supported types are `string` (default), signed 32-bit `int`, and `bool`.
+The Python `Harness` validates inputs, converts outputs to their declared types,
+captures stdout/stderr, and checks that all 20 NSIS registers are preserved.
+
+See the [testing framework guide](nsis/testing/README.md) for Bazel definitions,
+typed Python assertions, installer/uninstaller support, and runnable examples.
+These unit harnesses are separate from the end-to-end installer tests.
 
 ## Generated Installer Details
 

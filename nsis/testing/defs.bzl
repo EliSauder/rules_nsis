@@ -38,7 +38,12 @@ def _symbol_impl(ctx):
     ]
 
 nsis_symbol = rule(
-    doc = "Describe an NSIS symbol without maintaining a JSON file.",
+    doc = """Describe an NSIS symbol without maintaining a JSON file.
+
+Parameters use direction:name[:type]. The Python runner validates and converts
+string (default), signed 32-bit int, and bool values; booleans use 1/0 in NSIS.
+The default output is the generated JSON description consumed by Harness.
+""",
     implementation = _symbol_impl,
     attrs = {
         "symbol": attr.string(mandatory = True),

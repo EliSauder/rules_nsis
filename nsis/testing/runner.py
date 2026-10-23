@@ -90,6 +90,8 @@ def read_outputs(path, names):
 
 @dataclass(frozen=True)
 class Result:
+    """API outputs converted to declared Python types, plus process diagnostics."""
+
     outputs: dict[str, str | int | bool]
     returncode: int
     stdout: str
@@ -106,7 +108,12 @@ class Result:
 
 
 class Harness:
-    """Use as a context manager; files remain available until context exit."""
+    """Run an API with typed inputs/outputs; files persist until context exit.
+
+    Parameters default to string. Declared int parameters require signed 32-bit
+    Python integers, and bool parameters require Python booleans (NSIS uses 1/0).
+    Invalid inputs or malformed typed outputs raise ValueError.
+    """
 
     def __init__(self, binary, description, *, directory=None, timeout=30):
         self.binary = Path(binary).resolve()
