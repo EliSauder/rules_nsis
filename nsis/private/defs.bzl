@@ -869,7 +869,7 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
         tools = tools,
         outputs = [outfile],
         env = env,
-        use_default_shell_env = False,
+        use_default_shell_env = bool(sctx.required_env_vars),
     )
 
     return [

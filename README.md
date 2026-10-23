@@ -27,6 +27,19 @@ use_repo(nsis, "nsis_tool", "nsis_toolchains")
 register_toolchains("@nsis_toolchains//:all")
 ```
 
+The Windows x86 zlib dependency is downloaded from SourceForge first. If that
+download fails, Bazel builds upstream zlib 1.3.1 from GitHub sources with a
+Windows x86 platform transition and a pinned Zig compiler. It cross-compiles on
+Linux/macOS and builds Windows binaries on Windows, producing a static library,
+DLL, import library, headers, and license. Compilation failures are reported
+normally; no bundled ZIP is used. The download is currently disabled in
+`MODULE.bazel` (`download = False`) to exercise the source-build fallback;
+set it to `True` to restore the SourceForge-first behavior.
+The Windows bundle follows the layout in
+[NSIS Appendix G](https://nsis.sourceforge.io/Docs/AppendixG.html).
+Building native `makensis` on POSIX still requires native zlib development
+headers and libraries, as before; the Windows bundle does not replace them.
+
 #### Define Installer
 
 For a full list of options, see: https://registry.bazel.build/docs/rules_nsis
@@ -76,6 +89,14 @@ nsis_installer(
 - [ ] Set Environment Variables. \[Help Wanted]
 - [ ] Don't prompt for components if all hidden or all required.
 - [ ] Enable adding files directly to installer (add to hidden section).
+
+### Signing
+
+Set `signing_certificate` on `nsis_installer` to a
+[`rules_signing`](https://github.com/EliSauder/rules_signing) certificate target.
+If the certificate uses `password_env`, pass that variable to the build with
+`--action_env=VARIABLE_NAME` (or `--action_env=VARIABLE_NAME=value`).
+The installer action preserves the signing environment, including on Windows.
 
 ## Generated Installer Details
 
