@@ -11,6 +11,7 @@ load(":icacls.bzl", "icacls_cases")
 load(":logging.bzl", "logging_cases")
 load(":move_file_folder.bzl", "move_file_folder_cases")
 load(":mutex.bzl", "mutex_cases")
+load(":options.bzl", "options_cases")
 load(":product.bzl", "product_cases")
 load(":registry.bzl", "registry_cases")
 load(":sc.bzl", "sc_cases")
@@ -34,6 +35,7 @@ _INCLUDES = [
     "Logging.nsh",
     "MoveFileFolder.nsh",
     "Mutex.nsh",
+    "Options.nsh",
     "Product.nsh",
     "Registry.nsh",
     "Sc.nsh",
@@ -87,6 +89,7 @@ include_api_suite(
             logging_cases() +
             move_file_folder_cases() +
             mutex_cases() +
+            options_cases() +
             product_cases() +
             registry_cases() +
             _SC.cases +
