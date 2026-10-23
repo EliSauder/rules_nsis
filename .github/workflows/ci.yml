@@ -26,6 +26,12 @@ jobs:
           cache-save: ${{ github.event_name != 'pull_request' }}
       - name: Build
         run: bazel build //... --verbose_failures --sandbox_debug
+      - name: Sign installer with explicit password environment
+        run: bazel build //tests:minimal_installer_signed_env --action_env=RULES_NSIS_TEST_PASSWORD=test-password --verbose_failures
+      - name: Sign installer with inherited password environment
+        env:
+          RULES_NSIS_TEST_PASSWORD: test-password
+        run: bazel build //tests:minimal_installer_signed_env --action_env=RULES_NSIS_TEST_PASSWORD --verbose_failures
       - name: Test
         run: bazel test //... --verbose_failures --sandbox_debug --test_output=errors --test_summary=detailed  --flaky_test_attempts=5
   test-with-cache:
