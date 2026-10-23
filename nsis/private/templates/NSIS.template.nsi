@@ -534,10 +534,9 @@ Function .onInit
     !insertmacro SetShellContext
     !insertmacro DefineRegView
 
+    {{- /* allow_32bit_on_64bit relaxes bitwidth only; it never adds an ISA check. */}}
     {{ if or (not (ds "in").ArchitectureAllow32On64) (ds "in").ArchitectureIs64 }}
     !insertmacro ValidateArch "{{ (ds "in").Architecture }}"
-    {{ else }}
-    !insertmacro ValidateISA "{{ (ds "in").Architecture }}"
     {{ end }}
 
     !insertmacro ValidateMutex "${PRODUCT_ID}Install"
@@ -578,10 +577,9 @@ Function un.onInit
 
     !insertmacro un.SetProductCode "${PRODUCT_ID}"
 
+    {{- /* allow_32bit_on_64bit relaxes bitwidth only; it never adds an ISA check. */}}
     {{ if or (not (ds "in").ArchitectureAllow32On64) (ds "in").ArchitectureIs64 }}
     !insertmacro un.ValidateArch "{{ (ds "in").Architecture }}"
-    {{ else }}
-    !insertmacro un.ValidateISA "{{ (ds "in").Architecture }}"
     {{ end }}
 
     !insertmacro un.ValidateMutex "${PRODUCT_ID}Uninstall"

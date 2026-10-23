@@ -116,7 +116,9 @@ The installer action preserves the signing environment, including on Windows.
 - Asserts that the installer is being run on the correct architecture based
   on provided arch.
 - By default will allow 32bit installers to be installed on 64bit systems. This
-  can be disabled.
+  can be disabled. The flag only relaxes bitwidth: 32bit installers that allow
+  64bit hosts skip architecture validation entirely, so (for example) an
+  `x86_32` installer may run under emulation on `arm64` Windows.
 - Uses MUI for the UI.
 - Logs to StdOut if run from a console.
 - Ensures only one installer is running using a mutex.
@@ -128,6 +130,9 @@ The installer action preserves the signing environment, including on Windows.
   keys it uses. This is to handle race conditions while testing installers.
 - If version is not provided, will default to `0.0.0.0`.
 - EventLog keys written to `SYSTEM\CurrentControlSet\Services\EventLog\Application\{{.Id}}`
+  under `HKLM` (always, since the Event Log service only reads `HKLM`; this
+  requires an admin installer). Message file paths are stored as
+  `REG_EXPAND_SZ`, so environment variables such as `%SystemRoot%` expand.
 
 ### Stamping
 - Stamp values will be substituted with their workspace avlues when built with
