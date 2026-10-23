@@ -1,5 +1,16 @@
 from tests.includes import common
 
+_ARCHES = ("x86_32", "x86_64", "arm32", "arm64")
+
+# Installer arches each host accepts: a 32bit installer may only use the 64bit
+# host of its own instruction set.
+_ACCEPTS = {
+    "x86_32": {"x86_32"},
+    "x86_64": {"x86_32", "x86_64"},
+    "arm32": {"arm32"},
+    "arm64": {"arm32", "arm64"},
+}
+
 
 def run_case(case, harness, args):
     base = common.base(case)
@@ -20,16 +31,14 @@ def run_case(case, harness, args):
         assert harness.run(isa="arm" if "arm" in arch else "x86").returncode == 0
     elif base == "arch_is_native_arm32":
         harness.run().assert_outputs(arm32=arch == "arm32")
-    elif base == "arch_allows_32_on_64":
-        # Flags for installer arch x86_32, x86_64, arm32, arm64: a 32bit
-        # installer may only use the 64bit host of its own instruction set.
-        for host, expected in [
-            ("x86_32", "1000"),
-            ("x86_64", "1100"),
-            ("arm32", "0010"),
-            ("arm64", "0011"),
-        ]:
-            harness.run(host=host).assert_outputs(accepted=expected)
+    elif base.startswith(("arch_allows_32_on_64_on_", "arch_validate_32_on_64_on_")):
+        (host,) = args
+        for expected in _ARCHES:
+            accepted = expected in _ACCEPTS[host]
+            if base.startswith("arch_allows_"):
+                harness.run(expected=expected).assert_outputs(accepted=accepted)
+            else:
+                harness.run(expected=expected, expected_exitcode=0 if accepted else 3)
     else:
         raise common.unhandled(case)
 

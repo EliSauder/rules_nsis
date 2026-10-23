@@ -17,10 +17,11 @@ from tests.includes import common
 # api -> case -> (spec, extra args)
 CASES = {}
 
-# Cases that change machine state, so only their first invocation is checked.
+# Cases that change machine state or assert process output, so only their
+# first invocation is checked.
 _IMPURE = (
     "registry_set_", "registry_get_", "registry_remove", "uninstall_registry_",
-    "install_detail_", "eventlog_", "move_", "uninstall_existing", "icacls_",
+    "install_detail_", "eventlog_", "move_", "uninstall_existing", "icacls_", "mutex", "log",
 )
 
 
@@ -51,7 +52,8 @@ class ContractResult:
 
 
 def contract_harness(spec, *, stop_at_invocation=False):
-    def run(expect_errors=None, **values):
+    def run(expected_exitcode=0, expect_errors=None, **values):
+        assert type(expected_exitcode) is int
         assert expect_errors is None or type(expect_errors) is bool
         parameters = inputs(spec)
         assert values.keys() == {p["name"] for p in parameters}, values

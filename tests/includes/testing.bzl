@@ -15,17 +15,15 @@ def testing_cases():
         on_init = _TEST_ID,
     )
 
-    # SetTestId has no observable effect on its own.
+    # SetTestId's effect is observed by test_id, which sets the id in .onInit.
     cases += include_api_case(
         name = "test_id_set",
         api = "testing",
         include = "Testing.nsh",
-        src = "testing_adapters.nsh",
-        symbol = "HarnessSetTestId",
-        un_symbol = "HarnessSetTestId",
-        parameters = ["in:id", "out:value"],
+        symbol = "SetTestId",
+        un_symbol = "SetTestId",
+        parameters = ["in:id"],
     )
-
     # The production build (no TESTABLE_INSTALLER) is never in a test.
     for name, symbol, on_init, testable in [
         ("if_test", "IfTest", _TEST_ID, True),

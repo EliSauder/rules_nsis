@@ -35,10 +35,18 @@ Var StdOutAttempted
         StrCpy $StdOutAttempted "Y"
         Push $0
         Push $1
-        System::Call 'kernel32::AttachConsole(i -1)i.r1'
-        ${If} $1 != 0
-            System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+        ; Prefer an inherited (redirected) stdout; otherwise attach to the
+        ; parent's console.
+        System::Call 'kernel32::GetStdHandle(i -11)p.r0'
+        ${If} $0 P<> 0
+        ${AndIf} $0 P<> -1
             StrCpy $StdOutHandle $0
+        ${Else}
+            System::Call 'kernel32::AttachConsole(i -1)i.r1'
+            ${If} $1 != 0
+                System::Call 'kernel32::GetStdHandle(i -11)p.r0'
+                StrCpy $StdOutHandle $0
+            ${EndIf}
         ${EndIf}
         Pop $1
         Pop $0

@@ -449,7 +449,9 @@ independently and in parallel. Each include has its own files in
 - `<api>.bzl` declares its cases with `include_api_case` (from `defs.bzl`).
 - `<api>_test.py` holds the cases' assertions.
 - `<api>_adapters.nsh`, where needed, adds `Harness*` macros for cases a direct
-  symbol call cannot express.
+  symbol call cannot express: aliasing registers as operands, or expanding a
+  macro more than once in one function. Prefer a direct symbol (with `const:`
+  params, defines, or `on_init`) whenever possible.
 
 Every include also has compile-only tests, with and without
 `TESTABLE_INSTALLER`. `service_lifecycle` drives a real stub service
