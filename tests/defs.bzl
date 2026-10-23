@@ -1,5 +1,6 @@
 load("@rules_python//python:py_test.bzl", "py_test")
 load("@bazel_skylib//lib:shell.bzl", "shell")
+load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load(
     "//nsis/private:defs.bzl",
     "NsisInstallerInfo",
@@ -8,6 +9,25 @@ load(
     "NsisEventLogSourceInfo",
 )
 load("@aspect_bazel_lib//lib:paths.bzl", "to_rlocation_path")
+
+def _signing_env_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    actions = [action for action in analysistest.target_actions(env) if action.mnemonic == "MakeNSIS"]
+    asserts.equals(env, 1, len(actions))
+    if actions:
+        action_env = actions[0].env
+        asserts.equals(env, "test-password", action_env.get("RULES_NSIS_TEST_PASSWORD"))
+        asserts.equals(env, "en_US.UTF-8", action_env.get("LANG"))
+        asserts.true(env, "NSISDIR" in action_env)
+        asserts.true(env, "RUNFILES_DIR" in action_env)
+    return analysistest.end(env)
+
+signing_env_test = analysistest.make(
+    _signing_env_test_impl,
+    config_settings = {
+        "//command_line_option:action_env": ["RULES_NSIS_TEST_PASSWORD=test-password"],
+    },
+)
 
 def _get_installer_test_details(ctx, inst, target):
     outfile = ""

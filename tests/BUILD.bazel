@@ -1,4 +1,4 @@
-load("//tests:defs.bzl", "nsis_installer_test")
+load("//tests:defs.bzl", "nsis_installer_test", "signing_env_test")
 load(
     "//nsis:defs.bzl",
     "nsis_component",
@@ -9,7 +9,8 @@ load(
 )
 load("//nsis/private:transitions.bzl", "windows_source")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_python//python:py_test.bzl", "py_test")
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_signing//signing:defs.bzl", "self_signed_certificate", "sign")
 
 
@@ -52,6 +53,36 @@ self_signed_certificate(
     name = "selfsigned_cert",
     common_name = "Development (DO NOT TRUST)",
     organization = "Development",
+)
+
+self_signed_certificate(
+    name = "selfsigned_env_cert",
+    common_name = "Development (DO NOT TRUST)",
+    format = "p12",
+    password_env = "RULES_NSIS_TEST_PASSWORD",
+    tags = ["manual"],
+)
+
+nsis_installer(
+    name = "minimal_installer_signed_env",
+    id = "41f678a6-0759-4e71-bb5a-690b2b18b8ae",
+    components = [":minimal_component"],
+    product = "Environment Signed Installer",
+    product_path = "Environment Signed Installer",
+    signing_certificate = ":selfsigned_env_cert",
+    tags = ["manual"],
+)
+
+signing_env_test(
+    name = "signing_env_test",
+    target_under_test = ":minimal_installer_signed_env",
+)
+
+py_test(
+    name = "windows_zlib_test",
+    srcs = ["windows_zlib_test.py"],
+    args = ["$(rootpaths //nsis/toolchain:zlib_windows)"],
+    data = ["//nsis/toolchain:zlib_windows"],
 )
 
 

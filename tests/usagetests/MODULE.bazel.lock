@@ -69,6 +69,8 @@
     "https://bcr.bazel.build/modules/googletest/1.15.2/MODULE.bazel": "6de1edc1d26cafb0ea1a6ab3f4d4192d91a312fd2d360b63adaa213cd00b2108",
     "https://bcr.bazel.build/modules/googletest/1.17.0/MODULE.bazel": "dbec758171594a705933a29fcf69293d2468c49ec1f2ebca65c36f504d72df46",
     "https://bcr.bazel.build/modules/googletest/1.17.0/source.json": "38e4454b25fc30f15439c0378e57909ab1fd0a443158aa35aec685da727cd713",
+    "https://bcr.bazel.build/modules/hermetic_cc_toolchain/4.3.0/MODULE.bazel": "4157d273074a1876fa674deca1e551bad66f06b87da1603dd856244e97b7ced8",
+    "https://bcr.bazel.build/modules/hermetic_cc_toolchain/4.3.0/source.json": "ce6a4b5621b88b8707e362419d9972cc9669d5c24cec2a7610483a94be8fa4ae",
     "https://bcr.bazel.build/modules/jsoncpp/1.9.5/MODULE.bazel": "31271aedc59e815656f5736f282bb7509a97c7ecb43e927ac1a37966e0578075",
     "https://bcr.bazel.build/modules/jsoncpp/1.9.6/MODULE.bazel": "2f8d20d3b7d54143213c4dfc3d98225c42de7d666011528dc8fe91591e2e17b0",
     "https://bcr.bazel.build/modules/jsoncpp/1.9.6/source.json": "a04756d367a2126c3541682864ecec52f92cdee80a35735a3cb249ce015ca000",
@@ -126,6 +128,7 @@
     "https://bcr.bazel.build/modules/rules_cc/0.1.5/MODULE.bazel": "88dfc9361e8b5ae1008ac38f7cdfd45ad738e4fa676a3ad67d19204f045a1fd8",
     "https://bcr.bazel.build/modules/rules_cc/0.2.0/MODULE.bazel": "b5c17f90458caae90d2ccd114c81970062946f49f355610ed89bebf954f5783c",
     "https://bcr.bazel.build/modules/rules_cc/0.2.13/MODULE.bazel": "eecdd666eda6be16a8d9dc15e44b5c75133405e820f620a234acc4b1fdc5aa37",
+    "https://bcr.bazel.build/modules/rules_cc/0.2.14/MODULE.bazel": "353c99ed148887ee89c54a17d4100ae7e7e436593d104b668476019023b58df8",
     "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "1849602c86cb60da8613d2de887f9566a6d354a6df6d7009f9d04a14402f9a84",
     "https://bcr.bazel.build/modules/rules_cc/0.2.17/source.json": "3832f45d145354049137c0090df04629d9c2b5493dc5c2bf46f1834040133a07",
     "https://bcr.bazel.build/modules/rules_cc/0.2.8/MODULE.bazel": "f1df20f0bf22c28192a794f29b501ee2018fa37a3862a1a2132ae2940a23a642",
@@ -391,6 +394,61 @@
               ]
             }
           }
+        }
+      }
+    },
+    "@@rules_nsis+//nsis/private:zlib.bzl%zlib_toolchain": {
+      "general": {
+        "bzlTransitiveDigest": "9mIDzjDWMsmmz+gHg3OlJHEFCVumzADZ0OaLhdE6fYM=",
+        "usagesDigest": "LXBTc1uQ9qbx7E9aMLO4Z10rbP4iWmHJ9X1+vYdnGB4=",
+        "recordedInputs": [
+          "REPO_MAPPING:hermetic_cc_toolchain+,bazel_tools bazel_tools",
+          "REPO_MAPPING:hermetic_cc_toolchain+,hermetic_cc_toolchain hermetic_cc_toolchain+",
+          "REPO_MAPPING:rules_nsis+,hermetic_cc_toolchain hermetic_cc_toolchain+"
+        ],
+        "generatedRepoSpecs": {
+          "zig_sdk": {
+            "repoRuleId": "@@hermetic_cc_toolchain+//toolchain/private:repositories.bzl%zig_sdk_repository",
+            "attributes": {
+              "exec_platforms": {},
+              "extra_exec_compatible_with": [],
+              "extra_target_compatible_with": [],
+              "extra_target_settings": []
+            }
+          },
+          "zig_config": {
+            "repoRuleId": "@@hermetic_cc_toolchain+//toolchain:defs.bzl%zig_repository",
+            "attributes": {
+              "version": "0.15.2",
+              "url_formats": [
+                "https://ziglang.org/download/{version}/zig-{zig_platform}-{version}.{_ext}"
+              ],
+              "host_platform_sha256": {
+                "linux-aarch64": "958ed7d1e00d0ea76590d27666efbf7a932281b3d7ba0c6b01b0ff26498f667f",
+                "linux-x86_64": "02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239",
+                "macos-aarch64": "3cc2bab367e185cdfb27501c4b30b1b0653c28d9f73df8dc91488e66ece5fa6b",
+                "macos-x86_64": "375b6909fc1495d16fc2c7db9538f707456bfc3373b14ee83fdd3e22b3d43f7f",
+                "windows-aarch64": "b926465f8872bf983422257cd9ec248bb2b270996fbe8d57872cca13b56fc370",
+                "windows-x86_64": "3a0ed1e8799a2f8ce2a6e6290a9ff22e6906f8227865911fb7ddedc3cc14cb0c"
+              },
+              "host_platform_ext": {
+                "linux-aarch64": "tar.xz",
+                "linux-x86_64": "tar.xz",
+                "macos-aarch64": "tar.xz",
+                "macos-x86_64": "tar.xz",
+                "windows-x86_64": "zip",
+                "windows-aarch64": "zip"
+              }
+            }
+          }
+        },
+        "moduleExtensionMetadata": {
+          "explicitRootModuleDirectDeps": [
+            "zig_config"
+          ],
+          "explicitRootModuleDirectDevDeps": [],
+          "useAllRepos": "NO",
+          "reproducible": false
         }
       }
     },
