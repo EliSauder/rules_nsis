@@ -1,4 +1,5 @@
 load("//nsis/private:transitions.bzl", "windows_source_transition")
+load(":options.bzl", "NsisOptionsPageInfo", "collect_options_pages")
 load("@bazel_lib//lib:stamping.bzl", "STAMP_ATTRS", "maybe_stamp")
 load(
     "@rules_signing//signing:actions.bzl",
@@ -129,6 +130,7 @@ be consumed the same way whether or not the component is signed.
         "pre_install": "A pre install .nsh script to run before the component is installed.",
         "post_uninstall": "A post uninstall .nsh script to run after the component is uninstalled.",
         "pre_uninstall": "A pre uninstall .nsh script to run before the component is uninstalled.",
+        "options_pages": "Options pages shown when the component is selected.",
     },
 )
 
@@ -402,6 +404,7 @@ def _nsis_component_impl(ctx):
         pre_install = ctx.file.pre_install,
         post_uninstall = ctx.file.post_uninstall,
         pre_uninstall = ctx.file.pre_uninstall,
+        options_pages = ctx.attr.options_pages,
     )
 
 nsis_component = rule(
@@ -523,6 +526,12 @@ strict install order. Components should be able to be installed in any order.
             providers = [
                 NsisComponentInfo,
             ],
+        ),
+        "options_pages": attr.label_list(
+            mandatory = False,
+            allow_empty = True,
+            providers = [NsisOptionsPageInfo],
+            doc = "Options pages shown when this component is selected. They must use position = \"after_components\".",
         ),
         "shortcuts": attr.label_list(
             mandatory = False,
@@ -1284,6 +1293,11 @@ def _build_data_structure(ctx, toolchain):
     inst_data[_COMPONENT_GROUPS_KEY] = grps
     inst_data[_COMPONENT_DEPS_KEY] = deps
 
+    opts = collect_options_pages(ctx.label, ctx.attr.options_pages, _flatten_components(ctx))
+    inst_data["OptionsPages"] = opts.pages
+    inst_data["Options"] = opts.options
+    inst_data["HasOptions"] = len(opts.options) > 0
+
     return inst_data, component_map
 
 def _all_files_component_list(lst):
@@ -1699,6 +1713,12 @@ when attached to a console, to stdout.
                 [NsisComponentInfo],
                 [NsisComponentGroupInfo],
             ],
+        ),
+        "options_pages": attr.label_list(
+            mandatory = False,
+            allow_empty = True,
+            providers = [NsisOptionsPageInfo],
+            doc = "Options pages that are always shown, at the position each page declares.",
         ),
         "stamp_defaults": attr.string_dict(
             mandatory = False,

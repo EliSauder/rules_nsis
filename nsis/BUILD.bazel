@@ -10,6 +10,7 @@ bzl_library(
         "@bazel_lib//lib:stamping",
         "@rules_signing//signing:actions_bzl",
         "//nsis/private:defs.bzl",
+        "//nsis/private:options.bzl",
         "//nsis/private:transitions.bzl",
     ],
 )
