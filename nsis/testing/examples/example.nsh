@@ -98,3 +98,22 @@ FunctionEnd
     StrCpy ${THIRD} "${THIRD}|${TEST_MODE}"
 !macroend
 !define un.Example `!insertmacro un.Example`
+
+; A LogicLib condition: ${If} ${IsEven} VALUE.
+!macro _IsEven _a _b _t _f
+    IntOp $_example_scratch ${_b} % 2
+    IntCmp $_example_scratch 0 `${_t}` `${_f}` `${_f}`
+!macroend
+!define IsEven `"" IsEven`
+
+; A statement condition opens its own block: ${IfPositive} VALUE ... ${EndIf}.
+!define IfPositive `!insertmacro _IfPositive`
+!macro _IfPositive VALUE
+    ${If} ${VALUE} > 0
+!macroend
+
+; Reports the value .onInit or un.onInit stored for the harness.
+!macro ReadInitValue OUTPUT
+    StrCpy ${OUTPUT} $_example_init
+!macroend
+Var _example_init

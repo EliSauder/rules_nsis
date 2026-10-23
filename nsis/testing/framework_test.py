@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from nsis.testing.generate import REGISTERS, validate
+from nsis.testing.generate import REGISTERS, generate, validate
 from nsis.testing.runner import Harness, command_line, read_outputs
 
 
@@ -39,9 +39,49 @@ class DescriptionValidationTest(unittest.TestCase):
             {"parameters": [{"name": "a", "direction": "invalid"}]},
             {"parameters": [{"name": "a", "direction": "in"}] * 2},
             {"parameters": [{"name": "a", "direction": "in", "type": "float"}]},
+            {"parameters": [{"name": "a", "direction": "const"}]},
+            {"parameters": [{"name": "a", "direction": "in", "value": "x"}]},
+            {"parameters": [{"name": "a", "direction": "const", "value": "x", "type": "int"}]},
+            {"parameters": [{"name": "a", "direction": "const", "value": "x\nQuit"}]},
+            {"invocation": "statement"},
+            {"kind": "definition", "invocation": "statement"},
+            {"kind": "condition", "invocation": "value"},
+            {"kind": "condition"},
+            {"kind": "condition", "parameters": [{"name": "r", "direction": "inout", "type": "bool"}]},
+            {"kind": "condition", "parameters": [
+                {"name": "r", "direction": "out", "type": "bool"},
+                {"name": "s", "direction": "out", "type": "bool"},
+            ]},
+            {"kind": "condition", "parameters": [
+                *({"name": n, "direction": "in"} for n in "abc"),
+                {"name": "r", "direction": "out", "type": "bool"},
+            ]},
         ]:
             with self.subTest(change=change), self.assertRaises(ValueError):
                 validate(dict(ECHO, **change))
+
+    def test_valid_condition_and_const_descriptions(self):
+        for change in [
+            {"kind": "condition", "parameters": [{"name": "r", "direction": "out", "type": "bool"}]},
+            {"kind": "condition", "invocation": "statement", "parameters": [
+                *({"name": n, "direction": "in"} for n in "abc"),
+                {"name": "r", "direction": "out", "type": "bool"},
+            ]},
+            {"parameters": [
+                {"name": "text", "direction": "const", "value": '"$\\"quoted$\\""'},
+                {"name": "result", "direction": "out"},
+            ]},
+        ]:
+            with self.subTest(change=change):
+                validate(dict(ECHO, **change))
+
+    def test_invalid_harness_options(self):
+        with self.assertRaisesRegex(ValueError, "both"):
+            generate(dict(ECHO, defines={"A": "1"}), "example.nsh", defines={"A": "2"})
+        with self.assertRaisesRegex(ValueError, "define name"):
+            generate(ECHO, "example.nsh", defines={"bad name": "1"})
+        with self.assertRaisesRegex(ValueError, "on_init"):
+            generate(None, "example.nsh", on_init=["Quit"])
 
 
 class RunnerTest(unittest.TestCase):

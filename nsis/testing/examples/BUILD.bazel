@@ -1,5 +1,5 @@
 load("@rules_python//python:py_test.bzl", "py_test")
-load("//nsis/testing:defs.bzl", "nsis_symbol", "nsis_test_harness")
+load("//nsis/testing:defs.bzl", "nsis_compile_test", "nsis_symbol", "nsis_test_harness")
 
 _EXAMPLES = [
     "macro",
@@ -21,6 +21,11 @@ _EXAMPLES = [
     "function_order",
     "uninstaller_function_order",
     "defines",
+    "condition",
+    "statement_condition",
+    "constant",
+    "on_init",
+    "uninstaller_on_init",
 ]
 
 _DIVMOD = ["in:dividend:int", "in:divisor:int", "out:quotient:int", "out:remainder:int"]
@@ -53,18 +58,40 @@ _DIVMOD = ["in:dividend:int", "in:divisor:int", "out:quotient:int", "out:remaind
         ("error_flag", "SetErrorFlag", "macro", "installer", ["in:clear:bool"], ""),
         ("function_order", "DivMod", "function", "installer", _DIVMOD, ""),
         ("uninstaller_function_order", "un.DivMod", "function", "uninstaller", _DIVMOD, ""),
+        ("condition", "IsEven", "condition", "installer", ["in:value:int", "out:even:bool"], ""),
+        ("statement_condition", "IfPositive", "condition", "installer", ["in:value:int", "out:positive:bool"], "statement"),
+        ("on_init", "ReadInitValue", "macro", "installer", ["out:value"], ""),
+        ("uninstaller_on_init", "ReadInitValue", "macro", "uninstaller", ["out:value"], ""),
     ]
 ]
+
+# A const operand is compiled into the harness instead of passed at run time.
+nsis_symbol(
+    name = "constant_symbol",
+    symbol = "Echo",
+    kind = "macro",
+    parameters = ["const:text", "out:result"],
+    constants = {"text": '"compiled $\\"in$\\""'},
+)
 
 [
     nsis_test_harness(
         name = name + "_harness",
         src = "example.nsh",
         description = ":" + name + "_symbol",
+        defines = {"EXAMPLE_INIT": "from " + name} if name.endswith("on_init") else {},
+        # .onInit (or un.onInit for uninstaller descriptions) runs before the API.
+        on_init = ['StrCpy $_example_init "${EXAMPLE_INIT}"'] if name.endswith("on_init") else [],
         testonly = True,
     )
     for name in _EXAMPLES
 ]
+
+# Builds example.nsh with nothing but its own !includes.
+nsis_compile_test(
+    name = "example_compile_test",
+    src = "example.nsh",
+)
 
 filegroup(
     name = "binaries",

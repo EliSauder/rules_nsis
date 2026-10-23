@@ -41,6 +41,16 @@ def main():
         elif name == "defines":
             harness.run(second=5, third="x").assert_outputs(first=True, third="x|value with spaces")
             harness.run(second=0, third="").assert_outputs(first=False, third="|value with spaces")
+        elif name == "condition":
+            for value in (-4, 0, 7):
+                harness.run(value=value).assert_outputs(even=value % 2 == 0)
+        elif name == "statement_condition":
+            for value in (-1, 0, 1):
+                harness.run(value=value).assert_outputs(positive=value > 0)
+        elif name == "constant":
+            harness.run().assert_outputs(result='compiled "in"')
+        elif name in ("on_init", "uninstaller_on_init"):
+            harness.run().assert_outputs(value="from " + name)
         elif name == "typed":
             for number, enabled in [(-2147483648, False), (-1, True), (2147483646, False)]:
                 harness.run(number=number, enabled=enabled).assert_outputs(

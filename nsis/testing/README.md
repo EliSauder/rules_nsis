@@ -51,11 +51,11 @@ with Harness(binary_path, description_path, directory=test_tmpdir) as api:
 
 ## Declaring symbols
 
-`kind` is `macro` (`!insertmacro`), `definition` (`${...}`), or `function`
-(`Call`). `parameters` is an ordered list of `direction:name[:type]` strings,
-where direction is `in`, `out`, or `inout`. Types are `string` (default),
-`int`, and `bool`. Declare the actual symbol, including `un.` when
-appropriate.
+`kind` is `macro` (`!insertmacro`), `definition` (`${...}`), `function`
+(`Call`), or `condition` (a LogicLib test, see below). `parameters` is an
+ordered list of `direction:name[:type]` strings, where direction is `in`,
+`out`, `inout`, or `const`. Types are `string` (default), `int`, and `bool`.
+Declare the actual symbol, including `un.` when appropriate.
 
 Macros and callable definitions receive input values and output variable
 operands in that order. For constant definitions, set `invocation = "value"`
@@ -70,6 +70,42 @@ creates an uninstaller; the Python runner invokes it directly and waits for its
 exit. Optional `defines` maps preprocessor names to string values defined before
 including the source. Harnesses run at user execution level; they do not elevate.
 
+### Compile-time constants
+
+A `const:name` parameter is compiled into the harness instead of being passed
+at run time. Give its NSIS operand text in `constants`; it is inserted verbatim
+in its declared position. Use it for values the command line cannot carry
+(quotes, characters such as `${U+00AD}`) or for APIs that only accept literals:
+
+```starlark
+nsis_symbol(
+    name = "trim_quoted_symbol",
+    symbol = "TrimQuotes",
+    kind = "macro",
+    parameters = ["const:value", "out:result"],
+    constants = {"value": '"$\\"quoted$\\""'},
+)
+```
+
+Constants are untyped single-line strings, and `run()` does not accept them.
+
+### Conditions
+
+`kind = "condition"` tests a LogicLib condition and reports whether it held
+through exactly one `out:name:bool` parameter. By default (`invocation =
+"operand"`) the symbol is used as an operator: no inputs give `${If} ${Sym}`,
+one gives `${If} ${Sym} a`, and two give `${If} a ${Sym} b`. For definitions
+that expand to the `${If}` keyword themselves (used as `${IfAdmin}` rather than
+`${If} ${IfAdmin}`), set `invocation = "statement"`; inputs follow the symbol.
+
+```starlark
+nsis_symbol(
+    name = "is_even_symbol",
+    symbol = "IsEven",
+    kind = "condition",
+    parameters = ["in:value:int", "out:even:bool"],
+)
+```
 
 ## Parameter types
 
@@ -114,6 +150,46 @@ with Harness(typed_binary_path, typed_description_path, directory=test_tmpdir) a
     assert type(result.outputs["enabled"]) is bool
 ```
 
+
+## Harness options
+
+`nsis_test_harness` also accepts:
+
+- `defines`: preprocessor values defined before the source is included, in
+  addition to the symbol's `defines`. Defining the same name in both is an error.
+- `on_init`: NSIS lines run in `.onInit` (`un.onInit` for uninstaller symbols)
+  before any argument is read, for example to establish state such as a product
+  code that the API reads.
+
+```starlark
+nsis_test_harness(
+    name = "product_code",
+    src = "//nsis/private/includes:Product.nsh",
+    description = ":product_code_symbol",
+    defines = {"TESTABLE_INSTALLER": ""},
+    on_init = ['${SetProductCode} "aabbccdd-eeff-0011-2233-445566778899"'],
+    testonly = True,
+)
+```
+
+### Compile-only checks
+
+`nsis_compile_test` builds a harness around a source without invoking any
+symbol, then passes if it compiled. Use it to check that an include compiles on
+its own, under particular `defines`:
+
+```starlark
+load("@rules_nsis//nsis/testing:defs.bzl", "nsis_compile_test")
+
+nsis_compile_test(
+    name = "example_compile_test",
+    src = "example.nsh",
+    defines = {"TESTABLE_INSTALLER": ""},
+)
+```
+
+The generated script always includes `FileFunc.nsh` and `LogicLib.nsh`, so a
+missing include of either is not detected.
 
 ## Running an API
 
@@ -353,7 +429,9 @@ bazel test //nsis/testing/examples:all
 ```
 
 Examples cover macros, shorthand and constant definitions, functions (including
-multi-input/output stack order), uninstallers, harness `defines`, typed integer/boolean inout parameters, filesystem and registry
+multi-input/output stack order), operand and statement conditions, compile-time
+constants, uninstallers, harness `defines` and `on_init`, compile-only checks,
+typed integer/boolean inout parameters, filesystem and registry
 assertions, and captured stdout/stderr. Each example has its own Bazel test
 target. See [`examples/BUILD.bazel`](examples/BUILD.bazel) for symbol declarations
 and [`examples/example_test.py`](examples/example_test.py) for Python usage.
@@ -362,19 +440,32 @@ framework detects both changes, in installer and uninstaller contexts.
 
 ## This repository's include API suite
 
-`//tests:include_api_tests` uses this framework to test every public macro,
+`//tests/includes:tests` uses this framework to test every public macro,
 definition and function in `nsis/private/includes`, with one generated harness
 per entry point (and an `un.` variant where applicable) so cases run
-independently and in parallel. `tests/include_api_tests.bzl` declares the
-matrix, `tests/include_api_test.py` holds the per-case assertions, and
-`tests/include_api_fixture.nsh` is the shared harness source: it includes every
-API and adds `Harness*` adapter macros for cases that a direct symbol call
-cannot express.
+independently and in parallel. Each include has its own files in
+`tests/includes`:
+
+- `<api>.bzl` declares its cases with `include_api_case` (from `defs.bzl`).
+- `<api>_test.py` holds the cases' assertions.
+- `<api>_adapters.nsh`, where needed, adds `Harness*` macros for cases a direct
+  symbol call cannot express: aliasing registers as operands, expanding a
+  macro more than once in one function, reading state a call leaves in globals
+  (`DetectArch`), or observing a command-line option (`TestIdInit` reads the
+  harness's `testid` input). Prefer a direct symbol (with `const:`
+  params, defines, or `on_init`) whenever possible.
+
+Every include also has compile-only tests, with and without
+`TESTABLE_INSTALLER`. `service_lifecycle` drives a real stub service
+(`service_stub.c`) through every `Sc.nsh` macro; it needs an elevated test run
+and skips otherwise. Registry view cases (`registry_view_*`,
+`registry_pinned_*`) use HKLM, because both views share `HKCU\Software`, so
+they also need an elevated run.
 
 ```sh
-bazel build //tests:include_api_test_binaries  # cross-compile on any host
-bazel test //tests:include_api_tests           # Windows only
-bazel test //tests:include_api_contract_test   # any host
+bazel build //tests/includes:binaries     # cross-compile on any host
+bazel test //tests/includes:tests         # Windows only
+bazel test //tests/includes:contract_test # any host
 ```
 
 The contract test runs every case's dispatch against its generated symbol

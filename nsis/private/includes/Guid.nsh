@@ -54,6 +54,7 @@ FunctionEnd
 ; NormalizeGuid
 ;   in  (stack): UUID or GUID string (braces optional)
 ;   out (stack): "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" if valid, else ""
+;                with the error flag set
 ; ---------------------------------------------------------------------------
 !macro _NormalizeGuid PREFIX
 Function ${PREFIX}NormalizeGuid
@@ -64,6 +65,7 @@ Function ${PREFIX}NormalizeGuid
   Push $4                          ; current char
   Push $5                          ; accumulator (canonical core)
 
+  ClearErrors
   ; --- Strip surrounding braces if present ---------------------------------
   StrCpy $1 $0
   StrCpy $2 $0 1 0                 ; first char
@@ -113,6 +115,7 @@ Function ${PREFIX}NormalizeGuid
     Goto ng_done
   ng_invalid:
     StrCpy $0 ""
+    SetErrors
   ng_done:
 
   Pop $5

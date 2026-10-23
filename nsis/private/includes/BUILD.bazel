@@ -10,3 +10,9 @@ dirrule(
     srcs = [":includes"],
     visibility = ["//visibility:public"],
 )
+
+# Individual includes are harness sources for the include API tests.
+exports_files(
+    glob(["*.nsh"]),
+    visibility = ["//tests:__subpackages__"],
+)

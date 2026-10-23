@@ -151,24 +151,37 @@ FunctionEnd
 ; under allow_32bit_on_64bit, else 0: EXPECTED itself, or the 64bit host of the
 ; same instruction set (x86_32 on x86_64, arm32 on arm64). Cross-ISA hosts are
 ; rejected. A 64bit EXPECTED only accepts itself.
-!macro _ArchAllows32On64 PREFIX EXPECTED OUT
-    !if "${EXPECTED}" == "x86_32"
-        !define /redef _ARCH_32ON64_HOST "x86_64"
-    !else if "${EXPECTED}" == "arm32"
-        !define /redef _ARCH_32ON64_HOST "arm64"
-    !else
-        !define /redef _ARCH_32ON64_HOST "${EXPECTED}"
-    !endif
+!macro __ArchAllows32On64 PREFIX
+Function ${PREFIX}_ArchAllows32On64
+    Exch $0 ; expected
+    Push $1 ; 64bit host of the same instruction set
     ${If} $current_arch == ""
         Call ${PREFIX}DetectArch
     ${EndIf}
-    ${If} $current_arch == "${EXPECTED}"
-    ${OrIf} $current_arch == "${_ARCH_32ON64_HOST}"
-        StrCpy ${OUT} "1"
+    ${If} $0 == "x86_32"
+        StrCpy $1 "x86_64"
+    ${ElseIf} $0 == "arm32"
+        StrCpy $1 "arm64"
     ${Else}
-        StrCpy ${OUT} "0"
+        StrCpy $1 $0
     ${EndIf}
-    !undef _ARCH_32ON64_HOST
+    ${If} $current_arch == $0
+    ${OrIf} $current_arch == $1
+        StrCpy $0 "1"
+    ${Else}
+        StrCpy $0 "0"
+    ${EndIf}
+    Pop $1
+    Exch $0
+FunctionEnd
+!macroend
+!insertmacro __ArchAllows32On64 ""
+!insertmacro __ArchAllows32On64 "un."
+
+!macro _ArchAllows32On64 PREFIX EXPECTED OUT
+    Push "${EXPECTED}"
+    Call ${PREFIX}_ArchAllows32On64
+    Pop ${OUT}
 !macroend
 
 !macro ArchAllows32On64 EXPECTED OUT
