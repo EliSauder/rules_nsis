@@ -4,7 +4,7 @@ from tests.includes import common
 def run_case(case, harness, args):
     base = common.base(case)
     if base == "option_round_trip":
-        harness.run(value="C:\\Program Files\\App $x").assert_outputs(result="C:\\Program Files\\App $x")
+        harness.run(value="C:\\App\\$x|y").assert_outputs(result="C:\\App\\$x|y")
     elif base == "option_is_set":
         harness.run(value="1").assert_outputs(set=True)
         harness.run(value="0").assert_outputs(set=False)
@@ -22,7 +22,7 @@ def run_case(case, harness, args):
         ]:
             harness.run(list=items, value=value).assert_outputs(found=found)
     elif base == "option_persist":
-        for value in ["plain", "", "with | pipe and spaces", "C:\\Temp\\x"]:
+        for value in ["plain", "", "with|pipe$and\\slash", "C:\\Temp\\x"]:
             harness.run(value=value).assert_outputs(result=value)
     elif base == "option_load_missing":
         harness.run(default="kept").assert_outputs(result="kept")
