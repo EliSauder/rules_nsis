@@ -2,6 +2,7 @@ exports_files([
     "extensions.bzl",
     "defs.bzl",
     "options.bzl",
+    "cli.bzl",
 ], ["//visibility:public"])
 
 exports_files([

@@ -1,5 +1,6 @@
 load("//nsis/private:transitions.bzl", "windows_source_transition")
 load(":options.bzl", "NsisOptionsPageInfo", "collect_options_pages")
+load(":cli.bzl", "cli_data", "options_doc_content")
 load("@bazel_lib//lib:stamping.bzl", "STAMP_ATTRS", "maybe_stamp")
 load(
     "@rules_signing//signing:actions.bzl",
@@ -1298,6 +1299,19 @@ def _build_data_structure(ctx, toolchain):
     inst_data["Options"] = opts.options
     inst_data["HasOptions"] = len(opts.options) > 0
 
+    # BEGIN command line (/COMPONENTS, /INSTTYPE, /HELP)
+    inst_data["Cli"] = cli_data(
+        cmps,
+        grps,
+        deps,
+        component_map,
+        [str(x) for x in ctx.attr.install_categories],
+        bool(ctx.attr.testable),
+        opts.pages,
+        "{} {}".format(ctx.attr.product, ctx.attr.version).strip(),
+    )
+    # END command line
+
     return inst_data, component_map
 
 def _all_files_component_list(lst):
@@ -1528,6 +1542,16 @@ cat - "$1" >> "$outfile"
     return outfile
 
 
+def _options_doc_outputs(ctx, toolchain):
+    """The `options_doc` output group: JSON and Markdown of options, components and install types."""
+    data, _ = _build_data_structure(ctx, toolchain)
+    json_text, md_text = options_doc_content(ctx.attr.product, ctx.attr.version, data)
+    json_file = ctx.actions.declare_file("{}_options_doc.json".format(ctx.attr.name))
+    md_file = ctx.actions.declare_file("{}_options_doc.md".format(ctx.attr.name))
+    ctx.actions.write(output = json_file, content = json_text)
+    ctx.actions.write(output = md_file, content = md_text)
+    return [OutputGroupInfo(options_doc = depset([json_file, md_file]))]
+
 def _nsis_installer_impl(ctx):
     toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
 
@@ -1536,7 +1560,7 @@ def _nsis_installer_impl(ctx):
 
     script = _add_includes(ctx, toolchain, script)
 
-    return _makensis(ctx, toolchain, script, srcs, user_scripts) + [
+    return _makensis(ctx, toolchain, script, srcs, user_scripts) + _options_doc_outputs(ctx, toolchain) + [
         NsisInstallerInfo(
             name = ctx.attr.name,
             id = ctx.attr.id,

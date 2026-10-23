@@ -11,6 +11,7 @@ bzl_library(
         "@rules_signing//signing:actions_bzl",
         "//nsis/private:defs.bzl",
         "//nsis/private:options.bzl",
+        "//nsis/private:cli.bzl",
         "//nsis/private:transitions.bzl",
     ],
 )
