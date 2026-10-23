@@ -9,6 +9,9 @@ Unicode True
 {{- else }}
 !define REGISTRY_VIEW 32
 {{- end }}
+; Preserve the always-on, verbose logging of the original template.
+!define LOGGING_ENABLE
+!define LOGLEVEL_DEBUG
 SetCompressor {{ (ds "in").Compressor }}
 SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 
@@ -488,6 +491,7 @@ Section "-Core Installation"
     !insertmacro UpdateUninstallRegistry "${UnProductID}" "$0"
     !insertmacro UpdateUninstallRegistry "${UnComments}" "${PRODUCT_DESCRIPTION}"
     !insertmacro UpdateUninstallRegistry "${UnInstallSource}" "$EXEPATH"
+    Pop $0
 
     !if "${ICON_FILE}" != ""
     ; The icon is embedded in the uninstaller via MUI_UNICON.
@@ -510,10 +514,9 @@ Section "-Core Installation"
     Pop $R4
     Pop $R3
 
+    ; EstimatedSize is a REG_DWORD in KB.
     ${GetSize} "$INSTDIR" "/S=0K" $R0 $R1 $R2
-    IntFmt $0 "0x%08X" $0
-    IntOp $R0 $R0 * 1024
-    !insertmacro UpdateUninstallRegistry "${UnEstimatedSize}" $R0
+    !insertmacro UpdateUninstallRegistryDWORD "${UnEstimatedSize}" $R0
 
     Pop $R2
     Pop $R1
@@ -609,7 +612,7 @@ Function .onSelChange
     #   this is the component that triggered onSelChange
     # Else, skip
     ${If} $0 <> $SectionSelected_{{.Component}}
-        # If the component is seleceted, select all dependencies
+        # If the component is selected, select all dependencies
         ${If} $0 = 1
             # Set current component's fields
             IntOp $SectionSelected_{{.Component}} 0 + 1

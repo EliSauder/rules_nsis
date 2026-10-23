@@ -1,11 +1,11 @@
 !ifndef __INCLUDE_MOVEFILEFOLDER
 !define __INCLUDE_MOVEFILEFOLDER
 
-!include 'FileFunc.nsh'
-!insertmacro Locate
+!include LogicLib.nsh
+!include FileFunc.nsh
 
+; Set to 1 to overwrite existing destination files without an 'ifnewer' check.
 Var /GLOBAL switch_overwrite
-StrCpy $switch_overwrite 0
 
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ; MoveFile and MoveFolder macros
@@ -68,7 +68,7 @@ older_${_MOVEFILE_JUMP}:
 newer_${_MOVEFILE_JUMP}:
     delete "${destinationFile}"
     rename "${sourceFile}" "${destinationFile}"
-    delete "${sourceFile}" ;incase above failed!
+    delete "${sourceFile}" ;in case above failed!
 
 time_check_done_${_MOVEFILE_JUMP}:
 
@@ -84,11 +84,16 @@ done_${_MOVEFILE_JUMP}:
 !macroend
 !define MoveFile `!insertmacro MoveFile`
 
+!macro un.MoveFile sourceFile destinationFile
+    !insertmacro MoveFile `${sourceFile}` `${destinationFile}`
+!macroend
+!define un.MoveFile `!insertmacro un.MoveFile`
+
 ;==================
 ; MoveFolder macro
 ;==================
 
-!macro MoveFolder source destination mask
+!macro _MoveFolder PREFIX source destination mask
 
     !define _MOVEFOLDER_JUMP ${__LINE__}
 
@@ -133,18 +138,18 @@ done_${_MOVEFILE_JUMP}:
 
 ; Duplicate dir structure (to preserve empty folders and such)
 
-    ${Locate} "$R0" "/L=D" "_MoveFolder_Locate_createDir"
+    ${${PREFIX}Locate} "$R0" "/L=D" "${PREFIX}_MoveFolder_Locate_createDir"
 
 ; Locate files and move (via callback function)
 
-    ${Locate} "$R0" "/L=F /M=${mask} /S= /G=1" "_MoveFolder_Locate_moveFile"
+    ${${PREFIX}Locate} "$R0" "/L=F /M=${mask} /S= /G=1" "${PREFIX}_MoveFolder_Locate_moveFile"
 
 ; Delete subfolders left over after move
 
     Push $R2
 deldir_loop_${_MOVEFOLDER_JUMP}:
     StrCpy $R2 0
-    ${Locate} "$R0" "/L=DE" "_MoveFolder_Locate_deleteDir"
+    ${${PREFIX}Locate} "$R0" "/L=DE" "${PREFIX}_MoveFolder_Locate_deleteDir"
     StrCmp $R2 0 0 deldir_loop_${_MOVEFOLDER_JUMP}
     Pop $R2
 
@@ -153,7 +158,7 @@ deldir_loop_${_MOVEFOLDER_JUMP}:
     Push $R2
 delnewdir_loop_${_MOVEFOLDER_JUMP}:
     StrCpy $R2 0
-    ${Locate} "$R1" "/L=DE" "_MoveFolder_Locate_deleteDir"
+    ${${PREFIX}Locate} "$R1" "/L=DE" "${PREFIX}_MoveFolder_Locate_deleteDir"
     StrCmp $R2 0 0 delnewdir_loop_${_MOVEFOLDER_JUMP}
     Pop $R2
 
@@ -174,13 +179,23 @@ Pop $R0
 !undef _MOVEFOLDER_JUMP
 
 !macroend
+
+!macro MoveFolder source destination mask
+    !insertmacro _MoveFolder "" `${source}` `${destination}` `${mask}`
+!macroend
 !define MoveFolder `!insertmacro MoveFolder`
 
-===============
-veFolder macro's ${Locate} callback functions
-===============
+!macro un.MoveFolder source destination mask
+    !insertmacro _MoveFolder "un." `${source}` `${destination}` `${mask}`
+!macroend
+!define un.MoveFolder `!insertmacro un.MoveFolder`
 
-Function _MoveFolder_Locate_createDir
+;==================
+; MoveFolder macro's ${Locate} callback functions
+;==================
+
+!macro _MoveFolderCallbacks PREFIX
+Function ${PREFIX}_MoveFolder_Locate_createDir
 
     ${If} $R6 == ""
 	Push $R2
@@ -194,7 +209,7 @@ Function _MoveFolder_Locate_createDir
 
 FunctionEnd
 
-Function _MoveFolder_Locate_moveFile
+Function ${PREFIX}_MoveFolder_Locate_moveFile
 
     Push $R2
 
@@ -239,7 +254,7 @@ Function _MoveFolder_Locate_moveFile
 	newer:
 	delete "$R2"
 	rename "$R9" "$R2"
-	delete "$R9" ;incase above failed!
+	delete "$R9" ;in case above failed!
 
 	time_check_done:
 
@@ -256,7 +271,7 @@ Function _MoveFolder_Locate_moveFile
 
 FunctionEnd
 
-Function _MoveFolder_Locate_deleteDir
+Function ${PREFIX}_MoveFolder_Locate_deleteDir
 
     ${If} $R6 == ""
 	RMDir $R9
@@ -266,4 +281,9 @@ Function _MoveFolder_Locate_deleteDir
     Push $R1
 
 FunctionEnd
+!macroend
+
+!insertmacro _MoveFolderCallbacks ""
+!insertmacro _MoveFolderCallbacks "un."
+
 !endif

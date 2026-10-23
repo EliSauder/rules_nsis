@@ -378,7 +378,7 @@ def _validate_removed_directories(testcase: unittest.TestCase, config):
     expected_dirs = config.get("expected_dirs", {})
 
     for key, val in expected_dirs.items():
-        testcase.assertFalse(os.path.exists(key), f"Directory stil exsts after uninstall: {key}")
+        testcase.assertFalse(os.path.exists(key), f"Directory still exists after uninstall: {key}")
 
 def _validate_directories(testcase: unittest.TestCase, config):
     expected_dirs = config.get("expected_dirs", {})

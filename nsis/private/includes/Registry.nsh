@@ -198,7 +198,7 @@ Function ${PREFIX}FormatStrToBin
     ${Else}
         !insertmacro ${PREFIX}CharToASCII "$0" $2
     ${EndIf}
-    IntFmt $2 "0x%X" $2
+    IntFmt $2 "%X" $2
 
     !insertmacro ${PREFIX}Hex2Bin "$2" $0
 

@@ -6,13 +6,23 @@
 Var __shellctx_init
 Var current_context
 
+; The default context is "admin" when IS_ADMIN_EXECUTION_LEVEL is defined to a
+; non-zero value, and "current" otherwise (including when it is undefined).
+!macro _ShellCtxSetDefault
+!ifdef IS_ADMIN_EXECUTION_LEVEL
+!if "${IS_ADMIN_EXECUTION_LEVEL}" != "0"
+    StrCpy $current_context "admin"
+!else
+    StrCpy $current_context "current"
+!endif
+!else
+    StrCpy $current_context "current"
+!endif
+!macroend
+
 !macro __shellctx_init
     ${If} $__shellctx_init != "y"
-!ifdef IS_ADMIN_EXECUTION_LEVEL
-        StrCpy $current_context "admin"
-!else
-        StrCpy $current_context "current"
-!endif
+        !insertmacro _ShellCtxSetDefault
         StrCpy $__shellctx_init "y"
     ${EndIf}
 !macroend
@@ -54,11 +64,7 @@ Var current_context
 !define UpdateShellContextToCurrent `!insertmacro UpdateShellContextToCurrent`
 
 !macro ResetShellContext
-!ifdef IS_ADMIN_EXECUTION_LEVEL
-    StrCpy $current_context "admin"
-!else
-    StrCpy $current_context "current"
-!endif
+    !insertmacro _ShellCtxSetDefault
     StrCpy $__shellctx_init "y"
 !macroend
 !define ResetShellContext `!insertmacro ResetShellContext`

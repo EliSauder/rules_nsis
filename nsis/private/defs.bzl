@@ -37,7 +37,7 @@ NsisInstallerInfo = provider(
     fields = {
         "name": "The name of the installer",
         "id": """
-The unique identifier for this product. This should be the same accross all
+The unique identifier for this product. This should be the same across all
 versions, names, and install locations of the product. It will be used to
 identify the product inside the windows registry.
 """,
@@ -47,7 +47,7 @@ identify the product inside the windows registry.
         "vendor_path": "The optional path to use after the root by default. E.g. Company\\Vendor. Defaults to the vendor field.",
         "description": "The descripiton of the software being packaged.",
         "copyright": "The copyright of the software being packaged.",
-        "license_file": "The licens file to use for the installer",
+        "license_file": "The license file to use for the installer",
         "version": "The numric version for the installer.",
         "install_root": """
 The root path to install the software into. Defaults to NSIS's built in
@@ -63,10 +63,10 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "compressor_dictsize": "Set the compressor dict size for the lzma compression alg.",
         "icon": "The icon file for the installer.",
         "header_image": "The header image to use.",
-        "menu_image": "The image to ues for the welcome and finsih installer pages.",
+        "menu_image": "The image to use for the welcome and finish installer pages.",
         "install_categories": "The possible install types to use when selecting components.",
         "defines": "The defines to use for the installer.",
-        "verbosity": "The verbosity of outupt.",
+        "verbosity": "The verbosity of output.",
         "components": "List of root components and component groups.",
         "outfile": "Specify the outfile.",
         "arch": "The architecture to built the installer for.",
@@ -457,7 +457,7 @@ disabled: The service will not be started.
 Defines how the component shows up in the UI when selecting.
 
 hidden: The component will always be installed and is hidden from the user.
-required: The compenent is visible to the user, but will always be selected.
+required: The component is visible to the user, but will always be selected.
 default: The component is optional but will be selected by default.
 optional: The component is optional but will be deselected by default.
 """,
@@ -548,7 +548,7 @@ Example:
 {{ (ds "component_<bazel name>").InstallCategories }}
 ```
 
-Like the installer, component fields are avilable via their CamelCaseName.
+Like the installer, component fields are available via their CamelCaseName.
 
 Notes:
 - InstallCategories will be a single string value with the calculated install category numbers to be used with nsis's SectionIn
@@ -914,12 +914,12 @@ def _add_dep_key(deps, rev_deps, source, dest):
     deps[source].add(dest)
     rev_deps[dest].add(source)
 
-def _build_flat_dependency_list(verticies):
+def _build_flat_dependency_list(vertices):
     deps = {}
     rev_deps = {}
 
-    for key in verticies:
-        v = verticies[key]
+    for key in vertices:
+        v = vertices[key]
         if NsisComponentInfo not in v:
             continue
 
@@ -951,14 +951,14 @@ def _build_flat_dependency_list(verticies):
 
 
 def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
-    verticies = {}
+    vertices = {}
     edges = []
 
     for dep in inst_ctx.attr.components:
         edges.append({_EDGE_PARENT_KEY: None, _EDGE_CHILD_KEY: dep})
         if NsisComponentInfo in dep:
             cmp = dep[NsisComponentInfo]
-            verticies[cmp.name] = dep
+            vertices[cmp.name] = dep
         elif NsisComponentGroupInfo in dep:
             grp = dep[NsisComponentGroupInfo]
             edges.extend(grp.components)
@@ -977,7 +977,7 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
             child_name = child[NsisComponentInfo].name
         elif NsisComponentGroupInfo in child:
             child_name = child[NsisComponentGroupInfo].name
-        verticies[child_name] = child
+        vertices[child_name] = child
 
         if parent == None:
             next_stack.append((child_name, data_components, data_groups))
@@ -989,17 +989,17 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
             parent_name = parent[NsisComponentInfo].name
         elif NsisComponentGroupInfo in parent:
             parent_name = parent[NsisComponentGroupInfo].name
-        verticies[parent_name] = parent
+        vertices[parent_name] = parent
 
         if parent_name in edges_map:
             edges_map[parent_name].add(child_name)
         else:
             edges_map[parent_name] = set([child_name])
 
-    dep_lst, rev_dep_lst = _build_flat_dependency_list(verticies)
+    dep_lst, rev_dep_lst = _build_flat_dependency_list(vertices)
 
     n_edges = len(edges)
-    n_vert = len(verticies)
+    n_vert = len(vertices)
 
     component_map = dict()
 
@@ -1009,7 +1009,7 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
 
         current, current_components_data, current_groups_data = next_stack.pop()
 
-        v = verticies[current]
+        v = vertices[current]
         es = edges_map[current] if current in edges_map else {}
 
         next_components = []
@@ -1036,7 +1036,7 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
 
     deps = []
 
-    for k, v in verticies.items():
+    for k, v in vertices.items():
         if NsisComponentInfo not in v:
             continue
 
@@ -1523,9 +1523,9 @@ def _nsis_installer_impl(ctx):
             arch = ctx.attr.arch,
             testable = ctx.attr.testable,
             post_init = ctx.file.post_init,
-            pre_init = ctx.file.post_init,
+            pre_init = ctx.file.pre_init,
             post_uninit = ctx.file.post_uninit,
-            pre_uninit = ctx.file.post_uninit,
+            pre_uninit = ctx.file.pre_uninit,
         ),
     ]
 
@@ -1537,7 +1537,7 @@ nsis_installer = rule(
         "id": attr.string(
             mandatory = True,
             doc = """
-The unique identifier for this product. This should be the same accross all
+The unique identifier for this product. This should be the same across all
 versions, names, and install locations of the product. It will be used to
 identify the product inside the windows registry.
 """,

@@ -80,22 +80,24 @@ Var product_code
 !macroend
 !define un.GetUninstallRegistry `!insertmacro un.GetUninstallRegistry`
 
-!macro _UpdateUninstallRegistry PREFIX
-Function ${PREFIX}UpdateUninstallRegistry
+!macro _UpdateUninstallRegistry PREFIX SUFFIX TYP
+Function ${PREFIX}UpdateUninstallRegistry${SUFFIX}
     Exch $0 ; Subkey
     Exch 1
     Exch $1 ; Value
     Push $2
     !insertmacro ${PREFIX}GetProductCode $2
-    !insertmacro ${PREFIX}SetRegistrySubKeyStr "${_UNINSTALLER_BASE_KEY}\$2" "$0" $1
+    !insertmacro ${PREFIX}SetRegistrySubKey${TYP} "${_UNINSTALLER_BASE_KEY}\$2" "$0" $1
     Pop $2
     Pop $1
     Pop $0
 FunctionEnd
 !macroend
 
-!insertmacro _UpdateUninstallRegistry ""
-!insertmacro _UpdateUninstallRegistry "un."
+!insertmacro _UpdateUninstallRegistry "" "" "Str"
+!insertmacro _UpdateUninstallRegistry "un." "" "Str"
+!insertmacro _UpdateUninstallRegistry "" "DWORD" "DWORD"
+!insertmacro _UpdateUninstallRegistry "un." "DWORD" "DWORD"
 
 !macro UpdateUninstallRegistry SUBKEY VALUE
     Push "${VALUE}"
@@ -110,6 +112,20 @@ FunctionEnd
     Call un.UpdateUninstallRegistry
 !macroend
 !define un.UpdateUninstallRegistry `!insertmacro un.UpdateUninstallRegistry`
+
+!macro UpdateUninstallRegistryDWORD SUBKEY VALUE
+    Push "${VALUE}"
+    Push "${SUBKEY}"
+    Call UpdateUninstallRegistryDWORD
+!macroend
+!define UpdateUninstallRegistryDWORD `!insertmacro UpdateUninstallRegistryDWORD`
+
+!macro un.UpdateUninstallRegistryDWORD SUBKEY VALUE
+    Push "${VALUE}"
+    Push "${SUBKEY}"
+    Call un.UpdateUninstallRegistryDWORD
+!macroend
+!define un.UpdateUninstallRegistryDWORD `!insertmacro un.UpdateUninstallRegistryDWORD`
 
 !macro RemoveUninstallRegistry
     Push $0

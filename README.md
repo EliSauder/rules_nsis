@@ -146,7 +146,7 @@ The installer action preserves the signing environment, including on Windows.
 ### Component Dependencies
 
 Based on dependencies provided in each component, a dependency graph between
-components is created and then embeded in the installer. In the component
+components is created and then embedded in the installer. In the component
 selection screen the following behavior will be seen:
 
 1. When a component is selected, all of its dependencies (including transitive
@@ -154,6 +154,6 @@ selection screen the following behavior will be seen:
 2. When a component is unselected, the all of its dependencies (including
    transitive dependencies) will be unselected, unless:
    1. They were selected manually.
-   2. They are dependend on by another component (either directly or transitively).
+   2. They are depended on by another component (either directly or transitively).
 3. When a component is unselected, all dependents (either direct or transitive)
    will be unselected (even if they were selected manually).

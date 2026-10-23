@@ -5,16 +5,6 @@
 ; Modifications:
 ;  - Now behaves like string cmpr ver1 < ver2 = -1, ver1 > ver2 = 1, ver1 == ver2 = 0
 ;
-!macro VersionCompareCall _VER1 _VER2 _RESULT
-	Push `${_VER1}`
-	Push `${_VER2}`
-	Call VersionCompare
-	Pop ${_RESULT}
-!macroend
-!define VersionCompareCall `!insertmacro VersionCompareCall`
-
-!define VersionCompare `!insertmacro VersionCompareCall`
-
 ; ____________________________________________________________________________
 ;
 ;                             VersionCompare v1.0 + Modifications
@@ -28,6 +18,7 @@
 ;
 ; Syntax:
 ; ${VersionCompare} "[Version1]" "[Version2]" $var
+; ${un.VersionCompare} "[Version1]" "[Version2]" $var
 ;
 ; "[Version1]"        ; First version
 ; "[Version2]"        ; Second version
@@ -35,7 +26,8 @@
 ;                     ;    $var=0  Versions are equal
 ;                     ;    $var=1  Version1 is newer
 ;                     ;    $var=-1  Version2 is newer
-Function VersionCompare
+!macro _VersionCompare PREFIX
+Function ${PREFIX}VersionCompare
 	Exch $1
 	Exch
 	Exch $0
@@ -110,5 +102,25 @@ end:
 	Pop $1
 	Exch $0
 FunctionEnd
+!macroend
+
+!insertmacro _VersionCompare ""
+!insertmacro _VersionCompare "un."
+
+!macro VersionCompare _VER1 _VER2 _RESULT
+	Push `${_VER1}`
+	Push `${_VER2}`
+	Call VersionCompare
+	Pop ${_RESULT}
+!macroend
+!define VersionCompare `!insertmacro VersionCompare`
+
+!macro un.VersionCompare _VER1 _VER2 _RESULT
+	Push `${_VER1}`
+	Push `${_VER2}`
+	Call un.VersionCompare
+	Pop ${_RESULT}
+!macroend
+!define un.VersionCompare `!insertmacro un.VersionCompare`
 
 !endif

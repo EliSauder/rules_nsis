@@ -115,8 +115,6 @@ FunctionEnd
 !macroend
 !define un.DetectArch `!insertmacro un.DetectArch`
 
-!define IfBitWdithMatch `${If} `
-
 !macro ValidateArch EXPECTED
     ${If} $current_arch == ""
         Call DetectArch
@@ -149,7 +147,7 @@ FunctionEnd
 !macroend
 !define un.ValidateArch `!insertmacro un.ValidateArch`
 
-!macro ValidateBitwdth EXPECTED
+!macro ValidateBitwidth EXPECTED
     ${If} $current_arch == ""
         Call DetectArch
     ${EndIf}
@@ -167,9 +165,9 @@ FunctionEnd
         Abort
     ${EndIf}
 !macroend
-!define ValidateBitwdth `!insertmacro ValidateBitwdth`
+!define ValidateBitwidth `!insertmacro ValidateBitwidth`
 
-!macro un.ValidateBitwdth EXPECTED
+!macro un.ValidateBitwidth EXPECTED
     ${If} $current_arch == ""
         Call un.DetectArch
     ${EndIf}
@@ -187,7 +185,7 @@ FunctionEnd
         Abort
     ${EndIf}
 !macroend
-!define un.ValidateBitwdth `!insertmacro un.ValidateBitwdth`
+!define un.ValidateBitwidth `!insertmacro un.ValidateBitwidth`
 
 !macro _ValidateISA PREFIX EXPECTED
     ${If} $current_arch == ""

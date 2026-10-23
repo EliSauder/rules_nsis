@@ -572,3 +572,19 @@ nsis_installer_test(
     installer = ":minimal_installer_with_icon",
     must_have_files = ["README.md"],
 )
+
+nsis_installer(
+    name = "minimal_installer_user",
+    testable = True,
+    id = "c3b1e7a2-4f6d-4a8e-b5c9-1d2e3f4a5b6c",
+    components = [":minimal_component"],
+    product = "Minimal Installer User",
+    product_path = "Minimal Installer User",
+    execution_level = "user",
+)
+
+nsis_installer_test(
+    name = "minimal_installer_user_test",
+    installer = ":minimal_installer_user",
+    must_have_files = ["README.md"],
+)
