@@ -61,6 +61,7 @@ _GROUP_HEADER = 10
 _GROUP_PADDING = 4
 _GROUP_INDENT = 6
 _DROPDOWN_HEIGHT = 60
+_DEFAULT_LINES = 4
 
 _INT_MAX = 2147483647
 
@@ -88,6 +89,7 @@ NsisOptionInfo = provider(
         "save": "Whether the file dialog is a save dialog.",
         "must_exist": "Whether a path must exist.",
         "address_types": "Accepted network address types.",
+        "net_flags": "The NET_STRING_* mask of the accepted network address types.",
     },
 )
 
@@ -152,6 +154,62 @@ def _parse_int(value):
         return None
     return str(-n if negative else n)
 
+def _days_in_month(year, month):
+    if month in [1, 3, 5, 7, 8, 10, 12]:
+        return 31
+    if month != 2:
+        return 30
+    leap = (year % 4 == 0 and year % 100 != 0) or year % 400 == 0
+    return 29 if leap else 28
+
+def _parse_date(value):
+    """Returns the canonical YYYY-MM-DD form, or None when value is no date."""
+    if len(value) != 10 or value[4] != "-" or value[7] != "-":
+        return None
+    y = value[0:4]
+    m = value[5:7]
+    d = value[8:10]
+    if not (y.isdigit() and m.isdigit() and d.isdigit()):
+        return None
+    year = int(y.lstrip("0") or "0")
+    month = int(m.lstrip("0") or "0")
+    day = int(d.lstrip("0") or "0")
+    if year < 1601 or month < 1 or month > 12 or day < 1 or day > _days_in_month(year, month):
+        return None
+    return value
+
+def _parse_ipv4(value):
+    """Returns the dotted quad without leading zeros, or None."""
+    parts = value.split(".")
+    if len(parts) != 4:
+        return None
+    out = []
+    for p in parts:
+        if not p or not p.isdigit() or len(p) > 3:
+            return None
+        n = int(p.lstrip("0") or "0")
+        if n > 255:
+            return None
+        out.append(str(n))
+    return ".".join(out)
+
+def _valid_escapes(value):
+    """Whether a multi-line value only uses the escapes \\n and \\\\."""
+    i = 0
+    n = len(value)
+    for _ in range(n):
+        if i >= n:
+            break
+        if value[i] == "\\":
+            if i + 1 >= n or value[i + 1] not in ["n", "\\"]:
+                return False
+            i += 2
+        elif value[i] in ["\n", "\r"]:
+            return False
+        else:
+            i += 1
+    return True
+
 def _lines(text, chars = _LINE_CHARS):
     if not text:
         return 0
@@ -206,6 +264,76 @@ def _default_enum(label, a):
         _fail(label, "default '{}' is not one of choices {}".format(a.default, a.choices))
     return a.default
 
+def _default_richedit(label, a):
+    if not _valid_escapes(a.default):
+        _fail(label, "default must be on a single line; use \\n for line breaks and \\\\ for a backslash")
+    return _default_string(label, a)
+
+def _default_path(label, a):
+    d = a.default
+    if d and not (d.startswith("$") or d.startswith("\\\\") or (len(d) > 2 and d[1] == ":" and d[2] in ["\\", "/"])):
+        _fail(label, "default '{}' is not an absolute path".format(d))
+    return _default_string(label, a)
+
+def _default_combobox(label, a):
+    return _default_string(label, a)
+
+def _default_list(label, a):
+    if not a.multi_select:
+        return _default_enum(label, a)
+    if not a.default:
+        return ""
+    chosen = {}
+    for item in a.default.split("|"):
+        match = [c for c in a.choices if c.lower() == item.lower()]
+        if not match:
+            _fail(label, "default item '{}' is not one of choices {}".format(item, a.choices))
+        if match[0] in chosen:
+            _fail(label, "default item '{}' is listed twice".format(item))
+        chosen[match[0]] = True
+    return "|".join([c for c in a.choices if c in chosen])
+
+def _default_date(label, a):
+    if not a.default:
+        # Empty means "today" (clamped to min/max), which is only known at run time.
+        return ""
+    v = _parse_date(a.default)
+    if v == None:
+        _fail(label, "default '{}' is not a date (YYYY-MM-DD, years 1601-9999)".format(a.default))
+    if (a.min and v < a.min) or (a.max and v > a.max):
+        _fail(label, "default {} is outside of min/max [{}, {}]".format(v, a.min, a.max))
+    return v
+
+def _default_ip(label, a):
+    if not a.default:
+        return ""
+    v = _parse_ipv4(a.default)
+    if v == None:
+        _fail(label, "default '{}' is not an IPv4 address (a.b.c.d)".format(a.default))
+    return v
+
+def _default_net(label, a):
+    d = a.default
+    if not d:
+        return ""
+    for c in d.elems():
+        if c in " \t\r\n|":
+            _fail(label, "default '{}' is not a valid network address".format(d))
+    types = a.address_types
+    if types and "ipv6" not in types and "dns" not in types:
+        host = d
+        if "with_prefix" in types and "/" in host:
+            host, prefix = host.rsplit("/", 1)
+            if not prefix.isdigit() or int(prefix) > 32:
+                _fail(label, "default '{}' has an invalid prefix length".format(d))
+        if "with_port" in types and ":" in host:
+            host, port = host.rsplit(":", 1)
+            if not port.isdigit() or int(port) > 65535:
+                _fail(label, "default '{}' has an invalid port".format(d))
+        if _parse_ipv4(host) == None:
+            _fail(label, "default '{}' is not an IPv4 address".format(d))
+    return d
+
 def _layout_checkbox(_a):
     return struct(has_label = False, control_offset = 0, control_height = _EDIT_HEIGHT, height = _EDIT_HEIGHT, choice_height = 0)
 
@@ -224,6 +352,16 @@ def _layout_droplist(_a):
         control_offset = _LABEL_HEIGHT + 1,
         control_height = _DROPDOWN_HEIGHT,
         height = _LABEL_HEIGHT + 1 + _EDIT_HEIGHT,
+        choice_height = 0,
+    )
+
+def _layout_multiline(a):
+    h = (a.lines or _DEFAULT_LINES) * _LINE_HEIGHT + 4
+    return struct(
+        has_label = True,
+        control_offset = _LABEL_HEIGHT + 1,
+        control_height = h,
+        height = _LABEL_HEIGHT + 1 + h,
         choice_height = 0,
     )
 
@@ -279,7 +417,99 @@ _CONTROLS = {
         "default": _default_enum,
         "layout": _layout_droplist,
     },
+    "richedit": {
+        "type": "multiline",
+        "uses": ["max_length", "lines"],
+        "required": True,
+        "default": _default_richedit,
+        "layout": _layout_multiline,
+    },
+    "file_request": {
+        "type": "file",
+        "uses": ["filter", "save", "must_exist"],
+        "required": True,
+        "default": _default_path,
+        "layout": _layout_edit,
+    },
+    "dir_request": {
+        "type": "dir",
+        "uses": ["must_exist"],
+        "required": True,
+        "default": _default_path,
+        "layout": _layout_edit,
+    },
+    "combobox": {
+        "type": "string",
+        "uses": ["choices", "max_length"],
+        "optional_choices": True,
+        "required": True,
+        "default": _default_combobox,
+        "layout": _layout_droplist,
+    },
+    "listbox": {
+        "type": "enum",
+        "uses": ["choices", "multi_select", "lines"],
+        "required": True,
+        "default": _default_list,
+        "layout": _layout_multiline,
+    },
+    "sorted_listbox": {
+        "type": "enum",
+        "uses": ["choices", "multi_select", "lines"],
+        "required": True,
+        "default": _default_list,
+        "layout": _layout_multiline,
+    },
+    "date": {
+        "type": "date",
+        "uses": ["min", "max"],
+        "required": False,
+        "default": _default_date,
+        "layout": _layout_edit,
+    },
+    "ip_address": {
+        "type": "ipv4",
+        "uses": [],
+        "required": True,
+        "default": _default_ip,
+        "layout": _layout_edit,
+    },
+    "net_address": {
+        "type": "net",
+        "uses": ["address_types"],
+        "required": True,
+        "default": _default_net,
+        "layout": _layout_edit,
+    },
 }
+
+_ADDRESS_BASE_TYPES = ["ipv4", "ipv6", "dns"]
+_ADDRESS_TYPES = _ADDRESS_BASE_TYPES + ["with_port", "with_prefix"]
+
+def _net_flags(label, types):
+    """Maps address_types to the NET_STRING_* mask of ParseNetworkString."""
+    for t in types:
+        if t not in _ADDRESS_TYPES:
+            _fail(label, "address_types entry '{}' must be one of {}".format(t, _ADDRESS_TYPES))
+    if len(types) != len(set(types)):
+        _fail(label, "address_types contains duplicates")
+    if not types:
+        types = _ADDRESS_BASE_TYPES
+    bases = [t for t in types if t in _ADDRESS_BASE_TYPES]
+    if not bases:
+        _fail(label, "address_types needs at least one of ipv4, ipv6 or dns")
+    port = "with_port" in types
+    prefix = "with_prefix" in types
+    if prefix and bases == ["dns"]:
+        _fail(label, "address_types: with_prefix needs ipv4 or ipv6")
+    flags = 0
+    if "ipv4" in types:
+        flags |= 0x1 | (0x2 if port else 0) | (0x4 if prefix else 0)
+    if "ipv6" in types:
+        flags |= 0x8 | (0x20 if port else 0) | (0x80 if prefix else 0)
+    if "dns" in types:
+        flags |= 0x100 | (0x200 if port else 0)
+    return flags
 
 # Attr name -> value that means "not set".
 _CONTROL_ATTRS = {
@@ -351,11 +581,15 @@ def _nsis_option_impl(ctx):
     lo = ""
     hi = ""
     if "choices" in spec["uses"]:
-        if not a.choices:
+        if not a.choices and not spec.get("optional_choices"):
             _fail(label, "control '{}' requires choices".format(control))
         _validate_choices(label, a.choices)
     if "max_length" in spec["uses"] and a.max_length < 0:
         _fail(label, "max_length must not be negative")
+    if "lines" in spec["uses"] and a.lines < 0:
+        _fail(label, "lines must not be negative")
+    if a.required and "multi_select" in spec["uses"] and not a.multi_select:
+        _fail(label, "attribute 'required' is only used by control '{}' with multi_select".format(control))
     if control == "number":
         if a.min:
             lo = _parse_int(a.min)
@@ -367,6 +601,25 @@ def _nsis_option_impl(ctx):
                 _fail(label, "max '{}' is not a 32-bit integer".format(a.max))
         if lo and hi and int(lo) > int(hi):
             _fail(label, "min ({}) is greater than max ({})".format(lo, hi))
+    elif control == "date":
+        if a.min:
+            lo = _parse_date(a.min)
+            if lo == None:
+                _fail(label, "min '{}' is not a date (YYYY-MM-DD)".format(a.min))
+        if a.max:
+            hi = _parse_date(a.max)
+            if hi == None:
+                _fail(label, "max '{}' is not a date (YYYY-MM-DD)".format(a.max))
+        if lo and hi and lo > hi:
+            _fail(label, "min ({}) is greater than max ({})".format(lo, hi))
+    if control == "file_request" and a.filter:
+        parts = a.filter.split("|")
+        if len(parts) % 2 != 0 or "" in parts:
+            _fail(label, "filter '{}' must be pairs of 'name|pattern' separated by '|'".format(a.filter))
+    net_flags = 0
+    if control == "net_address":
+        net_flags = _net_flags(label, a.address_types)
+    if control in ["number", "date"]:
         a = struct(**dict({k: getattr(a, k) for k in _CONTROL_ATTRS.keys()}, min = lo, max = hi, control = a.control, default = a.default, required = a.required))
 
     default = spec["default"](label, a)
@@ -376,7 +629,7 @@ def _nsis_option_impl(ctx):
         name = ctx.label.name,
         key = key,
         control = control,
-        type = spec["type"],
+        type = "list" if a.multi_select else spec["type"],
         text = ctx.attr.label_text or _title_case(ctx.label.name),
         description = ctx.attr.description,
         default = default,
@@ -393,6 +646,7 @@ def _nsis_option_impl(ctx):
         save = a.save,
         must_exist = a.must_exist,
         address_types = a.address_types,
+        net_flags = net_flags,
     )]
 
 nsis_option = rule(
@@ -416,7 +670,12 @@ unless `persist = "no"`.
             doc = """
 The control kind, which determines the backing data type: `checkbox` (bool),
 `number` (int), `text` (string), `password` (secret string, never persisted),
-`radio` and `droplist` (one of `choices`).
+`radio` and `droplist` (one of `choices`), `richedit` (multi-line text, stored
+on one line with `\\n` and `\\\\` escapes), `file_request` and `dir_request`
+(absolute paths with a Browse button), `combobox` (text with suggested
+`choices`), `listbox` and `sorted_listbox` (one of `choices`, or a `|` separated
+list with `multi_select`), `date` (YYYY-MM-DD), `ip_address` (IPv4) and
+`net_address` (see `address_types`).
 """,
         ),
         "label_text": attr.string(
@@ -437,7 +696,7 @@ number closest to 0 within min/max, an empty string, or the first choice.
         ),
         "required": attr.bool(
             default = False,
-            doc = "Whether the value must be non-empty (text and password).",
+            doc = "Whether the value must be non-empty (not for number, checkbox, radio, droplist and date).",
         ),
         "enabled_by": attr.label(
             providers = [NsisOptionInfo],
@@ -450,17 +709,17 @@ number closest to 0 within min/max, an empty string, or the first choice.
         ),
         "choices": attr.string_list(
             default = [],
-            doc = "The valid values of radio and droplist controls.",
+            doc = "The valid values of radio, droplist, listbox and sorted_listbox controls; the suggestions of combobox.",
         ),
         "multi_select": attr.bool(default = False, doc = "List controls: select several values."),
-        "min": attr.string(default = "", doc = "Lower bound of number controls."),
-        "max": attr.string(default = "", doc = "Upper bound of number controls."),
+        "min": attr.string(default = "", doc = "Lower bound of number (integer) and date (YYYY-MM-DD) controls."),
+        "max": attr.string(default = "", doc = "Upper bound of number (integer) and date (YYYY-MM-DD) controls."),
         "max_length": attr.int(default = 0, doc = "Maximum text length, 0 for unlimited."),
-        "lines": attr.int(default = 0, doc = "Control height in text lines, 0 for the default."),
-        "filter": attr.string(default = "", doc = "File dialog filter."),
-        "save": attr.bool(default = False, doc = "File dialog is a save dialog."),
-        "must_exist": attr.bool(default = False, doc = "The path must exist."),
-        "address_types": attr.string_list(default = [], doc = "Accepted network address types."),
+        "lines": attr.int(default = 0, doc = "Height of richedit, listbox and sorted_listbox in text lines, 0 for the default (4)."),
+        "filter": attr.string(default = "", doc = "file_request: dialog filter, e.g. `Executables|*.exe|All files|*.*`."),
+        "save": attr.bool(default = False, doc = "file_request: use a save dialog (the file need not exist)."),
+        "must_exist": attr.bool(default = False, doc = "file_request, dir_request: the path must exist."),
+        "address_types": attr.string_list(default = [], doc = "net_address: any of `ipv4`, `ipv6`, `dns` (at least one) plus `with_port` and `with_prefix`. Empty means ipv4, ipv6 and dns."),
     },
 )
 
@@ -498,7 +757,7 @@ nsis_option_group = rule(
 def _option_ds(page, opt, x, width, y, in_group):
     """Returns the data source entry of an option laid out at y."""
     spec = _CONTROLS[opt.control]
-    a = struct(choices = opt.choices)
+    a = struct(choices = opt.choices, lines = opt.lines)
     lay = spec["layout"](a)
     height = lay.height
     desc_lines = _lines(opt.description)
@@ -522,14 +781,14 @@ def _option_ds(page, opt, x, width, y, in_group):
         "MultiSelect": opt.multi_select,
         "Min": opt.min,
         "Max": opt.max,
-        "AllowNegative": (not opt.min) or int(opt.min) < 0,
+        "AllowNegative": opt.control != "number" or (not opt.min) or int(opt.min) < 0,
         "MaxLength": opt.max_length,
         "Lines": opt.lines,
         "Filter": opt.filter,
         "Save": opt.save,
         "MustExist": opt.must_exist,
         "AddressTypes": opt.address_types,
-        "NetStringFlags": 0,
+        "NetStringFlags": opt.net_flags,
         "Required": opt.required,
         "EnabledBy": "",
         "EnabledChain": [],
@@ -543,6 +802,9 @@ def _option_ds(page, opt, x, width, y, in_group):
         "LabelY": y,
         "ControlY": y + lay.control_offset,
         "ControlHeight": lay.control_height,
+        "TextWidth": ("70%" if in_group else "78%") if opt.control in ["file_request", "dir_request"] else width,
+        "BrowseX": "76%" if in_group else "80%",
+        "BrowseWidth": "18%" if in_group else "20%",
         "DescriptionY": desc_y,
         "DescriptionHeight": desc_lines * _LINE_HEIGHT,
         "HasDependents": False,
