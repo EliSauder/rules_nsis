@@ -3,16 +3,26 @@ import subprocess
 
 from tests.includes import common
 
+# PowerShell takes ~20s to start on CI runners, so links are made in one call.
 _SCRIPT = (
-    "$s = (New-Object -ComObject WScript.Shell).CreateShortcut($env:LNK);"
-    "if ($env:TARGET) { $s.TargetPath = $env:TARGET; $s.Save() }"
-    "else { $s.TargetPath; $s.Arguments; $s.WorkingDirectory; $s.Description }"
+    "$shell = New-Object -ComObject WScript.Shell;"
+    "if ($env:TARGETS) {"
+    " $links = $env:LNK -split '\\|'; $targets = $env:TARGETS -split '\\|';"
+    " for ($i = 0; $i -lt $links.Count; $i++) {"
+    " $s = $shell.CreateShortcut($links[$i]); $s.TargetPath = $targets[$i]; $s.Save() } }"
+    "else { $s = $shell.CreateShortcut($env:LNK);"
+    " $s.TargetPath; $s.Arguments; $s.WorkingDirectory; $s.Description }"
 )
 
 
-def _shell_link(link, target=None):
-    """Writes a link to target, or reads the link's fields when target is None."""
-    env = dict(os.environ, LNK=str(link), TARGET=str(target or ""))
+def _shell_link(link=None, links=None):
+    """Writes links ({link: target}) in one call, or reads link's fields."""
+    links = links or {}
+    env = dict(
+        os.environ,
+        LNK="|".join(map(str, links)) if links else str(link),
+        TARGETS="|".join(map(str, links.values())),
+    )
     result = subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command", _SCRIPT],
         env=env,
@@ -54,7 +64,7 @@ def _get_target(harness, directory):
     harness.run(link=str(garbage), expect_errors=True).assert_outputs(target="")
     target = _target(directory)
     link = directory / "Tool.lnk"
-    _shell_link(link, target)
+    _shell_link(links={link: target})
     result = harness.run(link=str(link), expect_errors=False)
     assert result.outputs["target"].lower() == str(target).lower()
 
@@ -65,13 +75,12 @@ def _remove_if_owned(harness, directory):
     owned = _target(install)
     foreign = _target(directory / "other")
     owned_link = directory / "owned.lnk"
+    upper_link = directory / "upper.lnk"
     foreign_link = directory / "foreign.lnk"
     sibling_link = directory / "sibling.lnk"
-    _shell_link(owned_link, owned)
-    _shell_link(foreign_link, foreign)
-    # Shares the prefix text but is not inside the folder.
+    # The sibling shares the prefix text but is not inside the folder.
     sibling = _target(directory / "install2")
-    _shell_link(sibling_link, sibling)
+    _shell_link(links={owned_link: owned, upper_link: owned, foreign_link: foreign, sibling_link: sibling})
 
     harness.run(link=str(owned_link), prefix=str(install), expect_errors=False)
     assert not owned_link.exists()
@@ -81,9 +90,8 @@ def _remove_if_owned(harness, directory):
     assert sibling_link.exists()
 
     # The prefix match ignores case and a trailing separator.
-    _shell_link(owned_link, owned)
-    harness.run(link=str(owned_link), prefix=str(install).upper() + "\\", expect_errors=False)
-    assert not owned_link.exists()
+    harness.run(link=str(upper_link), prefix=str(install).upper() + "\\", expect_errors=False)
+    assert not upper_link.exists()
 
 
 def _remove_empty_dirs(harness, directory):
