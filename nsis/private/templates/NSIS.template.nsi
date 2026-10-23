@@ -36,6 +36,7 @@ SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 !include FileFunc.nsh
 !include nsDialogs.nsh
 !include Formatting.nsh
+!include Cli.nsh
 
 
 {{- range (ds "in").IncludeFiles }}
@@ -608,6 +609,170 @@ Function __Page_{{.Name}}_Leave
 FunctionEnd
 {{end}}
 
+{{define "optApplyOne"}}
+    StrCpy $__opt_chk_what "{{.Id}}"
+    StrCpy $__opt_chk_enabled 1
+    Call __Opt_Check_{{.Page}}_{{.Key}}
+    ${If} $__opt_chk_err != ""
+        ${Cli_Fail} "Invalid value for option {{.Id}}: $__opt_chk_err"
+    ${EndIf}
+    StrCpy ${{.Var}} $__opt_chk_val
+{{end}}
+
+{{define "optCli"}}
+{{- /* Result of the unknown-name check is left in $__opt_chk_enabled. */}}
+Function __Opt_IniIsKnown
+    Push $0
+    Push $1
+    StrCpy $0 $__opt_chk_what
+    StrCpy $1 $__opt_chk_val
+    StrCpy $__opt_chk_enabled 0
+    ${If} $0 == "setup"
+        StrCpy $__opt_chk_enabled 1
+    {{- range (ds "in").OptionsPages }}
+    ${ElseIf} $0 == "{{.Name}}"
+        ${If} $1 == ""
+            StrCpy $__opt_chk_enabled 1
+        {{- range .Options }}
+        ${ElseIf} $1 == "{{.Key}}"
+            StrCpy $__opt_chk_enabled 1
+        {{- end }}
+        ${EndIf}
+    {{- end }}
+    ${EndIf}
+    Pop $1
+    Pop $0
+FunctionEnd
+
+; Stack: ini file. Rejects unknown sections and keys, then applies known values.
+Function __Options_ApplyIni
+    Exch $0
+    Push $1
+    Push $2
+    Push $3
+    Push $4
+    Push $5
+    Push $6
+    Push $7
+    System::Alloc 131072
+    Pop $1
+    System::Alloc 131072
+    Pop $2
+    System::Call 'kernel32::GetPrivateProfileSectionNamesW(i r1, i 65535, w r0)'
+    IntOp $3 $1 + 0
+    ${Do}
+        System::Call 'kernel32::lstrlenW(i r3) i .r4'
+        ${If} $4 = 0
+            ${Break}
+        ${EndIf}
+        System::Call 'kernel32::lstrcpyW(w .r5, i r3)'
+        StrCpy $__opt_chk_what $5
+        StrCpy $__opt_chk_val ""
+        Call __Opt_IniIsKnown
+        ${If} $__opt_chk_enabled != 1
+            ${Cli_Fail} "Unknown section [$5] in the options file."
+        ${EndIf}
+        System::Call 'kernel32::GetPrivateProfileStringW(w r5, i 0, w "", i r2, i 65535, w r0)'
+        IntOp $6 $2 + 0
+        ${Do}
+            System::Call 'kernel32::lstrlenW(i r6) i .r7'
+            ${If} $7 = 0
+                ${Break}
+            ${EndIf}
+            System::Call 'kernel32::lstrcpyW(w .r4, i r6)'
+            StrCpy $__opt_chk_what $5
+            StrCpy $__opt_chk_val $4
+            Call __Opt_IniIsKnown
+            ${If} $__opt_chk_enabled != 1
+                ${Cli_Fail} "Unknown option [$5] $4 in the options file."
+            ${EndIf}
+            IntOp $7 $7 + 1
+            IntOp $7 $7 * 2
+            IntOp $6 $6 + $7
+        ${Loop}
+        System::Call 'kernel32::lstrlenW(i r3) i .r4'
+        IntOp $4 $4 + 1
+        IntOp $4 $4 * 2
+        IntOp $3 $3 + $4
+    ${Loop}
+    System::Free $1
+    System::Free $2
+    {{- range (ds "in").Options }}
+    ClearErrors
+    ReadINIStr $__opt_chk_val $0 "{{.Page}}" "{{.Key}}"
+    ${IfNot} ${Errors}
+{{- template "optApplyOne" . }}
+    ${EndIf}
+    {{- end }}
+    Pop $7
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+
+{{- /* Precedence: defaults, persisted values, /OPTIONS=, then /O: arguments. */}}
+Function __Options_ApplyCli
+    Push $0
+    Push $1
+    Push $2
+    Push $3
+    Push $4
+    Push $5
+    ClearErrors
+    ${Cli_GetArgValue} "/OPTIONS" $0
+    ${IfNot} ${Errors}
+        ${IfNot} ${FileExists} "$0"
+            ${Cli_Fail} "The options file given with /OPTIONS= does not exist."
+        ${EndIf}
+        Push $0
+        Call __Options_ApplyIni
+    ${EndIf}
+    ${Cli_ArgCount} $1
+    StrCpy $2 0
+    ${While} $2 < $1
+        ${Cli_GetArg} $2 $3
+        StrCpy $4 $3 3
+        ${If} $4 == "/O:"
+            StrCpy $3 $3 "" 3
+            StrCpy $5 0
+            ${Do}
+                StrCpy $4 $3 1 $5
+                ${If} $4 == ""
+                    ${Cli_Fail} "Option arguments must have the form /O:page.key=value."
+                ${EndIf}
+                ${If} $4 == "="
+                    ${Break}
+                ${EndIf}
+                IntOp $5 $5 + 1
+            ${Loop}
+            StrCpy $4 $3 $5
+            IntOp $5 $5 + 1
+            StrCpy $3 $3 "" $5
+            {{- range (ds "in").Options }}
+            ${If} $4 == "{{.Id}}"
+                StrCpy $__opt_chk_val $3
+{{- template "optApplyOne" . }}
+                Goto __cli_next
+            ${EndIf}
+            {{- end }}
+            ${Cli_Fail} "Unknown option: $4"
+        ${EndIf}
+        __cli_next:
+        IntOp $2 $2 + 1
+    ${EndWhile}
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+{{end}}
+
 {{define "optLeaveOne"}}
 {{- $n := printf "__skip_%s" .Key }}
     StrCpy $__opt_chk_enabled 1
@@ -932,6 +1097,8 @@ FunctionEnd
 Function un.__Options_InitDefaults
 {{- template "optInitDefaults" }}
 FunctionEnd
+
+{{ template "optCli" }}
 {{- end }}
 
 Function .onInit
@@ -980,6 +1147,11 @@ Function .onInit
     {{- template "sectionGroupVarInit" .}}
     {{- end}}
     Pop $0
+
+    {{- if (ds "in").HasOptions }}
+    ${Cli_Init}
+    Call __Options_ApplyCli
+    {{- end }}
 
     {{ if (ds "in").HasPostInit }}
     !insertmacro PostInit

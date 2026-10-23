@@ -772,3 +772,36 @@ nsis_installer_test(
         "options_uninstall.txt": "enable_extras=1\nextras_name=extra\nport=8080\nmode=fast\nlevel=b\ntoken=secret\nfeature=0\ntag=comp\n",
     },
 )
+
+nsis_installer_test(
+    name = "installer_with_options_cli_test",
+    installer = ":installer_with_options",
+    must_have_files = ["README.md"],
+    installer_args = [
+        "/O:install_settings.enable_extras=0",
+        "/O:install_settings.port=9090",
+        "/O:install_settings.mode=slow",
+        "/O:advanced_settings.token=abc",
+        "/O:component_settings.tag=zz",
+    ],
+    expected_file_contents = {
+        "options_install.txt": "enable_extras=0\nextras_name=extra\nport=9090\nmode=slow\nlevel=b\ntoken=abc\nfeature=0\ntag=zz\n",
+    },
+    expected_uninstall_file_contents = {
+        "options_uninstall.txt": "enable_extras=0\nextras_name=extra\nport=9090\nmode=slow\nlevel=b\ntoken=secret\nfeature=0\ntag=zz\n",
+    },
+)
+
+nsis_installer_test(
+    name = "installer_with_options_invalid_value_test",
+    installer = ":installer_with_options",
+    installer_args = ["/O:install_settings.port=99999"],
+    expected_installer_exitcode = 2,
+)
+
+nsis_installer_test(
+    name = "installer_with_options_unknown_option_test",
+    installer = ":installer_with_options",
+    installer_args = ["/O:install_settings.nope=1"],
+    expected_installer_exitcode = 2,
+)
