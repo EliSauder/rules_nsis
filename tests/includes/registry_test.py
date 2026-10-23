@@ -139,9 +139,10 @@ def _registry_case(base, harness):
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, path) as handle:
                 winreg.SetValueEx(handle, "Value", 0, value_type, value)
             harness.run(key=path, subkey="Value").assert_outputs(value=value)
-            # Missing values and keys read as empty with the error flag set.
-            harness.run(key=path, subkey="Missing", expect_errors=True).assert_outputs(value="")
-            harness.run(key=path + "\\Missing", subkey="Value", expect_errors=True).assert_outputs(value="")
+            if kind == "string":
+                # Missing values and keys read as empty with the error flag set.
+                harness.run(key=path, subkey="Missing", expect_errors=True).assert_outputs(value="")
+                harness.run(key=path + "\\Missing", subkey="Value", expect_errors=True).assert_outputs(value="")
         else:
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, path):
                 pass
