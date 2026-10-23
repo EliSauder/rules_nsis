@@ -781,21 +781,12 @@ def _make_nsis_args(ctx, toolchain, outfile):
 
     return args
 
-def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
+def _makensis(ctx, toolchain, script, inputs, user_scripts):
     if not script:
         fail("script can not be None")
-    if not options_file:
-        fail("options file can not be None")
 
     outfile = _get_outfile(ctx)
     args = _make_nsis_args(ctx, toolchain, outfile)
-    args.add(
-        _nsis_define(
-            toolchain.args_style,
-            "INSTALL_OPTIONS_FILE",
-            _make_sys_path(toolchain, options_file.path),
-        ),
-    )
 
     sctx = signing_context(
         ctx,
@@ -845,7 +836,7 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
     )
 
     inputs = depset(
-        direct = [script, options_file, ctx.file._includes],
+        direct = [script, ctx.file._includes],
         transitive = [
             user_scripts,
             makensis_dir,
@@ -960,18 +951,38 @@ def _build_flat_dependency_list(vertices):
     return deps, rev_deps
 
 
+def _collect_component_edges(ctx):
+    """Returns the root edges plus every group's flattened descendant edges."""
+    edges = []
+    for dep in ctx.attr.components:
+        edges.append({_EDGE_PARENT_KEY: None, _EDGE_CHILD_KEY: dep})
+        if NsisComponentGroupInfo in dep:
+            edges.extend(dep[NsisComponentGroupInfo].components)
+    return edges
+
+def _flatten_components(ctx):
+    """Returns the unique NsisComponentInfo set reachable from ctx.attr.components.
+
+    Components nested at any depth inside nsis_component_group targets are
+    included. Order is stable: first appearance in the edge walk, de-duplicated
+    by component name.
+    """
+    seen = set()
+    result = []
+    for edge in _collect_component_edges(ctx):
+        for node in (edge[_EDGE_PARENT_KEY], edge[_EDGE_CHILD_KEY]):
+            if node == None or NsisComponentInfo not in node:
+                continue
+            cmp = node[NsisComponentInfo]
+            if cmp.name in seen:
+                continue
+            seen.add(cmp.name)
+            result.append(cmp)
+    return result
+
 def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
     vertices = {}
-    edges = []
-
-    for dep in inst_ctx.attr.components:
-        edges.append({_EDGE_PARENT_KEY: None, _EDGE_CHILD_KEY: dep})
-        if NsisComponentInfo in dep:
-            cmp = dep[NsisComponentInfo]
-            vertices[cmp.name] = dep
-        elif NsisComponentGroupInfo in dep:
-            grp = dep[NsisComponentGroupInfo]
-            edges.extend(grp.components)
+    edges = _collect_component_edges(inst_ctx)
 
     edges_map = {}
     data_components = []
@@ -1436,10 +1447,7 @@ def _get_user_script_files(ctx):
     files.add(ctx.file.post_uninit)
     files.add(ctx.file.pre_uninit)
 
-    for c in ctx.attr.components:
-        if NsisComponentInfo not in c:
-            continue
-        cmp = c[NsisComponentInfo]
+    for cmp in _flatten_components(ctx):
         files.add(cmp.post_install)
         files.add(cmp.pre_install)
         files.add(cmp.post_uninstall)
@@ -1456,14 +1464,13 @@ def _get_user_script_files(ctx):
 
 def _get_root_script_files(ctx):
     root = _get_render_file(ctx, "nsis", ctx.file._template)
-    opt = _get_render_file(ctx, "nsis-options", ctx.file._template_options)
 
-    return root, opt
+    return root
 
 def _build_rendered_templates(ctx, toolchain):
     data, component_map = _build_data_structure(ctx, toolchain)
 
-    rootscript, option = _get_root_script_files(ctx)
+    rootscript = _get_root_script_files(ctx)
 
     scripts = _get_user_script_files(ctx)
     data["IncludeFiles"] = [_make_sys_path(toolchain, v.path) for k, v in scripts.items()]
@@ -1476,9 +1483,8 @@ def _build_rendered_templates(ctx, toolchain):
         files.add(f)
 
     script = _render_file(ctx, ctx.file._template, datafiles, rootscript)
-    option = _render_file(ctx, ctx.file._template_options, datafiles, option)
 
-    return (rootscript, option, depset([f for f in files]))
+    return (rootscript, depset([f for f in files]))
 
 def _read_stamp_values(ctx, stamp):
     if not stamp:
@@ -1512,11 +1518,11 @@ def _nsis_installer_impl(ctx):
     toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
 
     srcs = _all_files(ctx)
-    script, options, user_scripts = _build_rendered_templates(ctx, toolchain)
+    script, user_scripts = _build_rendered_templates(ctx, toolchain)
 
     script = _add_includes(ctx, toolchain, script)
 
-    return _makensis(ctx, toolchain, script, options, srcs, user_scripts) + [
+    return _makensis(ctx, toolchain, script, srcs, user_scripts) + [
         NsisInstallerInfo(
             name = ctx.attr.name,
             id = ctx.attr.id,
@@ -1810,10 +1816,6 @@ For more details see `post_init`.
         ),
         "_template": attr.label(
             default = Label("//nsis/private/templates:NSIS.template.nsi"),
-            allow_single_file = True,
-        ),
-        "_template_options": attr.label(
-            default = Label("//nsis/private/templates:NSIS.InstallOptions.template.ini"),
             allow_single_file = True,
         ),
         "_gomplate": attr.label(

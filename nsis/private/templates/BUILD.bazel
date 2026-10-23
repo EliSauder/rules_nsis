@@ -1,4 +1,3 @@
 exports_files([
-    "NSIS.InstallOptions.template.ini",
     "NSIS.template.nsi",
 ])

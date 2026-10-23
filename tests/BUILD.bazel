@@ -278,6 +278,41 @@ nsis_installer_test(
 )
 
 nsis_component(
+    name = "hook_group_component",
+    srcs = [":nsis_files"],
+    selection_mode = "default",
+    pre_install = "//tests/testdata:hook_pre_install.nsh",
+    post_install = "//tests/testdata:hook_post_install.nsh",
+    pre_uninstall = "//tests/testdata:hook_pre_uninstall.nsh",
+)
+
+nsis_component_group(
+    name = "hook_group",
+    components = [":hook_group_component"],
+)
+
+nsis_installer(
+    name = "installer_with_group_hooks",
+    testable = True,
+    id = "3c9d1f0e-6a52-4b1c-9f43-5a8e2d7b1c64",
+    components = [":hook_group"],
+    product = "Installer Group Hooks",
+    product_path = "Installer Group Hooks",
+)
+
+# The hooks write hook_pre.txt and hook_post.txt, so they are only present when
+# hooks of components nested in groups are rendered and included.
+nsis_installer_test(
+    name = "installer_with_group_hooks_test",
+    installer = ":installer_with_group_hooks",
+    must_have_files = [
+        "README.md",
+        "hook_pre.txt",
+        "hook_post.txt",
+    ],
+)
+
+nsis_component(
     name = "minimal_component_with_dir",
     directory = "Component",
     srcs = [":nsis_files"],

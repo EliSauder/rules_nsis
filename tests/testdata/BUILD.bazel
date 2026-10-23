@@ -2,6 +2,9 @@ load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 
 exports_files([
     "README.md",
+    "hook_post_install.nsh",
+    "hook_pre_install.nsh",
+    "hook_pre_uninstall.nsh",
     "test_icon.ico",
 ])
 
