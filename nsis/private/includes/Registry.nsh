@@ -71,34 +71,80 @@
 !macroend
 !define un.GetRegView `!insertmacro un.GetRegView`
 
-!macro _RemoveRegistryKeyFunction PREFIX
-Function ${PREFIX}RemoveRegistryKey
-    !insertmacro ${PREFIX}SetShellContext
-    !insertmacro ${PREFIX}DefineRegView
+; Pushes the loaded registry view (32 or 64) onto the stack.
+!macro _PushRegView PREFIX
+!ifdef REGISTRY_VIEW
+    Push "${REGISTRY_VIEW}"
+!else
+    Push $0
+    !insertmacro ${PREFIX}GetRegView $0
     Exch $0
+!endif
+!macroend
 
+; Switches to VIEW (32 or 64) for the next registry access.
+!macro _ApplyRegView PREFIX VIEW
+    ${If} "${VIEW}" == "64"
+        SetRegView 64
+    ${ElseIf} "${VIEW}" == "32"
+        SetRegView 32
+    ${Else}
+        !insertmacro LogWarn "Unknown registry view '${VIEW}', using the default view"
+        !insertmacro ${PREFIX}DefineRegView
+    ${EndIf}
+!macroend
+
+; Appends the test id to KEY when running under test. SCRATCH is preserved.
+!macro _ApplyRegTestId KEY SCRATCH
 !ifdef TESTABLE_INSTALLER
     ${IfTest}
-        Push $1
-        !insertmacro GetTestId $1
-        !insertmacro LogInfo "Removing registry '$0\$1'"
-        DeleteRegKey SHCTX "$0\$1"
-        Pop $1
-    ${Else}
-        !insertmacro LogInfo "Removing registry '$0'"
-        DeleteRegKey SHCTX "$0"
+        Push ${SCRATCH}
+        !insertmacro GetTestId ${SCRATCH}
+        StrCpy ${KEY} "${KEY}\${SCRATCH}"
+        Pop ${SCRATCH}
     ${EndIf}
-!else
-    !insertmacro LogInfo "Removing registry '$0'"
-    DeleteRegKey SHCTX "$0"
 !endif
+!macroend
+
+!macro _RemoveRegistryKeyFunction PREFIX
+Function ${PREFIX}RemoveRegistryKeyInView
+    !insertmacro ${PREFIX}SetShellContext
+    Exch $1 ; view
+    Exch
+    Exch $0 ; key
+
+    !insertmacro _ApplyRegTestId $0 $2
+    !insertmacro _ApplyRegView "${PREFIX}" $1
+    !insertmacro LogInfo "Removing registry '$0' (view: $1)"
+    DeleteRegKey SHCTX "$0"
+    !insertmacro ${PREFIX}DefineRegView
 
     Pop $0
+    Pop $1
+FunctionEnd
+
+Function ${PREFIX}RemoveRegistryKey
+    !insertmacro _PushRegView "${PREFIX}"
+    Call ${PREFIX}RemoveRegistryKeyInView
 FunctionEnd
 !macroend
 
 !insertmacro _RemoveRegistryKeyFunction ""
 !insertmacro _RemoveRegistryKeyFunction "un."
+
+!macro RemoveRegistryKeyInView VIEW KEY
+    Push "${KEY}"
+    Push "${VIEW}"
+    Call RemoveRegistryKeyInView
+!macroend
+!define RemoveRegistryKeyInView `!insertmacro RemoveRegistryKeyInView`
+
+!macro un.RemoveRegistryKeyInView VIEW KEY
+    Push "${KEY}"
+    Push "${VIEW}"
+    Call un.RemoveRegistryKeyInView
+!macroend
+!define un.RemoveRegistryKeyInView `!insertmacro un.RemoveRegistryKeyInView`
 
 !macro RemoveRegistryKey KEY
     Push "${KEY}"
@@ -183,30 +229,31 @@ FunctionEnd
 !define un.FormatStrToBin `!insertmacro un.FormatStrToBin`
 
 !macro _SetRegistrySubKey PREFIX TYP
-Function ${PREFIX}SetRegistrySubKey${TYP}
+Function ${PREFIX}SetRegistrySubKey${TYP}InView
     !insertmacro ${PREFIX}SetShellContext
-    !insertmacro ${PREFIX}DefineRegView
+    Exch $3 ; View
+    Exch
     Exch $0 ; Key
-    Exch 1
-    Exch $1 ; Value
     Exch 2
+    Exch $1 ; Value
+    Exch 3
     Exch $2 ; Subkey
 
-    !ifdef TESTABLE_INSTALLER
-    ${IfTest}
-        Push $3
-        !insertmacro GetTestId $3
-        StrCpy $0 "$0\$3"
-        Pop $3
-    ${EndIf}
-    !endif
-
+    !insertmacro _ApplyRegTestId $0 $4
+    !insertmacro _ApplyRegView "${PREFIX}" $3
     WriteReg${TYP} SHCTX "$0" "$2" $1
-    !insertmacro LogInfo "Set ${TYP} registry entry: '$0'.'$2'=$1"
+    !insertmacro LogInfo "Set ${TYP} registry entry: '$0'.'$2'=$1 (view: $3)"
+    !insertmacro ${PREFIX}DefineRegView
 
     Pop $2
+    Pop $3
     Pop $0
     Pop $1
+FunctionEnd
+
+Function ${PREFIX}SetRegistrySubKey${TYP}
+    !insertmacro _PushRegView "${PREFIX}"
+    Call ${PREFIX}SetRegistrySubKey${TYP}InView
 FunctionEnd
 !macroend
 
@@ -216,132 +263,150 @@ FunctionEnd
 !insertmacro _SetRegistrySubKey "" "DWORD"
 !insertmacro _SetRegistrySubKey "un." "DWORD"
 
-!macro SetRegistrySubKeyBin KEY SUBKEY VALUE
+; VALUE must be a literal hex string because WriteRegBin data is resolved at
+; compile time, so the Bin variants are macros rather than functions.
+!macro _SetRegistrySubKeyBinInView PREFIX VIEW KEY SUBKEY VALUE
+    !insertmacro ${PREFIX}SetShellContext
+    !insertmacro _ApplyRegView "${PREFIX}" "${VIEW}"
     WriteRegBin SHCTX "${KEY}" "${SUBKEY}" ${VALUE}
+    !insertmacro ${PREFIX}DefineRegView
+!macroend
+
+!macro SetRegistrySubKeyBinInView VIEW KEY SUBKEY VALUE
+    !insertmacro _SetRegistrySubKeyBinInView "" "${VIEW}" "${KEY}" "${SUBKEY}" ${VALUE}
+!macroend
+!define SetRegistrySubKeyBinInView `!insertmacro SetRegistrySubKeyBinInView`
+
+!macro un.SetRegistrySubKeyBinInView VIEW KEY SUBKEY VALUE
+    !insertmacro _SetRegistrySubKeyBinInView "un." "${VIEW}" "${KEY}" "${SUBKEY}" ${VALUE}
+!macroend
+!define un.SetRegistrySubKeyBinInView `!insertmacro un.SetRegistrySubKeyBinInView`
+
+!macro _SetRegistrySubKeyBin PREFIX KEY SUBKEY VALUE
+!ifdef REGISTRY_VIEW
+    !insertmacro _SetRegistrySubKeyBinInView "${PREFIX}" "${REGISTRY_VIEW}" "${KEY}" "${SUBKEY}" ${VALUE}
+!else
+    ; KEY may reference $0, so avoid using a register to hold the view.
+    !insertmacro ${PREFIX}SetShellContext
+    !insertmacro ${PREFIX}DefineRegView
+    WriteRegBin SHCTX "${KEY}" "${SUBKEY}" ${VALUE}
+!endif
+!macroend
+
+!macro SetRegistrySubKeyBin KEY SUBKEY VALUE
+    !insertmacro _SetRegistrySubKeyBin "" "${KEY}" "${SUBKEY}" ${VALUE}
 !macroend
 !define SetRegistrySubKeyBin `!insertmacro SetRegistrySubKeyBin`
 
 !macro un.SetRegistrySubKeyBin KEY SUBKEY VALUE
-    WriteRegBin SHCTX "${KEY}" "${SUBKEY}" ${VALUE}
+    !insertmacro _SetRegistrySubKeyBin "un." "${KEY}" "${SUBKEY}" ${VALUE}
 !macroend
 !define un.SetRegistrySubKeyBin `!insertmacro un.SetRegistrySubKeyBin`
+
+!macro SetRegistrySubKeyStrInView VIEW KEY SUBKEY VALUE
+    Push "${SUBKEY}"
+    Push ${VALUE}
+    Push "${KEY}"
+    Push "${VIEW}"
+    Call SetRegistrySubKeyStrInView
+!macroend
+!define SetRegistrySubKeyStrInView `!insertmacro SetRegistrySubKeyStrInView`
 
 !macro SetRegistrySubKeyStr KEY SUBKEY VALUE
     Push "${SUBKEY}"
     Push ${VALUE}
-    PUSH "${KEY}"
+    Push "${KEY}"
     Call SetRegistrySubKeyStr
 !macroend
 !define SetRegistrySubKeyStr `!insertmacro SetRegistrySubKeyStr`
 
-!macro un.SetRegistrySubKeyStr KEY SUBKEY VALUE
+!macro SetRegistrySubKeyDWORDInView VIEW KEY SUBKEY VALUE
     Push "${SUBKEY}"
     Push ${VALUE}
-    PUSH "${KEY}"
-    Call un.SetRegistrySubKeyStr
+    Push "${KEY}"
+    Push "${VIEW}"
+    Call SetRegistrySubKeyDWORDInView
 !macroend
-!define un.SetRegistrySubKeyStr `!insertmacro un.SetRegistrySubKeyStr`
+!define SetRegistrySubKeyDWORDInView `!insertmacro SetRegistrySubKeyDWORDInView`
 
 !macro SetRegistrySubKeyDWORD KEY SUBKEY VALUE
     Push "${SUBKEY}"
     Push ${VALUE}
-    PUSH "${KEY}"
+    Push "${KEY}"
     Call SetRegistrySubKeyDWORD
 !macroend
 !define SetRegistrySubKeyDWORD `!insertmacro SetRegistrySubKeyDWORD`
 
+!macro un.SetRegistrySubKeyStrInView VIEW KEY SUBKEY VALUE
+    Push "${SUBKEY}"
+    Push ${VALUE}
+    Push "${KEY}"
+    Push "${VIEW}"
+    Call un.SetRegistrySubKeyStrInView
+!macroend
+!define un.SetRegistrySubKeyStrInView `!insertmacro un.SetRegistrySubKeyStrInView`
+
+!macro un.SetRegistrySubKeyStr KEY SUBKEY VALUE
+    Push "${SUBKEY}"
+    Push ${VALUE}
+    Push "${KEY}"
+    Call un.SetRegistrySubKeyStr
+!macroend
+!define un.SetRegistrySubKeyStr `!insertmacro un.SetRegistrySubKeyStr`
+
+!macro un.SetRegistrySubKeyDWORDInView VIEW KEY SUBKEY VALUE
+    Push "${SUBKEY}"
+    Push ${VALUE}
+    Push "${KEY}"
+    Push "${VIEW}"
+    Call un.SetRegistrySubKeyDWORDInView
+!macroend
+!define un.SetRegistrySubKeyDWORDInView `!insertmacro un.SetRegistrySubKeyDWORDInView`
+
 !macro un.SetRegistrySubKeyDWORD KEY SUBKEY VALUE
     Push "${SUBKEY}"
     Push ${VALUE}
-    PUSH "${KEY}"
+    Push "${KEY}"
     Call un.SetRegistrySubKeyDWORD
 !macroend
 !define un.SetRegistrySubKeyDWORD `!insertmacro un.SetRegistrySubKeyDWORD`
 
 !macro _GetRegistrySubKey PREFIX
-Function ${PREFIX}GetRegistrySubKey
+Function ${PREFIX}GetRegistrySubKeyInView
     !insertmacro ${PREFIX}SetShellContext
-    !insertmacro ${PREFIX}DefineRegView
-    Exch $0
+    Exch $2 ; view
     Exch
-    Exch $1
+    Exch $0 ; key
+    Exch 2
+    Exch $1 ; subkey
 
-!ifdef TESTABLE_INSTALLER
-    ${IfTest}
-        Push $3
-        !insertmacro GetTestId $3
-        StrCpy $0 "$0\$3"
-        Pop $3
-    ${EndIf}
-!endif
-
+    !insertmacro _ApplyRegTestId $0 $3
+    !insertmacro _ApplyRegView "${PREFIX}" $2
     ReadRegStr $0 SHCTX "$0" "$1"
+    !insertmacro ${PREFIX}DefineRegView
+
     Pop $1
+    Pop $2
     Exch $0
+FunctionEnd
+
+Function ${PREFIX}GetRegistrySubKey
+    !insertmacro _PushRegView "${PREFIX}"
+    Call ${PREFIX}GetRegistrySubKeyInView
 FunctionEnd
 !macroend
 
 !insertmacro _GetRegistrySubKey ""
 !insertmacro _GetRegistrySubKey "un."
 
-; Reads from an explicit registry view (32 or 64), then restores the default view.
-!macro _GetRegistrySubKeyInView PREFIX
-Function ${PREFIX}GetRegistrySubKeyInView
-    !insertmacro ${PREFIX}SetShellContext
-    Exch $0 ; key
-    Exch
-    Exch $1 ; subkey
-    Exch 2
-    Exch $2 ; view
-
-!ifdef TESTABLE_INSTALLER
-    ${IfTest}
-        Push $3
-        !insertmacro GetTestId $3
-        StrCpy $0 "$0\$3"
-        Pop $3
-    ${EndIf}
-!endif
-
-    ${If} $2 == "64"
-        SetRegView 64
-    ${ElseIf} $2 == "32"
-        SetRegView 32
-    ${Else}
-        !insertmacro LogWarn "Unknown registry view '$2', using the default view"
-        !insertmacro ${PREFIX}DefineRegView
-    ${EndIf}
-
-    ReadRegStr $0 SHCTX "$0" "$1"
-    !insertmacro ${PREFIX}DefineRegView
-
-    Pop $2
-    Exch
-    Pop $1
-    Exch $0
-FunctionEnd
-!macroend
-
-!insertmacro _GetRegistrySubKeyInView ""
-!insertmacro _GetRegistrySubKeyInView "un."
-
 !macro GetRegistrySubKeyInView VIEW KEY SUBKEY OUT
-    Push "${VIEW}"
     Push "${SUBKEY}"
     Push "${KEY}"
+    Push "${VIEW}"
     Call GetRegistrySubKeyInView
     Pop ${OUT}
 !macroend
 !define GetRegistrySubKeyInView `!insertmacro GetRegistrySubKeyInView`
-
-!macro un.GetRegistrySubKeyInView VIEW KEY SUBKEY OUT
-    Push "${VIEW}"
-    Push "${SUBKEY}"
-    Push "${KEY}"
-    Call un.GetRegistrySubKeyInView
-    Pop ${OUT}
-!macroend
-!define un.GetRegistrySubKeyInView `!insertmacro un.GetRegistrySubKeyInView`
 
 !macro GetRegistrySubKey KEY SUBKEY OUT
     Push "${SUBKEY}"
@@ -350,6 +415,15 @@ FunctionEnd
     Pop ${OUT}
 !macroend
 !define GetRegistrySubKey `!insertmacro GetRegistrySubKey`
+
+!macro un.GetRegistrySubKeyInView VIEW KEY SUBKEY OUT
+    Push "${SUBKEY}"
+    Push "${KEY}"
+    Push "${VIEW}"
+    Call un.GetRegistrySubKeyInView
+    Pop ${OUT}
+!macroend
+!define un.GetRegistrySubKeyInView `!insertmacro un.GetRegistrySubKeyInView`
 
 !macro un.GetRegistrySubKey KEY SUBKEY OUT
     Push "${SUBKEY}"
