@@ -4,6 +4,11 @@ Unicode True
 {{- if (ds "in").TestableInstaller }}
 !define TESTABLE_INSTALLER
 {{- end }}
+{{- if (ds "in").ArchitectureIs64 }}
+!define REGISTRY_VIEW 64
+{{- else }}
+!define REGISTRY_VIEW 32
+{{- end }}
 SetCompressor {{ (ds "in").Compressor }}
 SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 
@@ -526,7 +531,7 @@ Function .onInit
     !insertmacro SetShellContext
     !insertmacro DefineRegView
 
-    {{ if not (ds "in").ArchitectureAllow32On64 }}
+    {{ if or (not (ds "in").ArchitectureAllow32On64) (ds "in").ArchitectureIs64 }}
     !insertmacro ValidateArch "{{ (ds "in").Architecture }}"
     {{ else }}
     !insertmacro ValidateISA "{{ (ds "in").Architecture }}"
@@ -570,7 +575,7 @@ Function un.onInit
 
     !insertmacro un.SetProductCode "${PRODUCT_ID}"
 
-    {{ if not (ds "in").ArchitectureAllow32On64 }}
+    {{ if or (not (ds "in").ArchitectureAllow32On64) (ds "in").ArchitectureIs64 }}
     !insertmacro un.ValidateArch "{{ (ds "in").Architecture }}"
     {{ else }}
     !insertmacro un.ValidateISA "{{ (ds "in").Architecture }}"

@@ -13,6 +13,16 @@
 !macroend
 !define UninstallExisting `!insertmacro UninstallExisting`
 
+; Looks up the uninstall string for ID in VIEW unless one was already found.
+; Uses $1 (uninstall path) and $2 (registry key) from UninstallExisting.
+!macro _UninstallExistingFind VIEW ID
+    ${If} "$1" == ""
+        StrCpy $2 "${_UNINSTALLER_BASE_KEY}\${ID}"
+        !insertmacro GetRegistrySubKeyInView ${VIEW} "$2" "${UnUninstallString}" $1
+        !insertmacro TrimQuotes $1 $1
+    ${EndIf}
+!macroend
+
 Function UninstallExisting #(appkey: str) -> int:
     Exch $0 ; appkey
     Push $1 ; uninstaller path
@@ -20,32 +30,41 @@ Function UninstallExisting #(appkey: str) -> int:
     Push $3 ; install location
     Push $4 ; result code
     Push $5 ; scratch
+    Push $6 ; product code
+    Push $7 ; registry view the key was found in
 
     StrCpy $4 0
+    StrCpy $1 ""
+    !insertmacro GetProductCode $6
 
-    !insertmacro GetProductCode $2
-    StrCpy $2 "${_UNINSTALLER_BASE_KEY}\$2"
-    !insertmacro GetRegistrySubKey "$2" "${UnUninstallString}" $1
-    !insertmacro TrimQuotes $1 $1
-    ${If} "$1" == ""
-        ; Older installers registered under the raw id rather than {ID}.
-        StrCpy $2 "${_UNINSTALLER_BASE_KEY}\$0"
-        !insertmacro GetRegistrySubKey "$2" "${UnUninstallString}" $1
-        !insertmacro TrimQuotes $1 $1
+    ; Older installers registered under the raw id rather than {ID}, and may
+    ; have used the other registry view, so check every combination.
+    !insertmacro GetRegView $7
+    !insertmacro _UninstallExistingFind $7 "$6"
+    !insertmacro _UninstallExistingFind $7 "$0"
+    ${If} $7 == "64"
+        StrCpy $5 "32"
+    ${Else}
+        StrCpy $5 "64"
     ${EndIf}
+    ${If} "$1" == ""
+        StrCpy $7 $5
+    ${EndIf}
+    !insertmacro _UninstallExistingFind $7 "$6"
+    !insertmacro _UninstallExistingFind $7 "$0"
 
     ${If} "$1" == ""
         !insertmacro LogDebug "No uninstall path for id: $0"
         Goto _UninstallExistingDone
     ${EndIf}
-    !insertmacro LogInfo "$0 has uninstall path: $1 (key: $2)"
+    !insertmacro LogInfo "$0 has uninstall path: $1 (key: $2, view: $7)"
 
     ${IfNot} ${FileExists} "$1"
         !insertmacro LogWarn "Uninstall file $1 does not exist"
         Goto _UninstallExistingDone
     ${EndIf}
 
-    !insertmacro GetRegistrySubKey "$2" "${UnInstallLocation}" $3
+    !insertmacro GetRegistrySubKeyInView $7 "$2" "${UnInstallLocation}" $3
     !insertmacro TrimQuotes $3 $3
     ${If} "$3" == ""
         !insertmacro LogError "App $0 has no InstallDir path. Please uninstall manually first."
@@ -81,6 +100,8 @@ Function UninstallExisting #(appkey: str) -> int:
 
 _UninstallExistingDone:
     StrCpy $0 $4
+    Pop $7
+    Pop $6
     Pop $5
     Pop $4
     Pop $3

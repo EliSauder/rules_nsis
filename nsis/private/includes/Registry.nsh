@@ -8,29 +8,68 @@
 !include Logging.nsh
 !include Arch.nsh
 
-!macro DefineRegView
+; REGISTRY_VIEW (32 or 64) pins the registry view used by every function in
+; this file. When it is not defined, the native view of the host is used.
+!ifdef REGISTRY_VIEW
+    !if "${REGISTRY_VIEW}" != "32"
+    !if "${REGISTRY_VIEW}" != "64"
+        !error "REGISTRY_VIEW must be 32 or 64, got '${REGISTRY_VIEW}'"
+    !endif
+    !endif
+!endif
+
+!macro _DefineRegView PREFIX
+!ifdef REGISTRY_VIEW
+    SetRegView ${REGISTRY_VIEW}
+!else
     Push $0
-    !insertmacro Is64Bit $0
+    !insertmacro ${PREFIX}Is64Bit $0
     ${If} $0 == "1"
         SetRegView 64
     ${Else}
         SetRegView 32
     ${EndIf}
     Pop $0
+!endif
+!macroend
+
+!macro DefineRegView
+    !insertmacro _DefineRegView ""
 !macroend
 !define DefineRegView `!insertmacro DefineRegView`
 
 !macro un.DefineRegView
-    Push $0
-    !insertmacro un.Is64Bit $0
-    ${If} $0 == "1"
-        SetRegView 64
-    ${Else}
-        SetRegView 32
-    ${EndIf}
-    Pop $0
+    !insertmacro _DefineRegView "un."
 !macroend
 !define un.DefineRegView `!insertmacro un.DefineRegView`
+
+!macro GetRegView OUT
+!ifdef REGISTRY_VIEW
+    StrCpy ${OUT} "${REGISTRY_VIEW}"
+!else
+    !insertmacro Is64Bit ${OUT}
+    ${If} ${OUT} == "1"
+        StrCpy ${OUT} "64"
+    ${Else}
+        StrCpy ${OUT} "32"
+    ${EndIf}
+!endif
+!macroend
+!define GetRegView `!insertmacro GetRegView`
+
+!macro un.GetRegView OUT
+!ifdef REGISTRY_VIEW
+    StrCpy ${OUT} "${REGISTRY_VIEW}"
+!else
+    !insertmacro un.Is64Bit ${OUT}
+    ${If} ${OUT} == "1"
+        StrCpy ${OUT} "64"
+    ${Else}
+        StrCpy ${OUT} "32"
+    ${EndIf}
+!endif
+!macroend
+!define un.GetRegView `!insertmacro un.GetRegView`
 
 !macro _RemoveRegistryKeyFunction PREFIX
 Function ${PREFIX}RemoveRegistryKey
@@ -244,6 +283,65 @@ FunctionEnd
 
 !insertmacro _GetRegistrySubKey ""
 !insertmacro _GetRegistrySubKey "un."
+
+; Reads from an explicit registry view (32 or 64), then restores the default view.
+!macro _GetRegistrySubKeyInView PREFIX
+Function ${PREFIX}GetRegistrySubKeyInView
+    !insertmacro ${PREFIX}SetShellContext
+    Exch $0 ; key
+    Exch
+    Exch $1 ; subkey
+    Exch 2
+    Exch $2 ; view
+
+!ifdef TESTABLE_INSTALLER
+    ${IfTest}
+        Push $3
+        !insertmacro GetTestId $3
+        StrCpy $0 "$0\$3"
+        Pop $3
+    ${EndIf}
+!endif
+
+    ${If} $2 == "64"
+        SetRegView 64
+    ${ElseIf} $2 == "32"
+        SetRegView 32
+    ${Else}
+        !insertmacro LogWarn "Unknown registry view '$2', using the default view"
+        !insertmacro ${PREFIX}DefineRegView
+    ${EndIf}
+
+    ReadRegStr $0 SHCTX "$0" "$1"
+    !insertmacro ${PREFIX}DefineRegView
+
+    Pop $2
+    Exch
+    Pop $1
+    Exch $0
+FunctionEnd
+!macroend
+
+!insertmacro _GetRegistrySubKeyInView ""
+!insertmacro _GetRegistrySubKeyInView "un."
+
+!macro GetRegistrySubKeyInView VIEW KEY SUBKEY OUT
+    Push "${VIEW}"
+    Push "${SUBKEY}"
+    Push "${KEY}"
+    Call GetRegistrySubKeyInView
+    Pop ${OUT}
+!macroend
+!define GetRegistrySubKeyInView `!insertmacro GetRegistrySubKeyInView`
+
+!macro un.GetRegistrySubKeyInView VIEW KEY SUBKEY OUT
+    Push "${VIEW}"
+    Push "${SUBKEY}"
+    Push "${KEY}"
+    Call un.GetRegistrySubKeyInView
+    Pop ${OUT}
+!macroend
+!define un.GetRegistrySubKeyInView `!insertmacro un.GetRegistrySubKeyInView`
 
 !macro GetRegistrySubKey KEY SUBKEY OUT
     Push "${SUBKEY}"

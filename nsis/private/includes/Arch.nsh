@@ -154,7 +154,7 @@ FunctionEnd
         Call DetectArch
     ${EndIf}
     ${If} ${EXPECTED} = 64
-    ${AndIf} $is64Bit == "0"
+    ${AndIf} $is64bit == "0"
         !insertmacro LogError "Installer must be run on a 64 bit computer."
         MessageBox MB_ICONSTOP "Installer must be run on a 64 bit computer." /SD IDOK
         SetErrorLevel 3
@@ -174,7 +174,7 @@ FunctionEnd
         Call un.DetectArch
     ${EndIf}
     ${If} ${EXPECTED} = 64
-    ${AndIf} $is64Bit == "0"
+    ${AndIf} $is64bit == "0"
         !insertmacro LogError "Installer must be run on a 64 bit computer."
         MessageBox MB_ICONSTOP "Installer must be run on a 64 bit computer." /SD IDOK
         SetErrorLevel 3
@@ -189,43 +189,38 @@ FunctionEnd
 !macroend
 !define un.ValidateBitwdth `!insertmacro un.ValidateBitwdth`
 
-!macro ValidateISA EXPECTED
+!macro _ValidateISA PREFIX EXPECTED
     ${If} $current_arch == ""
-        Call DetectArch
+        Call ${PREFIX}DetectArch
     ${EndIf}
-    ${If} ${EXPECTED} == "arm"
-    ${AndIf} $isArm == "0"
-        !insertmacro LogError "Installer must be run on an arm computer."
-        MessageBox MB_ICONSTOP "Installer must be run on an arm computer." /SD IDOK
+    Push $0
+    ; EXPECTED may be an ISA ("x86", "arm") or a full arch ("x86_32", "arm64").
+    StrCpy $0 "${EXPECTED}" 3
+    ${If} $0 == "arm"
+        StrCpy $0 $isArm
+    ${ElseIf} $0 == "x86"
+        StrCpy $0 $isx86
+    ${Else}
+        StrCpy $0 "0"
+    ${EndIf}
+    ${If} $0 != "1"
+        StrCpy $0 $current_arch
+        !insertmacro LogError "Current architecture '$0' does not match the ${EXPECTED} instruction set."
+        MessageBox MB_ICONSTOP "This installer requires a ${EXPECTED} compatible version of windows. You are running with $0." /SD IDOK
+        Pop $0
         SetErrorLevel 3
         Abort
-    ${ElseIf} ${EXPECTED} == "x86"
-    ${AndIf} $isx86 == "0"
-        !insertmacro LogError "Installer must be run on a x86 computer."
-        MessageBox MB_ICONSTOP "Installer must be run on a x86 computer." /SD IDOK
-        SetErrorLevel 3
-        Abort
     ${EndIf}
+    Pop $0
+!macroend
+
+!macro ValidateISA EXPECTED
+    !insertmacro _ValidateISA "" "${EXPECTED}"
 !macroend
 !define ValidateISA `!insertmacro ValidateISA`
 
 !macro un.ValidateISA EXPECTED
-    ${If} $current_arch == ""
-        Call un.DetectArch
-    ${EndIf}
-    ${If} ${EXPECTED} == "arm"
-    ${AndIf} $isArm == "0"
-        !insertmacro LogError "Installer must be run on an arm computer."
-        MessageBox MB_ICONSTOP "Installer must be run on an arm computer." /SD IDOK
-        SetErrorLevel 3
-        Abort
-    ${ElseIf} ${EXPECTED} == "x86"
-    ${AndIf} $isx86 == "0"
-        !insertmacro LogError "Installer must be run on a x86 computer."
-        MessageBox MB_ICONSTOP "Installer must be run on a x86 computer." /SD IDOK
-        SetErrorLevel 3
-        Abort
-    ${EndIf}
+    !insertmacro _ValidateISA "un." "${EXPECTED}"
 !macroend
 !define un.ValidateISA `!insertmacro un.ValidateISA`
 
