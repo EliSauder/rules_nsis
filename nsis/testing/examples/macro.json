@@ -1,8 +1,0 @@
-{
-  "symbol": "Echo",
-  "kind": "macro",
-  "parameters": [
-    {"name": "text", "direction": "in"},
-    {"name": "result", "direction": "out"}
-  ]
-}

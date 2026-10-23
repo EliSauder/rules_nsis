@@ -1,9 +1,0 @@
-{
-  "symbol": "Registry",
-  "kind": "macro",
-  "parameters": [
-    {"name": "key", "direction": "in"},
-    {"name": "value", "direction": "in"},
-    {"name": "result", "direction": "out"}
-  ]
-}

@@ -1,5 +1,5 @@
 load("@rules_python//python:py_test.bzl", "py_test")
-load("//nsis/testing:defs.bzl", "nsis_test_harness")
+load("//nsis/testing:defs.bzl", "nsis_symbol", "nsis_test_harness")
 
 _EXAMPLES = [
     "macro",
@@ -16,10 +16,34 @@ _EXAMPLES = [
 ]
 
 [
+    nsis_symbol(
+        name = name + "_symbol",
+        symbol = symbol,
+        kind = kind,
+        context = context,
+        parameters = parameters,
+        invocation = invocation,
+    )
+    for name, symbol, kind, context, parameters, invocation in [
+        ("macro", "Echo", "macro", "installer", ["in:text", "out:result"], ""),
+        ("definition", "Answer", "definition", "installer", ["out:result"], "value"),
+        ("shorthand", "Echo", "definition", "installer", ["in:text", "out:result"], ""),
+        ("function", "Echo", "function", "installer", ["in:text", "out:result"], ""),
+        ("uninstaller", "un.Echo", "function", "uninstaller", ["in:text", "out:result"], ""),
+        ("file", "CreateFile", "macro", "installer", ["in:path", "out:result"], ""),
+        ("logging", "Emit", "macro", "installer", ["in:text"], ""),
+        ("registry", "Registry", "macro", "installer", ["in:key", "in:value", "out:result"], ""),
+        ("inout", "Append", "macro", "installer", ["inout:value"], ""),
+        ("corruption", "CorruptRegisters", "macro", "installer", [], ""),
+        ("uninstaller_corruption", "CorruptRegisters", "macro", "uninstaller", [], ""),
+    ]
+]
+
+[
     nsis_test_harness(
         name = name + "_harness",
         src = "example.nsh",
-        description = name + ".json",
+        description = ":" + name + "_symbol",
         testonly = True,
     )
     for name in _EXAMPLES
@@ -31,6 +55,29 @@ filegroup(
     testonly = True,
 )
 
+nsis_symbol(
+    name = "description_fixture",
+    symbol = "un.Example",
+    kind = "definition",
+    context = "uninstaller",
+    parameters = ["in:second", "out:first", "inout:third"],
+    invocation = "call",
+    defines = {"TEST_MODE": "value with spaces"},
+    testonly = True,
+)
+
+py_test(
+    name = "description_test",
+    size = "small",
+    srcs = ["description_test.py"],
+    args = [
+        "$(rlocationpath :description_fixture)",
+        "$(rlocationpath :definition_symbol)",
+    ],
+    data = [":description_fixture", ":definition_symbol"],
+    deps = ["//nsis/testing", "@rules_python//python/runfiles"],
+)
+
 [
     py_test(
         name = name + "_test",
@@ -40,9 +87,9 @@ filegroup(
         args = [
             name,
             "$(rlocationpath :" + name + "_harness)",
-            "$(rlocationpath " + name + ".json)",
+            "$(rlocationpath :" + name + "_symbol)",
         ],
-        data = [":" + name + "_harness", name + ".json"],
+        data = [":" + name + "_harness", ":" + name + "_symbol"],
         deps = ["//nsis/testing", "@rules_python//python/runfiles"],
         target_compatible_with = ["@platforms//os:windows"],
     )

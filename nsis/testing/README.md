@@ -1,37 +1,39 @@
 # NSIS API test harnesses
 
-Write an include, describe one entry point in JSON, and build a standalone test
-executable. These harnesses do not use the installer end-to-end test rule.
-Existing include tests are unchanged.
-
-```json
-{
-  "symbol": "Echo",
-  "kind": "macro",
-  "context": "installer",
-  "parameters": [
-    {"name": "text", "direction": "in"},
-    {"name": "result", "direction": "out"}
-  ]
-}
-```
+Write an include, describe one entry point with `nsis_symbol`, and build a
+standalone test executable. Bazel generates the JSON description automatically;
+no handwritten JSON is needed. These harnesses do not use the installer
+end-to-end test rule. Existing include tests are unchanged.
 
 ```starlark
-load("@rules_nsis//nsis/testing:defs.bzl", "nsis_test_harness")
+load("@rules_nsis//nsis/testing:defs.bzl", "nsis_symbol", "nsis_test_harness")
+
+nsis_symbol(
+    name = "echo_symbol",
+    symbol = "Echo",
+    kind = "macro",
+    parameters = ["in:text", "out:result"],
+)
 
 nsis_test_harness(
     name = "echo",
     src = "example.nsh",
-    description = "echo.json",
+    description = ":echo_symbol",
     includes = [],  # Additional include files needed by example.nsh.
     testonly = True,
 )
 ```
 
+`nsis_symbol` produces a JSON file as its default output, so Python tests can
+resolve `$(rlocationpath :echo_symbol)` and pass that path to `Harness`. Add the
+symbol target to the Python test's `data` along with the harness binary.
+Symbols can be reused by multiple harness targets.
+
 `kind` is `macro` (`!insertmacro`), `definition` (`${...}`), or `function`
-(`Call`). Parameters are ordered and have direction `in`, `out`, or `inout`.
+(`Call`). `parameters` is an ordered list of `direction:name` strings, where
+direction is `in`, `out`, or `inout`.
 Macros and callable definitions receive input values and output variable
-operands in that order. For constant definitions, set `"invocation": "value"`
+operands in that order. For constant definitions, set `invocation = "value"`
 and declare exactly one output. Definitions otherwise default to callable
 shorthand expansion, including output-only helpers. For functions, inputs are
 pushed in reverse declaration order (the first input is on top), and outputs
@@ -44,9 +46,23 @@ creates an uninstaller; the Python runner invokes it directly and waits for its
 exit. Optional `defines` maps preprocessor names to string values defined before
 including the source. Harnesses run at user execution level; they do not elevate.
 
+Standalone JSON files remain accepted by `description` and the generator CLI.
+The equivalent standalone description for the example above is:
+
+```json
+{
+  "symbol": "Echo",
+  "kind": "macro",
+  "parameters": [
+    {"name": "text", "direction": "in"},
+    {"name": "result", "direction": "out"}
+  ]
+}
+```
+
 ## Python tests
 
-Depend on `@rules_nsis//nsis/testing`, add the binary and JSON to test `data`,
+Depend on `@rules_nsis//nsis/testing`, add the binary and symbol to test `data`,
 resolve their runfile paths, and use the context manager:
 
 ```python
@@ -111,7 +127,7 @@ all before/after snapshots; the runner reports every changed register.
 ## Examples and checks
 
 ```sh
-bazel test //nsis/testing:framework_test
+bazel test //nsis/testing:framework_test //nsis/testing/examples:description_test
 bazel build //nsis/testing/examples:binaries
 # Windows:
 bazel test //nsis/testing/examples:all

@@ -1,8 +1,0 @@
-{
-  "symbol": "CreateFile",
-  "kind": "macro",
-  "parameters": [
-    {"name": "path", "direction": "in"},
-    {"name": "result", "direction": "out"}
-  ]
-}

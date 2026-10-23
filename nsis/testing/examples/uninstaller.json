@@ -1,9 +1,0 @@
-{
-  "symbol": "un.Echo",
-  "kind": "function",
-  "context": "uninstaller",
-  "parameters": [
-    {"name": "text", "direction": "in"},
-    {"name": "result", "direction": "out"}
-  ]
-}

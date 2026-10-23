@@ -1,6 +1,0 @@
-{
-  "symbol": "Answer",
-  "kind": "definition",
-  "invocation": "value",
-  "parameters": [{"name": "result", "direction": "out"}]
-}

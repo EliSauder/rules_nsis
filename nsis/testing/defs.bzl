@@ -1,13 +1,69 @@
-"""Build standalone, JSON-described NSIS API harnesses."""
+"""Describe NSIS symbols and build standalone API test harnesses."""
 
 load("//nsis/private:transitions.bzl", "windows_source_transition")
 
+NsisSymbolInfo = provider(
+    doc = "An NSIS entry point description.",
+    fields = {"description": "Generated JSON description file."},
+)
+
+def _symbol_impl(ctx):
+    parameters = []
+    names = []
+    for parameter in ctx.attr.parameters:
+        parts = parameter.split(":")
+        if len(parts) != 2 or parts[0] not in ["in", "out", "inout"] or not parts[1]:
+            fail("parameters must use 'in:name', 'out:name', or 'inout:name': " + parameter)
+        if parts[1] in names:
+            fail("duplicate parameter name: " + parts[1])
+        names.append(parts[1])
+        parameters.append({"name": parts[1], "direction": parts[0]})
+    description = {
+        "symbol": ctx.attr.symbol,
+        "kind": ctx.attr.kind,
+        "context": ctx.attr.context,
+        "parameters": parameters,
+        "defines": ctx.attr.defines,
+    }
+    if ctx.attr.invocation:
+        description["invocation"] = ctx.attr.invocation
+    output = ctx.actions.declare_file(ctx.label.name + ".json")
+    ctx.actions.write(output, json.encode(description))
+    return [
+        DefaultInfo(files = depset([output])),
+        NsisSymbolInfo(description = output),
+    ]
+
+nsis_symbol = rule(
+    doc = "Describe an NSIS symbol without maintaining a JSON file.",
+    implementation = _symbol_impl,
+    attrs = {
+        "symbol": attr.string(mandatory = True),
+        "kind": attr.string(mandatory = True, values = ["macro", "definition", "function"]),
+        "context": attr.string(default = "installer", values = ["installer", "uninstaller"]),
+        "parameters": attr.string_list(
+            doc = "Ordered operands, written as 'in:name', 'out:name', or 'inout:name'.",
+        ),
+        "invocation": attr.string(
+            default = "",
+            values = ["", "call", "value"],
+            doc = "For definitions: callable shorthand (default) or constant value.",
+        ),
+        "defines": attr.string_dict(),
+    },
+)
+
 def _harness_impl(ctx):
+    description = (
+        ctx.attr.description[NsisSymbolInfo].description
+        if NsisSymbolInfo in ctx.attr.description
+        else ctx.file.description
+    )
     toolchain = ctx.toolchains["//nsis/toolchain:toolchain_type"].nsis
     script = ctx.actions.declare_file(ctx.label.name + ".nsi")
     binary = ctx.actions.declare_file(ctx.label.name + ".exe")
     args = ctx.actions.args()
-    args.add("--spec", ctx.file.description)
+    args.add("--spec", description)
     args.add("--source", ctx.file.src)
     args.add("--output", script)
     args.add("--include-dir", ctx.file._includes.path)
@@ -16,7 +72,7 @@ def _harness_impl(ctx):
     ctx.actions.run(
         executable = ctx.executable._generator,
         arguments = [args],
-        inputs = [ctx.file.description, ctx.file.src] + ctx.files.includes,
+        inputs = [description, ctx.file.src] + ctx.files.includes,
         outputs = [script],
         mnemonic = "GenerateNsisHarness",
     )
@@ -47,18 +103,22 @@ def _harness_impl(ctx):
     return [DefaultInfo(
         files = depset([binary]),
         executable = binary,
-        runfiles = ctx.runfiles(files = [ctx.file.description]),
+        runfiles = ctx.runfiles(files = [description]),
     )]
 
 nsis_test_harness = rule(
-    doc = "Compile a standalone API harness from an NSH include and JSON description.",
+    doc = "Compile an NSH include using an nsis_symbol target or JSON description.",
     implementation = _harness_impl,
     executable = True,
     cfg = windows_source_transition,
     toolchains = ["//nsis/toolchain:toolchain_type"],
     attrs = {
         "src": attr.label(mandatory = True, allow_single_file = [".nsh"]),
-        "description": attr.label(mandatory = True, allow_single_file = [".json"]),
+        "description": attr.label(
+            mandatory = True,
+            allow_single_file = [".json"],
+            doc = "An nsis_symbol target, or a standalone JSON description file.",
+        ),
         "includes": attr.label_list(allow_files = [".nsh"]),
         "arch": attr.string(default = "x86_64", values = ["x86_64", "x86_32", "arm64"]),
         "_generator": attr.label(

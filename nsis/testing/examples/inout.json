@@ -1,5 +1,0 @@
-{
-  "symbol": "Append",
-  "kind": "macro",
-  "parameters": [{"name": "value", "direction": "inout"}]
-}
