@@ -18,7 +18,12 @@ _EXAMPLES = [
     "stack_consume",
     "uninstaller_stack_leak",
     "error_flag",
+    "function_order",
+    "uninstaller_function_order",
+    "defines",
 ]
+
+_DIVMOD = ["in:dividend:int", "in:divisor:int", "out:quotient:int", "out:remainder:int"]
 
 [
     nsis_symbol(
@@ -46,6 +51,8 @@ _EXAMPLES = [
         ("stack_consume", "ConsumeStack", "macro", "installer", [], ""),
         ("uninstaller_stack_leak", "LeakStack", "macro", "uninstaller", [], ""),
         ("error_flag", "SetErrorFlag", "macro", "installer", ["in:clear:bool"], ""),
+        ("function_order", "DivMod", "function", "installer", _DIVMOD, ""),
+        ("uninstaller_function_order", "un.DivMod", "function", "uninstaller", _DIVMOD, ""),
     ]
 ]
 
@@ -66,7 +73,7 @@ filegroup(
 )
 
 nsis_symbol(
-    name = "description_fixture",
+    name = "defines_symbol",
     symbol = "un.Example",
     kind = "definition",
     context = "uninstaller",
@@ -81,10 +88,10 @@ py_test(
     size = "small",
     srcs = ["description_test.py"],
     args = [
-        "$(rlocationpath :description_fixture)",
+        "$(rlocationpath :defines_symbol)",
         "$(rlocationpath :definition_symbol)",
     ],
-    data = [":description_fixture", ":definition_symbol"],
+    data = [":defines_symbol", ":definition_symbol"],
     deps = ["//nsis/testing", "@rules_python//python/runfiles"],
 )
 

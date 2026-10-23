@@ -7,7 +7,7 @@ from pathlib import Path
 
 from python.runfiles import Runfiles
 
-from nsis.testing.generate import generate, validate
+from nsis.testing.generate import validate
 
 
 class DescriptionTest(unittest.TestCase):
@@ -28,19 +28,10 @@ class DescriptionTest(unittest.TestCase):
             "invocation": "call",
             "defines": {"TEST_MODE": "value with spaces"},
         })
-        script = generate(description, "example.nsh")
-        self.assertIn(
-            '${un.Example} "$_harness_param_second" $_harness_param_first $_harness_param_third',
-            script,
-        )
         constant = json.loads(
             Path(runfiles.Rlocation(sys.argv[2])).read_text(encoding="utf-8")
         )
         self.assertEqual(constant["invocation"], "value")
-        self.assertIn(
-            'StrCpy $_harness_param_result "${Answer}"',
-            generate(constant, "example.nsh"),
-        )
 
 
 if __name__ == "__main__":

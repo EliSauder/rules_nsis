@@ -66,3 +66,35 @@ Var _example_scratch
         SetErrors
     ${EndIf}
 !macroend
+
+; Two stack inputs and two stack outputs pin the function calling convention:
+; the first input is on top on entry, the first output on top on return.
+!macro _DivModFunction PREFIX
+Function ${PREFIX}DivMod
+    Exch $0 ; dividend
+    Exch
+    Exch $1 ; divisor
+    Push $2
+    IntOp $2 $0 / $1
+    IntOp $0 $0 % $1
+    StrCpy $1 $2
+    Pop $2
+    Exch $1
+    Exch
+    Exch $0
+    Exch
+FunctionEnd
+!macroend
+!insertmacro _DivModFunction ""
+!insertmacro _DivModFunction "un."
+
+; Uses a harness define and mixes parameter directions and types.
+!macro un.Example SECOND FIRST THIRD
+    ${If} ${SECOND} > 0
+        StrCpy ${FIRST} 1
+    ${Else}
+        StrCpy ${FIRST} 0
+    ${EndIf}
+    StrCpy ${THIRD} "${THIRD}|${TEST_MODE}"
+!macroend
+!define un.Example `!insertmacro un.Example`

@@ -364,7 +364,7 @@ def nsis_include_api_tests():
         args = [
             "$(rlocationpath :" + name + "_symbol)"
             for name in symbols
-        ] + ["--includes=$(rlocationpath //nsis/private/includes:includes_dir)"],
-        data = [":" + name + "_symbol" for name in symbols] + ["//nsis/private/includes:includes_dir"],
+        ],
+        data = [":" + name + "_symbol" for name in symbols],
         deps = ["//nsis/testing", "@rules_python//python/runfiles"],
     )

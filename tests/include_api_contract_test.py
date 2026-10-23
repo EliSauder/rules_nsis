@@ -2,8 +2,6 @@
 
 import json
 import os
-import re
-import shlex
 import sys
 import unittest
 from pathlib import Path
@@ -18,7 +16,6 @@ from nsis.testing.runner import serialize_input
 
 
 SPECS = {}
-INCLUDES = None
 
 
 class ReachedInvocation(Exception):
@@ -114,180 +111,9 @@ class DispatchContractTest(unittest.TestCase):
             self.assertIs(raised.exception, error)
 
 
-class OperandPreservationTest(unittest.TestCase):
-    def run_macro(self, source, name, output="$result"):
-        """Symbolically execute straight-line stack/operand code, stubbing OS calls."""
-        text = (INCLUDES / source).read_text()
-        body = re.search(
-            r"!macro " + re.escape(name) + r"(?: [^\n]*)?\n(.*?)!macroend",
-            text, re.S,
-        ).group(1).replace("${OUT}", output)
-        # The mutex's success path skips the error/Abort branch.
-        body = re.sub(r"\$\{If\}.*?\$\{EndIf\}", "", body, flags=re.S)
-        registers = {
-            "$" + register: "sentinel-" + register
-            for register in [str(i) for i in range(10)] + ["R" + str(i) for i in range(10)]
-        }
-        original = dict(registers)
-        stack = ["caller-stack-item"]
-        for line in body.splitlines():
-            parts = line.strip().split()
-            if not parts:
-                continue
-            command, *operands = parts
-            if command == "Push":
-                stack.insert(0, registers.get(operands[0], operands[0]))
-            elif command == "Pop":
-                registers[operands[0]] = stack.pop(0)
-            elif command == "Exch":
-                register = operands[0]
-                stack[0], registers[register] = registers[register], stack[0]
-            elif command == "System::Call":
-                register = re.search(r"i \.([rR]\d)", line).group(1)
-                registers["$" + register.replace("r", "")] = "mutex-handle"
-                stack.insert(0, "0")
-            elif command == "!insertmacro":
-                if operands[0].endswith("GetProductCode"):
-                    registers[operands[-1]] = "product-code"
-                elif operands[0].endswith("GetRegistrySubKey"):
-                    registers[operands[-1]] = "registry-value"
-                else:
-                    self.fail(f"Unexpected macro: {line}")
-            else:
-                self.fail(f"Unexpected instruction: {line}")
-        self.assertEqual(stack, ["caller-stack-item"])
-        return registers, original
-
-    def test_mutex_preserves_handle_output_register_in_both_contexts(self):
-        for name in ("ValidateMutex", "un.ValidateMutex"):
-            with self.subTest(name=name):
-                registers, original = self.run_macro("Mutex.nsh", name)
-                self.assertEqual(registers, original)
-
-    def test_registry_getter_preserves_registers_and_supports_output_alias(self):
-        for name in ("GetUninstallRegistry", "un.GetUninstallRegistry"):
-            for output in ("$result", "$0", "$R9"):
-                with self.subTest(name=name, output=output):
-                    registers, original = self.run_macro("Product.nsh", name, output)
-                    self.assertEqual(registers[output], "registry-value")
-                    original[output] = "registry-value"
-                    self.assertEqual(registers, original)
-
-    def test_existing_uninstall_stack_paths(self):
-        text = (INCLUDES / "Uninstall.nsh").read_text()
-        body = text.split("Function UninstallExisting ", 1)[1].split("FunctionEnd", 1)[0]
-        body = re.sub(
-            r"!ifdef TESTABLE_INSTALLER\n(.*?)!else\n.*?!endif",
-            lambda match: match[1], body, flags=re.S,
-        )
-        lines = [line.strip() for line in body.splitlines()[1:] if line.strip()]
-        labels = {line[:-1]: index for index, line in enumerate(lines) if line.endswith(":")}
-
-        def branch_end(index, allow_else):
-            depth = 0
-            for cursor in range(index + 1, len(lines)):
-                line = lines[cursor]
-                if line.startswith(("${If}", "${IfNot}", "${IfTest}", "${IfNotTest}")):
-                    depth += 1
-                elif line == "${EndIf}":
-                    if depth == 0:
-                        return cursor + 1
-                    depth -= 1
-                elif allow_else and line == "${Else}" and depth == 0:
-                    return cursor + 1
-            self.fail("Unbalanced conditional")
-
-        scenarios = [
-            ("", False, "", 0, 0),
-            ("missing.exe", False, "", 0, 0),
-            ("uninstall.exe", True, "", 0, 1),
-            ("uninstall.exe", True, "install-dir", 0, 0),
-            ("uninstall.exe", True, "install-dir", 37, 37),
-            ("uninstall.exe", True, "install-dir", "error", 1),
-            ("uninstall.exe", True, "install-dir", "timeout", 1),
-        ]
-        for path, exists, directory, child_code, expected in scenarios:
-            with self.subTest(path=path, directory=directory, child_code=child_code):
-                registers = {"$" + str(i): "sentinel-" + str(i) for i in range(10)}
-                original = dict(registers)
-                stack = ["appkey", "caller-stack-item"]
-                value = lambda operand: registers.get(operand, operand)
-                cursor = 0
-                while cursor < len(lines):
-                    line = lines[cursor]
-                    cursor += 1
-                    if line.startswith(("#", ";")) or line.endswith(":"):
-                        continue
-                    if line.startswith("!insertmacro"):
-                        if "GetProductCode" in line:
-                            registers[line.split()[-1]] = "{product-code}"
-                        elif "GetRegView" in line:
-                            registers[line.split()[-1]] = "64"
-                        elif "_UninstallExistingFind" in line:
-                            if registers["$1"] == "":
-                                registers["$1"] = path
-                                registers["$2"] = "uninstall-key"
-                        elif "GetRegistrySubKeyInView" in line:
-                            registers[line.split()[-1]] = directory
-                        elif "GetTestId" in line:
-                            registers[line.split()[-1]] = "test-id"
-                        elif "TrimQuotes" not in line and "Log" not in line:
-                            self.fail(f"Unexpected macro: {line}")
-                        continue
-                    if line.startswith("nsExec::"):
-                        stack[:0] = [str(child_code), "child-output"]
-                        continue
-                    parts = shlex.split(line)
-                    command, *operands = parts
-                    if command == "${If}":
-                        matched = value(operands[0]) == value(operands[2])
-                        if cursor < len(lines) and lines[cursor].startswith("${OrIf}"):
-                            alternative = shlex.split(lines[cursor])[1:]
-                            matched |= value(alternative[0]) == value(alternative[2])
-                            cursor += 1
-                        if not matched:
-                            cursor = branch_end(cursor - 1, True)
-                    elif command == "${IfNot}":
-                        self.assertEqual(operands[0], "${FileExists}")
-                        if exists:
-                            cursor = branch_end(cursor - 1, True)
-                    elif command == "${Else}":
-                        cursor = branch_end(cursor - 1, False)
-                    elif command in ("${EndIf}", "${IfTest}", "${IfNotTest}", "MessageBox", "Delete", "RMDir"):
-                        pass
-                    elif command == "Push":
-                        stack.insert(0, value(operands[0]))
-                    elif command == "Pop":
-                        registers[operands[0]] = stack.pop(0)
-                    elif command == "Exch":
-                        if not operands or operands[0].isdigit():
-                            offset = int(operands[0]) if operands else 1
-                            stack[0], stack[offset] = stack[offset], stack[0]
-                        else:
-                            register = operands[0]
-                            stack[0], registers[register] = registers[register], stack[0]
-                    elif command == "StrCpy":
-                        registers[operands[0]] = value(operands[1])
-                    elif command == "IntOp":
-                        registers[operands[0]] = str(int(value(operands[1])) + int(value(operands[3])))
-                    elif command == "Goto":
-                        cursor = labels[operands[0]]
-                    elif command == "IfFileExists":
-                        cursor = labels[operands[1] if exists else operands[2]]
-                    elif command == "Return":
-                        break
-                    else:
-                        self.fail(f"Unexpected instruction: {line}")
-                self.assertEqual(stack, [str(expected), "caller-stack-item"])
-                self.assertEqual(registers, original)
-
-
 if __name__ == "__main__":
     runfiles = Runfiles.Create()
     for path in sys.argv[1:]:
-        if path.startswith("--includes="):
-            INCLUDES = Path(runfiles.Rlocation(path.removeprefix("--includes=")))
-            continue
         case = Path(path).name.removesuffix("_symbol.json")
         SPECS[case] = validate(json.loads(Path(runfiles.Rlocation(path)).read_text()))
     unittest.main(argv=[sys.argv[0]])

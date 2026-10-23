@@ -35,6 +35,12 @@ def main():
             assert harness.run(clear=True, expect_errors=False).errors is False
             with unittest.TestCase().assertRaisesRegex(AssertionError, "error flag"):
                 harness.run(clear=True, expect_errors=True)
+        elif name in ("function_order", "uninstaller_function_order"):
+            harness.run(dividend=17, divisor=5).assert_outputs(quotient=3, remainder=2)
+            harness.run(dividend=5, divisor=17).assert_outputs(quotient=0, remainder=5)
+        elif name == "defines":
+            harness.run(second=5, third="x").assert_outputs(first=True, third="x|value with spaces")
+            harness.run(second=0, third="").assert_outputs(first=False, third="|value with spaces")
         elif name == "typed":
             for number, enabled in [(-2147483648, False), (-1, True), (2147483646, False)]:
                 harness.run(number=number, enabled=enabled).assert_outputs(

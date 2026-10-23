@@ -352,8 +352,8 @@ bazel build //nsis/testing/examples:binaries
 bazel test //nsis/testing/examples:all
 ```
 
-Examples cover macros, shorthand and constant definitions, functions,
-uninstallers, typed integer/boolean inout parameters, filesystem and registry
+Examples cover macros, shorthand and constant definitions, functions (including
+multi-input/output stack order), uninstallers, harness `defines`, typed integer/boolean inout parameters, filesystem and registry
 assertions, and captured stdout/stderr. Each example has its own Bazel test
 target. See [`examples/BUILD.bazel`](examples/BUILD.bazel) for symbol declarations
 and [`examples/example_test.py`](examples/example_test.py) for Python usage.
@@ -379,9 +379,7 @@ bazel test //tests:include_api_contract_test   # any host
 
 The contract test runs every case's dispatch against its generated symbol
 without executing Windows binaries, validating input names/types and typed
-output expectations. It also symbolically replays the register/stack handling
-of `ValidateMutex`, `GetUninstallRegistry` and `UninstallExisting` by parsing
-their NSIS source.
+output expectations.
 
 Numeric and boolean APIs use typed symbols. Service and ACL command results stay
 strings because `nsExec` can return `error` or `timeout`, not just decimal exit

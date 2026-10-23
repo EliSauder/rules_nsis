@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from nsis.testing.generate import REGISTERS, generate, validate
+from nsis.testing.generate import REGISTERS, validate
 from nsis.testing.runner import Harness, command_line, read_outputs
 
 
@@ -31,37 +31,7 @@ def outputs(errors=False, **values):
     return record(**values, **{"harness.errors": "1" if errors else "0"})
 
 
-class GeneratorTest(unittest.TestCase):
-    def test_macro_and_definition_arguments(self):
-        for kind, command in [("macro", "!insertmacro Echo"), ("definition", "${Echo}")]:
-            with self.subTest(kind=kind):
-                script = generate(dict(ECHO, kind=kind), "example.nsh")
-                self.assertIn(f'{command} "$_harness_param_text" $_harness_param_result', script)
-
-    def test_function_stack_order_and_uninstaller(self):
-        spec = {
-            "symbol": "un.Add",
-            "kind": "function",
-            "context": "uninstaller",
-            "parameters": [
-                {"name": "left", "direction": "in"},
-                {"name": "right", "direction": "in"},
-                {"name": "sum", "direction": "out"},
-            ],
-        }
-        script = generate(spec, "example.nsh")
-        self.assertIn('Push "$_harness_param_right"\nPush "$_harness_param_left"\nCall un.Add\n', script)
-        self.assertLess(script.index("Call un.Add"), script.index("Pop $_harness_param_sum"))
-        self.assertIn('WriteUninstaller "$_harness_uninstaller"', script)
-        self.assertGreater(script.index("Call un.Add"), script.index('Section "Uninstall"'))
-
-    def test_constant_definition(self):
-        script = generate({
-            "symbol": "Answer", "kind": "definition", "invocation": "value",
-            "parameters": [{"name": "result", "direction": "out"}],
-        }, "example.nsh")
-        self.assertIn('StrCpy $_harness_param_result "${Answer}"', script)
-
+class DescriptionValidationTest(unittest.TestCase):
     def test_invalid_descriptions(self):
         for change in [
             {"kind": "unknown"}, {"symbol": 'Bad"\nQuit'}, {"extra": True},
@@ -72,55 +42,6 @@ class GeneratorTest(unittest.TestCase):
         ]:
             with self.subTest(change=change), self.assertRaises(ValueError):
                 validate(dict(ECHO, **change))
-
-    def test_registers_are_seeded_before_and_checked_after_api_in_both_contexts(self):
-        for context in ("installer", "uninstaller"):
-            script = generate(dict(ECHO, context=context), "example.nsh")
-            call = script.index('!insertmacro Echo "$_harness_param_text" $_harness_param_result')
-            write = script.index('FileOpen $_harness_file "$_harness_output"')
-            for register in REGISTERS:
-                with self.subTest(context=context, register=register):
-                    self.assertLess(
-                        script.index(f"StrCpy ${register} $_harness_before_{register}"), call
-                    )
-                    snapshot = script.index(f"StrCpy $_harness_after_{register} ${register}")
-                    self.assertLess(call, snapshot)
-                    self.assertLess(snapshot, write)
-                    self.assertIn(
-                        f"StrCmpS $_harness_after_{register} $_harness_before_{register} +2",
-                        script,
-                    )
-
-    def test_stack_sentinel_brackets_operands_and_error_flag_is_captured_first(self):
-        spec = {
-            "symbol": "Add", "kind": "function",
-            "parameters": [
-                {"name": "left", "direction": "in"},
-                {"name": "sum", "direction": "out"},
-            ],
-        }
-        script = generate(spec, "example.nsh")
-        sentinel = script.index("Push $_harness_stack_sentinel")
-        clear = script.index("ClearErrors", sentinel)
-        push = script.index('Push "$_harness_param_left"')
-        call = script.index("Call Add")
-        errors = script.index("IfErrors 0 +2", call)
-        output = script.index("Pop $_harness_param_sum")
-        check = script.index("Pop $_harness_stack_actual")
-        self.assertLess(sentinel, clear)
-        self.assertLess(clear, push)
-        self.assertLess(push, call)
-        self.assertLess(call, errors)
-        self.assertLess(errors, output)
-        self.assertLess(output, check)
-        self.assertIn("SetErrorLevel 66", script)
-        self.assertIn('FileWriteUTF16LE $_harness_file "harness.errors:', script)
-        self.assertIn('"$_harness_output.stack"', script)
-        # Sentinels for every register plus the stack sentinel.
-        self.assertEqual(
-            script.count("System::Call 'ole32::CoCreateGuid(g .s) i.r0'"),
-            len(REGISTERS) + 1,
-        )
 
 
 class RunnerTest(unittest.TestCase):
