@@ -7,6 +7,12 @@
 !define _ROOT_EVENTLOG_KEY "SYSTEM\CurrentControlSet\Services\EventLog"
 !define _DEFAULT_EVENTMESSAGEFILE "%SystemRoot%\System32\EventCreate.exe"
 
+; Event sources are always registered under HKLM, the only hive the Event Log
+; service reads, regardless of the shell context; this requires administrator
+; rights. Message file paths are written as REG_EXPAND_SZ so values such as
+; %SystemRoot% are expanded. Under a testable installer the test id is appended
+; to the source key, as for the other registry helpers. The error flag is set
+; when the source could not be registered.
 !macro _EventLog_AddSource PREFIX
 Function ${PREFIX}EventLog_AddSource
     Exch $0 ; Key
@@ -22,6 +28,7 @@ Function ${PREFIX}EventLog_AddSource
     Exch $5 ; PMF
 
     StrCpy $0 "${_ROOT_EVENTLOG_KEY}\$0\$1" ; eventlog reg key
+    !insertmacro _ApplyRegTestId $0 $1
 
     ${If} "$2" == ""
         StrCpy $2 "0"
@@ -30,15 +37,23 @@ Function ${PREFIX}EventLog_AddSource
         StrCpy $3 "${_DEFAULT_EVENTMESSAGEFILE}"
     ${EndIf}
 
-    !insertmacro ${PREFIX}SetRegistrySubKeyDWORD "$0" "TypesSupported" $2
-    !insertmacro ${PREFIX}SetRegistrySubKeyStr "$0" "EventMessageFile" "$3"
+    ClearErrors
+    WriteRegDWORD HKLM "$0" "TypesSupported" $2
+    WriteRegExpandStr HKLM "$0" "EventMessageFile" "$3"
 
     ${If} "$4" != ""
-        !insertmacro ${PREFIX}SetRegistrySubKeyStr "$0" "CategoryMessageFile" "$4"
+        WriteRegExpandStr HKLM "$0" "CategoryMessageFile" "$4"
     ${EndIf}
 
     ${If} "$5" != ""
-        !insertmacro ${PREFIX}SetRegistrySubKeyStr "$0" "ParameterMessageFile" "$5"
+        WriteRegExpandStr HKLM "$0" "ParameterMessageFile" "$5"
+    ${EndIf}
+
+    ${If} ${Errors}
+        !insertmacro LogError "Failed to register event source 'HKLM\$0' (administrator rights are required)."
+        SetErrors
+    ${Else}
+        !insertmacro LogInfo "Registered event source 'HKLM\$0'."
     ${EndIf}
 
     Pop $5
@@ -75,13 +90,22 @@ FunctionEnd
 !macroend
 !define un.EventLog_AddSource `!insertmacro un.EventLog_AddSource`
 
+!macro _EventLog_RemoveSource KEY SOURCE
+    Push $0
+    StrCpy $0 "${_ROOT_EVENTLOG_KEY}\${KEY}\${SOURCE}"
+    !insertmacro _ApplyRegTestId $0 $1
+    !insertmacro LogInfo "Removing event source 'HKLM\$0'"
+    DeleteRegKey HKLM "$0"
+    Pop $0
+!macroend
+
 !macro EventLog_RemoveSource KEY SOURCE
-    !insertmacro RemoveRegistryKey "${_ROOT_EVENTLOG_KEY}\${KEY}\${SOURCE}"
+    !insertmacro _EventLog_RemoveSource "${KEY}" "${SOURCE}"
 !macroend
 !define EventLog_RemoveSource `!insertmacro EventLog_RemoveSource`
 
 !macro un.EventLog_RemoveSource KEY SOURCE
-    !insertmacro un.RemoveRegistryKey "${_ROOT_EVENTLOG_KEY}\${KEY}\${SOURCE}"
+    !insertmacro _EventLog_RemoveSource "${KEY}" "${SOURCE}"
 !macroend
 !define un.EventLog_RemoveSource `!insertmacro un.EventLog_RemoveSource`
 !endif

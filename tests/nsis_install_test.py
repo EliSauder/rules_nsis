@@ -212,6 +212,7 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
             emf,
             f"EventMessageFile {valEmh} != '{emf}'"
         )
+        testcase.assertEqual(typEmh, winreg.REG_EXPAND_SZ)
 
         valTs, typTs = _reg_value(root, reg_path, access, "TypesSupported")
         testcase.assertEqual(
@@ -229,14 +230,16 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
                 cmf,
                 f"CategoryMessageFile {valcmf} != {cmf}"
             )
+            testcase.assertEqual(typcmf, winreg.REG_EXPAND_SZ)
         pmf = ";".join(v["parameter_message_files"])
         if pmf and len(pmf) > 0:
             valpmf, typpmf = _reg_value(root, reg_path, access, "ParameterMessageFile")
             testcase.assertEqual(
-                valcmf,
-                cmf,
+                valpmf,
+                pmf,
                 f"ParameterMessageFile {valpmf} != {pmf}"
             )
+            testcase.assertEqual(typpmf, winreg.REG_EXPAND_SZ)
 
 
 def _validate_removed_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
