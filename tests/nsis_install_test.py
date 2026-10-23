@@ -446,6 +446,15 @@ def _validate_services(testcase, config, install_root):
 
         testcase.assertEqual(val["description"], svc.description(), f"Description '{svc.description()}' not equal expected '{val['description']}'")
 
+def _validate_file_contents(testcase, expected: dict, root: str):
+    for path, content in expected.items():
+        if not os.path.isabs(path):
+            path = os.path.join(root, path)
+        testcase.assertTrue(os.path.isfile(path), f"Expected file missing: {path}")
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            actual = f.read().replace("\r\n", "\n")
+        testcase.assertEqual(content, actual, f"Unexpected content in {path}")
+
 def _validate_install(testcase, install_root, subpath, appkey, config, installer):
     installer_cmd = _get_installer_cmd(installer, install_root, config)
 
@@ -476,6 +485,8 @@ def _validate_install(testcase, install_root, subpath, appkey, config, installer
         _validate_files(testcase, config, install_root)
     with testcase.subTest(msg="Validate Installed Directories"):
         _validate_directories(testcase, config)
+    with testcase.subTest(msg="Validate Installed File Contents"):
+        _validate_file_contents(testcase, config.get("expected_file_contents", {}), install_root)
     with testcase.subTest(msg="Validate Installed Registry Keys"):
         _validate_reg(testcase, config, install_root, subpath, appkey)
     with testcase.subTest(msg="Validate Installed Services"):
@@ -504,6 +515,8 @@ def _validate_uninstall(testcase, install_root, subpath, appkey, config, runun=T
         log.debug("nsis uninstall stdout=%r", proc.stdout)
         log.debug("nsis uninstall stderr=%r", proc.stderr)
 
+    with testcase.subTest(msg="Validate Uninstall File Contents"):
+        _validate_file_contents(testcase, config.get("expected_uninstall_file_contents", {}), TEST_TMPDIR)
     with testcase.subTest(msg="Validate Removed Files"):
         _validate_removed_files(testcase, config, install_root)
     with testcase.subTest(msg="Validate Removed Directories"):

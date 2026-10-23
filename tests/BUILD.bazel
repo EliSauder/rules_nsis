@@ -7,6 +7,9 @@ load(
     "nsis_installer",
     "nsis_directory",
     "nsis_eventlog_source",
+    "nsis_option",
+    "nsis_option_group",
+    "nsis_options_page",
 )
 load("//nsis/private:transitions.bzl", "windows_source")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
@@ -691,4 +694,81 @@ nsis_installer_test(
     name = "minimal_installer_user_test",
     installer = ":minimal_installer_user",
     must_have_files = ["README.md"],
+)
+
+nsis_option(name = "enable_extras", key = "enable_extras", control = "checkbox", default = "1", label_text = "Install extras")
+
+nsis_option(name = "extras_name", control = "text", default = "extra", enabled_by = ":enable_extras", required = True, max_length = 20)
+
+nsis_option(name = "port", control = "number", min = "1", max = "65535", default = "8080")
+
+nsis_option(name = "mode", control = "droplist", choices = ["fast", "slow"])
+
+nsis_option(name = "level", control = "radio", choices = ["a", "b", "c"], default = "b", description = "The level of detail.")
+
+nsis_option(name = "token", control = "password", default = "secret")
+
+nsis_option_group(
+    name = "extras_group",
+    options = [":extras_name", ":port"],
+    enabled_by = ":enable_extras",
+)
+
+nsis_options_page(
+    name = "install_settings",
+    title = "Install Settings",
+    subtitle = "Choose the settings",
+    position = "after_directory",
+    options = [
+        ":enable_extras",
+        ":extras_group",
+        ":mode",
+    ],
+)
+
+nsis_options_page(
+    name = "advanced_settings",
+    position = "after_license",
+    options = [":level", ":token"],
+)
+
+nsis_option(name = "feature", control = "checkbox")
+
+nsis_option(name = "tag", control = "text", default = "comp")
+
+nsis_options_page(
+    name = "component_settings",
+    position = "after_components",
+    options = [":feature", ":tag"],
+)
+
+nsis_component(
+    name = "options_component",
+    srcs = [":nsis_files"],
+    selection_mode = "default",
+    options_pages = [":component_settings"],
+    post_install = "//tests/testdata:options_post_install.nsh",
+    pre_uninstall = "//tests/testdata:options_pre_uninstall.nsh",
+)
+
+nsis_installer(
+    name = "installer_with_options",
+    testable = True,
+    id = "9e1c4b52-7d3a-4f08-b6a1-2c5d8e0f3a77",
+    components = [":options_component"],
+    options_pages = [":install_settings", ":advanced_settings"],
+    product = "Installer With Options",
+    product_path = "Installer With Options",
+)
+
+nsis_installer_test(
+    name = "installer_with_options_test",
+    installer = ":installer_with_options",
+    must_have_files = ["README.md"],
+    expected_file_contents = {
+        "options_install.txt": "enable_extras=1\nextras_name=extra\nport=8080\nmode=fast\nlevel=b\ntoken=secret\nfeature=0\ntag=comp\n",
+    },
+    expected_uninstall_file_contents = {
+        "options_uninstall.txt": "enable_extras=1\nextras_name=extra\nport=8080\nmode=fast\nlevel=b\ntoken=secret\nfeature=0\ntag=comp\n",
+    },
 )

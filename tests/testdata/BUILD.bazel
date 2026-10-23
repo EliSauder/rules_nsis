@@ -5,6 +5,8 @@ exports_files([
     "hook_post_install.nsh",
     "hook_pre_install.nsh",
     "hook_pre_uninstall.nsh",
+    "options_post_install.nsh",
+    "options_pre_uninstall.nsh",
     "test_icon.ico",
 ])
 
