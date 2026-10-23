@@ -956,3 +956,120 @@ nsis_installer_test(
         "missing_dir": "text_controls.data_dir=C:\\definitely\\missing\\dir",
     }.items()
 ]
+
+# BEGIN command line (/COMPONENTS, /INSTTYPE, /HELP)
+nsis_component(
+    name = "cli_core",
+    srcs = [":nsis_files"],
+    selection_mode = "required",
+    post_install = "//tests/testdata:components_post_install.nsh",
+    pre_uninstall = "//tests/testdata:components_pre_uninstall.nsh",
+)
+
+nsis_component(
+    name = "cli_tools",
+    selection_mode = "default",
+    dependencies = [":cli_core"],
+    install_categories = ["Full", "Typical"],
+)
+
+nsis_component(
+    name = "cli_docs",
+    selection_mode = "optional",
+    dependencies = [":cli_tools"],
+    install_categories = ["Full"],
+)
+
+nsis_component(
+    name = "cli_samples",
+    selection_mode = "optional",
+    install_categories = ["Full"],
+)
+
+nsis_component_group(
+    name = "cli_extras",
+    components = [":cli_docs", ":cli_samples"],
+)
+
+nsis_installer(
+    name = "installer_with_cli",
+    testable = True,
+    id = "5b7e3a90-2c14-4d6f-8a51-9e0c7d3b4f12",
+    components = [":cli_core", ":cli_tools", ":cli_extras"],
+    options_pages = [":install_settings", ":advanced_settings"],
+    product = "Installer With Cli",
+    product_path = "Installer With Cli",
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_defaults_test",
+    installer = ":installer_with_cli",
+    expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=0\nsamples=0\n"},
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_absolute_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/COMPONENTS=cli_docs"],
+    expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=1\nsamples=0\n"},
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_relative_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/COMPONENTS=+cli_samples,-cli_tools"],
+    expected_file_contents = {"components.txt": "core=1\ntools=0\ndocs=0\nsamples=1\n"},
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_group_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/COMPONENTS=cli_extras"],
+    expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=1\nsamples=1\n"},
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_insttype_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/INSTTYPE=Full", "/COMPONENTS=-cli_samples"],
+    expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=1\nsamples=0\n"},
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_minimal_insttype_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/INSTTYPE=Minimal"],
+    expected_file_contents = {"components.txt": "core=1\ntools=0\ndocs=0\nsamples=0\n"},
+)
+
+[
+    nsis_installer_test(
+        name = "installer_with_cli_{}_test".format(name),
+        installer = ":installer_with_cli",
+        installer_args = args,
+        expected_installer_exitcode = 2,
+    )
+    for name, args in {
+        "unknown_component": ["/COMPONENTS=cli_nope"],
+        "mixed_modes": ["/COMPONENTS=cli_core,+cli_docs"],
+        "deselect_required": ["/COMPONENTS=-cli_core"],
+        "deselect_dependency": ["/COMPONENTS=+cli_docs,-cli_tools"],
+        "unknown_insttype": ["/INSTTYPE=Bogus"],
+        "insttype_absolute": ["/INSTTYPE=Full", "/COMPONENTS=cli_core"],
+    }.items()
+]
+
+py_test(
+    name = "nsis_cli_help_test",
+    srcs = [":nsis_cli_help_test.py", ":__init__.py"],
+    main = ":nsis_cli_help_test.py",
+    args = [
+        "$(rlocationpath :installer_with_cli)",
+        "$(rlocationpath :minimal_installer)",
+    ],
+    data = [":installer_with_cli", ":minimal_installer"],
+    target_compatible_with = ["@platforms//os:windows"],
+    timeout = "short",
+    deps = ["@rules_python//python/runfiles"],
+)
+# END command line

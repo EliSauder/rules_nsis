@@ -5,6 +5,8 @@ exports_files([
     "hook_post_install.nsh",
     "hook_pre_install.nsh",
     "hook_pre_uninstall.nsh",
+    "components_post_install.nsh",
+    "components_pre_uninstall.nsh",
     "controls_post_install.nsh",
     "controls_pre_uninstall.nsh",
     "options_post_install.nsh",
