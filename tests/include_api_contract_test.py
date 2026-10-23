@@ -141,7 +141,8 @@ class OperandPreservationTest(unittest.TestCase):
                 register = operands[0]
                 stack[0], registers[register] = registers[register], stack[0]
             elif command == "System::Call":
-                registers["$1"] = "mutex-handle"
+                register = re.search(r"i \.([rR]\d)", line).group(1)
+                registers["$" + register.replace("r", "")] = "mutex-handle"
                 stack.insert(0, "0")
             elif command == "!insertmacro":
                 if operands[0].endswith("GetProductCode"):
@@ -184,7 +185,7 @@ class OperandPreservationTest(unittest.TestCase):
             depth = 0
             for cursor in range(index + 1, len(lines)):
                 line = lines[cursor]
-                if line.startswith(("${If}", "${IfNotTest}")):
+                if line.startswith(("${If}", "${IfNot}", "${IfTest}", "${IfNotTest}")):
                     depth += 1
                 elif line == "${EndIf}":
                     if depth == 0:
@@ -200,6 +201,8 @@ class OperandPreservationTest(unittest.TestCase):
             ("uninstall.exe", True, "", 0, 1),
             ("uninstall.exe", True, "install-dir", 0, 0),
             ("uninstall.exe", True, "install-dir", 37, 37),
+            ("uninstall.exe", True, "install-dir", "error", 1),
+            ("uninstall.exe", True, "install-dir", "timeout", 1),
         ]
         for path, exists, directory, child_code, expected in scenarios:
             with self.subTest(path=path, directory=directory, child_code=child_code):
@@ -214,8 +217,18 @@ class OperandPreservationTest(unittest.TestCase):
                     if line.startswith(("#", ";")) or line.endswith(":"):
                         continue
                     if line.startswith("!insertmacro"):
-                        if "GetUninstallRegistry" in line:
-                            registers[line.split()[-1]] = path if "UnUninstallString" in line else directory
+                        if "GetProductCode" in line:
+                            registers[line.split()[-1]] = "{product-code}"
+                        elif "GetRegView" in line:
+                            registers[line.split()[-1]] = "64"
+                        elif "_UninstallExistingFind" in line:
+                            if registers["$1"] == "":
+                                registers["$1"] = path
+                                registers["$2"] = "uninstall-key"
+                        elif "GetRegistrySubKeyInView" in line:
+                            registers[line.split()[-1]] = directory
+                        elif "GetTestId" in line:
+                            registers[line.split()[-1]] = "test-id"
                         elif "TrimQuotes" not in line and "Log" not in line:
                             self.fail(f"Unexpected macro: {line}")
                         continue
@@ -226,11 +239,19 @@ class OperandPreservationTest(unittest.TestCase):
                     command, *operands = parts
                     if command == "${If}":
                         matched = value(operands[0]) == value(operands[2])
+                        if cursor < len(lines) and lines[cursor].startswith("${OrIf}"):
+                            alternative = shlex.split(lines[cursor])[1:]
+                            matched |= value(alternative[0]) == value(alternative[2])
+                            cursor += 1
                         if not matched:
+                            cursor = branch_end(cursor - 1, True)
+                    elif command == "${IfNot}":
+                        self.assertEqual(operands[0], "${FileExists}")
+                        if exists:
                             cursor = branch_end(cursor - 1, True)
                     elif command == "${Else}":
                         cursor = branch_end(cursor - 1, False)
-                    elif command in ("${EndIf}", "${IfNotTest}", "MessageBox", "Delete", "RMDir"):
+                    elif command in ("${EndIf}", "${IfTest}", "${IfNotTest}", "MessageBox", "Delete", "RMDir"):
                         pass
                     elif command == "Push":
                         stack.insert(0, value(operands[0]))

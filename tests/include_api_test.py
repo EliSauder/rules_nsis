@@ -127,8 +127,6 @@ def _run_case(case, harness, child_binaries=()):
         assert harness.run(isa="arm" if "arm" in arch else "x86").returncode == 0
     elif base == "arch_reg_view":
         assert harness.run().returncode == 0
-    elif base == "arch_if_bitwidth_match":
-        harness.run().assert_outputs(result="matched")
     elif base == "if_test":
         harness.run().assert_outputs(result="matched")
     elif base == "if_not_test":

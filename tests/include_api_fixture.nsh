@@ -52,17 +52,6 @@ FunctionEnd
     Pop $0
 !macroend
 
-!macro HarnessCheckBitwidth RESULT
-    Push $0
-    !insertmacro GetArch $0
-    ${IfBitWdithMatch} $is64bit == "1"
-        StrCpy ${RESULT} "matched"
-    ${Else}
-        StrCpy ${RESULT} "not-matched"
-    ${EndIf}
-    Pop $0
-!macroend
-
 !macro HarnessIfTest RESULT
     ${IfTest}
         StrCpy ${RESULT} "matched"

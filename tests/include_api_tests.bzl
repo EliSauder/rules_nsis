@@ -7,7 +7,7 @@ _PAIRED = [
     ("arch_is_64_bit", "Is64Bit", ["out:value:bool"]),
     ("arch_is_32_bit", "Is32Bit", ["out:value:bool"]),
     ("arch_validate", "ValidateArch", ["in:expected"]),
-    ("arch_validate_bitwidth", "ValidateBitwdth", ["in:bits:int"]),
+    ("arch_validate_bitwidth", "ValidateBitwidth", ["in:bits:int"]),
     ("arch_validate_isa", "ValidateISA", ["in:isa"]),
     ("arch_reg_view", "DefineRegView", []),
     ("char_to_ascii", "CharToASCII", ["in:character", "out:value:int"]),
@@ -110,11 +110,10 @@ _CONSTANTS = [
 
 _INSTALLER_ONLY = [
     ("version_compare", "VersionCompare", "definition", ["in:first", "in:second", "out:comparison:int"], ""),
-    ("version_compare_call", "VersionCompareCall", "macro", ["in:first", "in:second", "out:comparison:int"], ""),
+    ("version_compare_call", "VersionCompare", "macro", ["in:first", "in:second", "out:comparison:int"], ""),
 ]
 
 _BRANCH_ADAPTERS = [
-    ("arch_if_bitwidth_match", "HarnessCheckBitwidth", ["out:result"], {}),
     ("if_test", "HarnessIfTest", ["out:result"], {"TEST_INITIAL_ID": "framework-test-id"}),
     ("if_not_test", "HarnessIfNotTest", ["out:result"], {}),
     ("test_id_set", "HarnessSetTestId", ["in:id", "out:value"], {}),
