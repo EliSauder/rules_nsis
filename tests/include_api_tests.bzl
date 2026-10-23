@@ -124,6 +124,7 @@ _BRANCH_ADAPTERS = [
     ("trim_quotes_special", "HarnessTrimQuotesSpecial", [
         "out:quoted", "out:empty", "out:left",
     ], {}),
+    ("char_to_ascii_soft_hyphen", "HarnessCharToASCIISoftHyphen", ["out:value:int"], {}),
     ("move_file_twice", "HarnessMoveFileTwice", [
         "in:first_source", "in:first_destination", "in:second_source", "in:second_destination",
     ], {}),

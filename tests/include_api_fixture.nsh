@@ -58,6 +58,12 @@ FunctionEnd
     Pop $0
 !macroend
 
+; U+00AD cannot be passed on the command line: GetOptions treats this
+; zero-weight character as the end of the value, so it is embedded here.
+!macro HarnessCharToASCIISoftHyphen RESULT
+    ${CharToASCII} "${U+00AD}" ${RESULT}
+!macroend
+
 ; MoveFile derives its labels from the call site, so repeated expansions in one
 ; function (including through a wrapper macro) must still compile and run.
 !macro HarnessMoveFileTwice FIRST_SOURCE FIRST_DESTINATION SECOND_SOURCE SECOND_DESTINATION

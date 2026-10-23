@@ -289,7 +289,10 @@ assert result.errors is False
 `run()` requires exactly the declared input/inout parameters, with their declared
 Python types. String outputs preserve whitespace, quotes, newlines and Unicode.
 String inputs currently cannot contain literal quotes, newlines or NUL because the
-NSIS command-line parser cannot round-trip them reliably. NSIS's compiled string
+NSIS command-line parser cannot round-trip them reliably. Characters that
+Windows string comparison ignores (for example the soft hyphen U+00AD) also
+truncate the value, because `GetOptions` treats them as the end of the string;
+embed such characters in an adapter macro (for example `${U+00AD}`) instead. NSIS's compiled string
 length limit still applies. Use file inputs for larger or arbitrary data.
 `expected_exitcode=N` supports failure tests. A zero exit without an output
 record is an error, including an API that silently calls `Abort` or `Quit`.
