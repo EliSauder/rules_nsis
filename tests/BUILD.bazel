@@ -338,6 +338,14 @@ nsis_installer_test(
     must_have_files = ["Component/README.md"],
 )
 
+# A reinstall without /D= goes to the directory of the previous install.
+nsis_installer_test(
+    name = "minimal_installer_with_dir_reinstall_test",
+    installer = ":minimal_installer_with_dir",
+    must_have_files = ["Component/README.md"],
+    reinstall_without_dir = True,
+)
+
 nsis_component(
     name = "ssc_with_group_and_dir_component",
     directory = "Component",

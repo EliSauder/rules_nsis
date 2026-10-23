@@ -343,8 +343,14 @@ These unit harnesses are separate from the end-to-end installer tests.
 - Uninstaller file name: `Uninstaller.exe`
 - Writes to Windows Registry `Software\{{.Product}}` or
   `Software\{{.Vendor}}\{{.Product}}`
-  depending on what values are provided. Writes to subkeys:
+  depending on what values are provided. Writes the values:
     - InstallDir
+    - Version
+- When a previous install exists, a new install without `/D=` installs into
+  its `InstallDir`. `/D=`, or a `PreInit` hook that changes `$INSTDIR`, takes
+  precedence. Custom NSIS code can use `${GetProductRegistry}`,
+  `${UpdateProductRegistry}` and `${RemoveProductRegistry}` from `Product.nsh`
+  for this key.
 - Adds uninstaller details to `Software\Microsoft\Windows\CurrentVersion\Uninstall\{{.Id}}`
   writes to the same package path as above. Writes to subkeys:
     - DisplayName

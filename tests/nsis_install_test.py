@@ -358,9 +358,9 @@ def _get_installer_cmd(installer, install_root, config):
         str(installer),
         "/S",
         f"/TESTID={TEST_ID}",
-    ] + installer_args + [
-        f"/D={install_root}"
-    ]
+    ] + installer_args
+    if not config.get("reinstall_without_dir"):
+        cmd.append(f"/D={install_root}")
     return cmd
 
 def _validate_removed_files(testcase: unittest.TestCase, config: dict, install_root: str):
@@ -557,6 +557,11 @@ class NsisInstallerTest(unittest.TestCase):
 
         install_root = _get_install_root()
         subpath, appkey = _get_app_key_and_subpath(config)
+
+        if config.get("reinstall_without_dir"):
+            first = [str(installer), "/S", f"/TESTID={TEST_ID}", f"/D={install_root}"]
+            proc = subprocess.run(first, capture_output=True, text=True, timeout=120, check=False, env=env)
+            self.assertEqual(proc.returncode, 0, f"First install failed\ncmd: {first}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
         res = _validate_install(self, install_root, subpath, appkey, config, installer)
         if res:

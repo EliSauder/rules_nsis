@@ -95,6 +95,79 @@ Var product_key
 !macroend
 !define un.GetProductKey `!insertmacro un.GetProductKey`
 
+!macro _UpdateProductRegistry PREFIX
+Function ${PREFIX}UpdateProductRegistry
+    Exch $0 ; Subkey
+    Exch 1
+    Exch $1 ; Value
+    Push $2
+    !insertmacro ${PREFIX}GetProductKey $2
+    !insertmacro ${PREFIX}SetRegistrySubKeyStr "$2" "$0" $1
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+!macroend
+
+!insertmacro _UpdateProductRegistry ""
+!insertmacro _UpdateProductRegistry "un."
+
+!macro UpdateProductRegistry SUBKEY VALUE
+    Push "${VALUE}"
+    Push "${SUBKEY}"
+    Call UpdateProductRegistry
+!macroend
+!define UpdateProductRegistry `!insertmacro UpdateProductRegistry`
+
+!macro un.UpdateProductRegistry SUBKEY VALUE
+    Push "${VALUE}"
+    Push "${SUBKEY}"
+    Call un.UpdateProductRegistry
+!macroend
+!define un.UpdateProductRegistry `!insertmacro un.UpdateProductRegistry`
+
+!macro _GetProductRegistry PREFIX SUBKEY OUT
+    Push $0
+    !insertmacro ${PREFIX}GetProductKey $0
+    !insertmacro ${PREFIX}GetRegistrySubKey "$0" "${SUBKEY}" $0
+    Exch $0
+    Pop ${OUT}
+!macroend
+
+!macro GetProductRegistry SUBKEY OUT
+    !insertmacro _GetProductRegistry "" "${SUBKEY}" ${OUT}
+!macroend
+!define GetProductRegistry `!insertmacro GetProductRegistry`
+
+!macro un.GetProductRegistry SUBKEY OUT
+    !insertmacro _GetProductRegistry "un." "${SUBKEY}" ${OUT}
+!macroend
+!define un.GetProductRegistry `!insertmacro un.GetProductRegistry`
+
+; Removes CHILD under the product key, or the product key itself when CHILD is
+; empty.
+!macro _RemoveProductRegistry PREFIX CHILD
+    Push $0
+    !insertmacro ${PREFIX}GetProductKey $0
+    StrCmp `${CHILD}` "" +2
+        StrCpy $0 "$0\${CHILD}"
+    !insertmacro ${PREFIX}RemoveRegistryKey "$0"
+    Pop $0
+!macroend
+
+!macro RemoveProductRegistry CHILD
+    !insertmacro _RemoveProductRegistry "" `${CHILD}`
+!macroend
+!define RemoveProductRegistry `!insertmacro RemoveProductRegistry`
+
+!macro un.RemoveProductRegistry CHILD
+    !insertmacro _RemoveProductRegistry "un." `${CHILD}`
+!macroend
+!define un.RemoveProductRegistry `!insertmacro un.RemoveProductRegistry`
+
+!define ProdInstallDir "InstallDir"
+!define ProdVersion "Version"
+
 !macro GetUninstallRegistry SUBKEY OUT
     Push $0
     !insertmacro GetProductCode $0

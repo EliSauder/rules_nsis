@@ -107,9 +107,8 @@ SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 !define SERVICE_DISPLAY_PREFIX "${PRODUCT}"
 {{- end}}
 
-!define REG_KEY "Software\${PRODUCT_KEY_PATH}"
-
-!define REG_KEY_INSTLOC "InstallDir"
+; $INSTDIR when .onInit starts, if it is still the InstallDir default (no /D=).
+Var __instdir_default
 
 {{- if (ds "in").HasOptions }}
 {{ template "optVars" }}
@@ -152,12 +151,6 @@ RequestExecutionLevel {{ (ds "in").ExecutionLevel }}
 {{- else }}
 RequestExecutionLevel admin
 {{- end }}
-
-{{- if eq (ds "in").ExecutionLevel "admin"}}
-InstallDirRegKey HKLM "${REG_KEY}" "${REG_KEY_INSTLOC}"
-{{- else }}
-InstallDirRegKey HKCU "${REG_KEY}" "${REG_KEY_INSTLOC}"
-{{- end}}
 
 VIProductVersion "${PRODUCT_VERSION}"
 VIAddVersionKey "ProductName" "${PRODUCT}"
@@ -1372,8 +1365,8 @@ Section "-Core Installation"
 
     SetOutPath "$INSTDIR"
 
-    !insertmacro SetRegistrySubKeyStr "${REG_KEY}" "${REG_KEY_INSTLOC}" "$INSTDIR"
-    !insertmacro SetRegistrySubKeyStr "${REG_KEY}" "Version" "${PRODUCT_VERSION}"
+    ${UpdateProductRegistry} "${ProdInstallDir}" "$INSTDIR"
+    ${UpdateProductRegistry} "${ProdVersion}" "${PRODUCT_VERSION}"
 
     {{- if (ds "in").HasOptions }}
     ${Option_Persist}
@@ -2285,6 +2278,11 @@ FunctionEnd
 {{- /* END shortcuts: functions */}}
 
 Function .onInit
+    {{- /* NSIS strips /D= from $CMDLINE; an unchanged default means it was not given. */}}
+    StrCpy $__instdir_default ""
+    ${If} $INSTDIR == "${INSTALL_ROOT}\${SUB_PATH}"
+        StrCpy $__instdir_default $INSTDIR
+    ${EndIf}
     {{- if (ds "in").TestableInstaller }}
     !insertmacro TestIdInit
     {{- end }}
@@ -2300,6 +2298,18 @@ Function .onInit
     {{- /* Re-apply in case the hook changed the shell context. */}}
     !insertmacro SetShellContext
     !insertmacro DefineRegView
+
+    {{- /* Reuse the previous install's directory unless /D= or PreInit chose one.
+           Before UninstallExisting, which removes the key it lives in. */}}
+    ${If} $__instdir_default != ""
+    ${AndIf} $INSTDIR == $__instdir_default
+        Push $0
+        ${GetProductRegistry} "${ProdInstallDir}" $0
+        ${If} $0 != ""
+            StrCpy $INSTDIR $0
+        ${EndIf}
+        Pop $0
+    ${EndIf}
 
     {{- if (ds "in").HasOptions }}
     {{- /* Before UninstallExisting, which removes the key the values live in. */}}
@@ -2476,9 +2486,9 @@ Section "Uninstall"
 
   !insertmacro un.RemoveRegistryKey "${_UNINSTALLER_BASE_KEY}\$product_code"
   {{- if (ds "in").HasOptions }}
-  !insertmacro un.RemoveRegistryKey "${REG_KEY}\Options"
+  ${un.RemoveProductRegistry} "Options"
   {{- end }}
-  !insertmacro un.RemoveRegistryKey "${REG_KEY}"
+  ${un.RemoveProductRegistry} ""
 
   ;Remove the uninstaller itself.
   SetFileAttributes "$INSTDIR\${UNINSTALLER_NAME}" NORMAL

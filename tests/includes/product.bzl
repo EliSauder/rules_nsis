@@ -36,6 +36,8 @@ _CONSTANTS = [
     ("directory", "InsDirectory", "Directory"),
     ("eventlog_source", "InsEventLogSource", "EventLogSource"),
     ("ins_install_location", "InsInstallLocation", "InstallLocation"),
+    ("prod_install_dir", "ProdInstallDir", "InstallDir"),
+    ("prod_version", "ProdVersion", "Version"),
 ]
 
 def product_code(code):
@@ -51,6 +53,20 @@ def product_code(code):
             "uninstaller": ['${un.SetProductCode} "' + un_code + '"'],
         },
         args = {"installer": [code], "uninstaller": [un_code]},
+    )
+
+def product_key(path):
+    """on_init and args giving a case its own product key per context.
+
+    Each context gets a distinct key since the cases run in parallel.
+    """
+    un_path = path + "_un"
+    return struct(
+        on_init = {
+            "installer": ['${SetProductKey} "' + path + '"'],
+            "uninstaller": ['${un.SetProductKey} "' + un_path + '"'],
+        },
+        args = {"installer": [path], "uninstaller": [un_path]},
     )
 
 def product_cases():
@@ -110,6 +126,22 @@ def product_cases():
             symbol = "GetProductKey",
             parameters = ["out:value"],
             on_init = on_init,
+        )
+
+    for name, symbol, parameters in [
+        ("product_registry_update", "UpdateProductRegistry", ["in:subkey", "in:value"]),
+        ("product_registry_get", "GetProductRegistry", ["in:subkey", "out:value"]),
+        ("product_registry_remove", "RemoveProductRegistry", ["in:child"]),
+    ]:
+        key = product_key("rules_nsis_tests_" + name)
+        cases += include_api_case(
+            name = name,
+            api = "product",
+            include = "Product.nsh",
+            symbol = symbol,
+            parameters = parameters,
+            on_init = key.on_init,
+            args = key.args,
         )
 
     # The output operand is a register the macro also uses internally.
