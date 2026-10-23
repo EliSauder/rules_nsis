@@ -10,7 +10,9 @@ load(
     "nsis_option",
     "nsis_option_group",
     "nsis_options_page",
+    "nsis_shortcut",
 )
+load("//nsis/private:dirrule.bzl", "dirrule")
 load("//nsis/private:transitions.bzl", "windows_source")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 load("@rules_python//python:py_test.bzl", "py_test")
@@ -1073,3 +1075,99 @@ py_test(
     deps = ["@rules_python//python/runfiles"],
 )
 # END command line
+
+
+nsis_shortcut(
+    name = "readme_shortcut",
+    target = "//tests/testdata:README.md",
+    display_name = "Readme",
+    description = "Opens the readme",
+    locations = ["start_menu", "desktop"],
+)
+
+nsis_shortcut(
+    name = "readme_tools_shortcut",
+    target = "//tests/testdata:README.md",
+    display_name = "Readme in Tools",
+    locations = ["start_menu"],
+    start_menu_subfolder = "Tools",
+)
+
+dirrule(
+    name = "shortcut_tree",
+    srcs = ["//tests/testdata:README.md"],
+)
+
+nsis_shortcut(
+    name = "tree_shortcut",
+    target = ":shortcut_tree",
+    target_subpath = "README.md",
+    icon = "//tests/testdata:test_icon.ico",
+    display_name = "Tree readme",
+    locations = ["desktop"],
+)
+
+nsis_component(
+    name = "shortcut_main_component",
+    srcs = [":nsis_files", "//tests/testdata:test_icon.ico"],
+    selection_mode = "default",
+    shortcuts = [":readme_shortcut", ":readme_tools_shortcut"],
+)
+
+nsis_component(
+    name = "shortcut_tree_component",
+    srcs = [":shortcut_tree", "//tests/testdata:test_icon.ico"],
+    directory = "tree",
+    selection_mode = "default",
+    shortcuts = [":tree_shortcut"],
+    pre_uninstall = "//tests/testdata:shortcuts_pre_uninstall.nsh",
+)
+
+nsis_component(
+    name = "shortcut_optional_component",
+    srcs = [":nsis_files"],
+    directory = "optional",
+    selection_mode = "optional",
+    shortcuts = [":optional_shortcut"],
+)
+
+nsis_shortcut(
+    name = "optional_shortcut",
+    target = "//tests/testdata:README.md",
+    display_name = "Optional readme",
+    locations = ["start_menu", "desktop"],
+)
+
+nsis_installer(
+    name = "installer_with_shortcuts",
+    testable = True,
+    id = "3f6a9c21-5b7d-4e08-a1c4-7d2e9b8f0a55",
+    components = [
+        ":shortcut_main_component",
+        ":shortcut_tree_component",
+        ":shortcut_optional_component",
+    ],
+    shortcuts_desktop_default = True,
+    product = "Installer With Shortcuts",
+    product_path = "Installer With Shortcuts",
+    vendor = "Rules NSIS",
+)
+
+nsis_installer_test(
+    name = "installer_with_shortcuts_test",
+    installer = ":installer_with_shortcuts",
+    must_have_files = ["README.md", "tree/README.md", "tree/test_icon.ico"],
+    # The test framework expects the files of every component.
+    installer_args = ["/COMPONENTS=+shortcut_optional_component"],
+)
+
+nsis_installer_test(
+    name = "installer_with_shortcuts_cli_test",
+    installer = ":installer_with_shortcuts",
+    must_have_files = ["README.md"],
+    installer_args = [
+        "/COMPONENTS=+shortcut_optional_component",
+        "/O:shortcuts.desktop=0",
+        "/O:shortcuts.start_menu_folder=Custom\\Folder",
+    ],
+)

@@ -8,7 +8,9 @@ load(
     "nsis_option",
     "nsis_option_group",
     "nsis_options_page",
+    "nsis_shortcut",
 )
+load("//nsis/private:dirrule.bzl", "dirrule")
 
 def _eventlog_requires_admin_test_impl(ctx):
     env = analysistest.begin(ctx)
@@ -103,6 +105,55 @@ def options_failure_test(
             product_path = "Options Negative",
             tags = ["manual"],
         )
+    _expect_failure_test(
+        name = name,
+        target_under_test = ":" + name + "_installer",
+        expected = expected,
+    )
+
+def shortcut_failure_test(
+        name,
+        expected,
+        shortcut = {},
+        shortcut2 = None,
+        tree = False,
+        installed = True):
+    """Declares an installer with a bad nsis_shortcut and a test that expects `expected`.
+
+    Args:
+        name: The test name.
+        expected: Text the analysis failure must contain.
+        shortcut: nsis_shortcut attrs; `target` defaults to the component's README.md.
+        shortcut2: attrs of an optional second shortcut on the same component.
+        tree: Install the README.md as a directory artifact instead of a file.
+        installed: Whether the component installs the shortcut's default target.
+    """
+    srcs = ["//tests/testdata:README.md"]
+    if tree:
+        dirrule(name = name + "_tree", srcs = srcs, tags = ["manual"])
+        srcs = [":" + name + "_tree"]
+    shortcuts = []
+    for i, attrs in enumerate([shortcut, shortcut2]):
+        if attrs == None:
+            continue
+        attrs = dict(attrs)
+        attrs.setdefault("target", "//tests/testdata:README.md" if installed else "//tests/testdata:test_icon.ico")
+        nsis_shortcut(name = "{}_shortcut{}".format(name, i), tags = ["manual"], **attrs)
+        shortcuts.append(":{}_shortcut{}".format(name, i))
+    nsis_component(
+        name = name + "_component",
+        srcs = srcs,
+        shortcuts = shortcuts,
+        tags = ["manual"],
+    )
+    nsis_installer(
+        name = name + "_installer",
+        id = "6b0c1d7a-0000-4000-8000-000000000002",
+        components = [":" + name + "_component"],
+        product = "Shortcuts Negative",
+        product_path = "Shortcuts Negative",
+        tags = ["manual"],
+    )
     _expect_failure_test(
         name = name,
         target_under_test = ":" + name + "_installer",
