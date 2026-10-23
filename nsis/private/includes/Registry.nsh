@@ -220,7 +220,7 @@ FunctionEnd
 
 !macro FormatStrToBin VAL ISINT OUT
     Push "${VAL}"
-    Push ${ISINT}
+    Push "${ISINT}"
     Call FormatStrToBin
     Pop ${OUT}
 !macroend
@@ -228,7 +228,7 @@ FunctionEnd
 
 !macro un.FormatStrToBin VAL ISINT OUT
     Push "${VAL}"
-    Push ${ISINT}
+    Push "${ISINT}"
     Call un.FormatStrToBin
     Pop ${OUT}
 !macroend
@@ -270,12 +270,26 @@ FunctionEnd
 !insertmacro _SetRegistrySubKey "un." "DWORD"
 
 ; VALUE must be a literal hex string because WriteRegBin data is resolved at
-; compile time, so the Bin variants are macros rather than functions.
+; compile time, so the Bin variants are macros rather than functions. KEY,
+; SUBKEY and VIEW may reference registers, so they are pushed (evaluated) before
+; $0-$2 are swapped in to hold them; all registers are restored afterwards.
 !macro _SetRegistrySubKeyBinInView PREFIX VIEW KEY SUBKEY VALUE
+    Push "${VIEW}"
+    Push "${KEY}"
+    Push "${SUBKEY}"
+    Exch $2 ; subkey
+    Exch
+    Exch $0 ; key
+    Exch 2
+    Exch $1 ; view
     !insertmacro ${PREFIX}SetShellContext
-    !insertmacro _ApplyRegView "${PREFIX}" "${VIEW}"
-    WriteRegBin SHCTX "${KEY}" "${SUBKEY}" ${VALUE}
+    !insertmacro _ApplyRegTestId $0 $3
+    !insertmacro _ApplyRegView "${PREFIX}" $1
+    WriteRegBin SHCTX "$0" "$2" ${VALUE}
     !insertmacro ${PREFIX}DefineRegView
+    Pop $1
+    Pop $2
+    Pop $0
 !macroend
 
 !macro SetRegistrySubKeyBinInView VIEW KEY SUBKEY VALUE
@@ -292,10 +306,17 @@ FunctionEnd
 !ifdef REGISTRY_VIEW
     !insertmacro _SetRegistrySubKeyBinInView "${PREFIX}" "${REGISTRY_VIEW}" "${KEY}" "${SUBKEY}" ${VALUE}
 !else
-    ; KEY may reference $0, so avoid using a register to hold the view.
+    Push "${KEY}"
+    Push "${SUBKEY}"
+    Exch $1 ; subkey
+    Exch
+    Exch $0 ; key
     !insertmacro ${PREFIX}SetShellContext
+    !insertmacro _ApplyRegTestId $0 $2
     !insertmacro ${PREFIX}DefineRegView
-    WriteRegBin SHCTX "${KEY}" "${SUBKEY}" ${VALUE}
+    WriteRegBin SHCTX "$0" "$1" ${VALUE}
+    Pop $0
+    Pop $1
 !endif
 !macroend
 
@@ -311,7 +332,7 @@ FunctionEnd
 
 !macro SetRegistrySubKeyStrInView VIEW KEY SUBKEY VALUE
     Push "${SUBKEY}"
-    Push ${VALUE}
+    Push "${VALUE}"
     Push "${KEY}"
     Push "${VIEW}"
     Call SetRegistrySubKeyStrInView
@@ -320,7 +341,7 @@ FunctionEnd
 
 !macro SetRegistrySubKeyStr KEY SUBKEY VALUE
     Push "${SUBKEY}"
-    Push ${VALUE}
+    Push "${VALUE}"
     Push "${KEY}"
     Call SetRegistrySubKeyStr
 !macroend
@@ -328,7 +349,7 @@ FunctionEnd
 
 !macro SetRegistrySubKeyDWORDInView VIEW KEY SUBKEY VALUE
     Push "${SUBKEY}"
-    Push ${VALUE}
+    Push "${VALUE}"
     Push "${KEY}"
     Push "${VIEW}"
     Call SetRegistrySubKeyDWORDInView
@@ -337,7 +358,7 @@ FunctionEnd
 
 !macro SetRegistrySubKeyDWORD KEY SUBKEY VALUE
     Push "${SUBKEY}"
-    Push ${VALUE}
+    Push "${VALUE}"
     Push "${KEY}"
     Call SetRegistrySubKeyDWORD
 !macroend
@@ -345,7 +366,7 @@ FunctionEnd
 
 !macro un.SetRegistrySubKeyStrInView VIEW KEY SUBKEY VALUE
     Push "${SUBKEY}"
-    Push ${VALUE}
+    Push "${VALUE}"
     Push "${KEY}"
     Push "${VIEW}"
     Call un.SetRegistrySubKeyStrInView
@@ -354,7 +375,7 @@ FunctionEnd
 
 !macro un.SetRegistrySubKeyStr KEY SUBKEY VALUE
     Push "${SUBKEY}"
-    Push ${VALUE}
+    Push "${VALUE}"
     Push "${KEY}"
     Call un.SetRegistrySubKeyStr
 !macroend
@@ -362,7 +383,7 @@ FunctionEnd
 
 !macro un.SetRegistrySubKeyDWORDInView VIEW KEY SUBKEY VALUE
     Push "${SUBKEY}"
-    Push ${VALUE}
+    Push "${VALUE}"
     Push "${KEY}"
     Push "${VIEW}"
     Call un.SetRegistrySubKeyDWORDInView
@@ -371,7 +392,7 @@ FunctionEnd
 
 !macro un.SetRegistrySubKeyDWORD KEY SUBKEY VALUE
     Push "${SUBKEY}"
-    Push ${VALUE}
+    Push "${VALUE}"
     Push "${KEY}"
     Call un.SetRegistrySubKeyDWORD
 !macroend
