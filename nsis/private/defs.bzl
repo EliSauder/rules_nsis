@@ -1,6 +1,15 @@
 load("//nsis/private:transitions.bzl", "windows_source_transition")
 load(":options.bzl", "NsisOptionsPageInfo", "collect_options_pages")
 load(":cli.bzl", "cli_data", "options_doc_content")
+load(
+    ":shortcuts.bzl",
+    "NsisShortcutInfo",
+    "collect_shortcuts",
+    "default_start_menu_folder",
+    "resolve_component_shortcuts",
+    "shortcut_ds",
+    "shortcuts_page",
+)
 load("@bazel_lib//lib:stamping.bzl", "STAMP_ATTRS", "maybe_stamp")
 load(
     "@rules_signing//signing:actions.bzl",
@@ -125,7 +134,7 @@ be consumed the same way whether or not the component is signed.
 """,
         "dirs": "The directories to create with the component.",
         "dependencies": "The components this one depends on.",
-        "shortcuts": "A list of shortcuts to make.",
+        "shortcuts": "The resolved shortcuts of the component (structs with the NsisShortcutInfo fields plus target_rel, icon_rel).",
         "eventlog": "Whether or not to create eventlog entries.",
         "post_install": "A post install .nsh script to run after the component is installed.",
         "pre_install": "A pre install .nsh script to run before the component is installed.",
@@ -396,7 +405,13 @@ def _nsis_component_impl(ctx):
         selection_mode = str(ctx.attr.selection_mode),
         display_name = _resolve_displayname(ctx.attr.display_name, ctx.label.name),
         install_categories = [str(x) for x in ctx.attr.install_categories],
-        shortcuts = ctx.attr.shortcuts,
+        shortcuts = resolve_component_shortcuts(
+            ctx.label,
+            ctx.label.name,
+            _make_win_path(ctx.attr.directory),
+            files.to_list(),
+            ctx.attr.shortcuts,
+        ),
         srcs = files,
         dependencies = ctx.attr.dependencies,
         dirs = [x[NsisDirectoryInfo] for x in ctx.attr.dirs if NsisDirectoryInfo in x ],
@@ -537,8 +552,12 @@ strict install order. Components should be able to be installed in any order.
         "shortcuts": attr.label_list(
             mandatory = False,
             allow_empty = True,
-            doc = "(Unused) A list of files that, when installed, will be created as shortcuts if short cuts are enabled.",
-            allow_files = True,
+            providers = [NsisShortcutInfo],
+            doc = """
+`nsis_shortcut` targets for files this component installs. They are created
+after the installation, if the user (or the command line) allows it, and only
+when the component was installed.
+""",
         ),
         "eventlog": attr.label(
             mandatory = False,
@@ -578,7 +597,9 @@ Notes:
 - CreateDirectories is available as a list of nsis_directory rules (same CamelCaseName field access works).
 - Files is a list of {Name,Source} with Name being the output file name and source the bazel path to access the file from.
 - Directories is a list of source paths that are directories
-- Shortcuts is a list exactly like `Files`
+- Shortcuts is a list of {Name, LinkName, Target, TargetRelative, Arguments, Description, Icon, IconRelative, IconIndex, StartMenu, Desktop, Path, StartMenuSubfolder, LocationPath}.
+  Shortcuts are created after all `post_install` hooks have run, so the links do not exist yet in a hook.
+- HasShortcuts is available as a bool field.
 - HasEventLog is available as a bool field.
 - EventLog is available as a nsis_eventlog_source rule (same CamelCaseName field access).
 ```
@@ -1229,7 +1250,8 @@ def _get_component_ds(toolchain, component, inst_cat):
         "Directories": [],
         "CreateDirectories": [_get_create_directory_ds(x) for x in component.dirs],
         "Dependencies": [str(x[NsisComponentInfo].name) for x in component.dependencies],
-        "Shortcuts": [],
+        "Shortcuts": [shortcut_ds(x) for x in component.shortcuts],
+        "HasShortcuts": len(component.shortcuts) > 0,
         "HasPostInstall": component.post_install != None,
         "HasPreInstall": component.pre_install != None,
         "HasPostUninstall": component.post_uninstall != None,
@@ -1249,12 +1271,6 @@ def _get_component_ds(toolchain, component, inst_cat):
             "Name": _make_win_path(f.basename),
             "Source": _make_sys_path(toolchain, f.path),
         }
-
-    for file in component.shortcuts:
-        data["Shortcuts"].append({
-            "Name": str(_make_win_path(file.basename)),
-            "Source": str(_make_sys_path(toolchain, file.path)),
-        })
 
     for file in component.srcs.to_list():
         if file.is_directory:
@@ -1295,9 +1311,33 @@ def _build_data_structure(ctx, toolchain):
     inst_data[_COMPONENT_DEPS_KEY] = deps
 
     opts = collect_options_pages(ctx.label, ctx.attr.options_pages, _flatten_components(ctx))
-    inst_data["OptionsPages"] = opts.pages
-    inst_data["Options"] = opts.options
-    inst_data["HasOptions"] = len(opts.options) > 0
+    pages = opts.pages
+    options = opts.options
+
+    shortcuts = collect_shortcuts(ctx.label, _flatten_components(ctx))
+    inst_data["HasShortcuts"] = shortcuts.has_shortcuts
+    inst_data["HasStartMenuShortcuts"] = shortcuts.has_start_menu
+    inst_data["HasDesktopShortcuts"] = shortcuts.has_desktop
+    inst_data["HasPathShortcuts"] = shortcuts.has_path
+    inst_data["ShortcutComponents"] = shortcuts.components
+    if shortcuts.has_shortcuts:
+        page = shortcuts_page(
+            ctx.label,
+            ctx.attr.start_menu_folder or default_start_menu_folder(
+                ctx.attr.vendor,
+                ctx.attr.vendor_path,
+                ctx.attr.product_path,
+            ),
+            ctx.attr.shortcuts_enabled_default,
+            ctx.attr.shortcuts_start_menu_default,
+            ctx.attr.shortcuts_desktop_default,
+        )
+        pages = pages + [page]
+        options = options + page["Options"]
+
+    inst_data["OptionsPages"] = pages
+    inst_data["Options"] = options
+    inst_data["HasOptions"] = len(options) > 0
 
     # BEGIN command line (/COMPONENTS, /INSTTYPE, /HELP)
     inst_data["Cli"] = cli_data(
@@ -1307,7 +1347,7 @@ def _build_data_structure(ctx, toolchain):
         component_map,
         [str(x) for x in ctx.attr.install_categories],
         bool(ctx.attr.testable),
-        opts.pages,
+        pages,
         "{} {}".format(ctx.attr.product, ctx.attr.version).strip(),
     )
     # END command line
@@ -1341,14 +1381,7 @@ def _all_files_group(group):
     return depset(transitive = transitive)
 
 def _all_files_component(cmp):
-    transitive = [cmp.srcs]
-
-    srcs = depset(
-        direct = [x[DefaultInfo].files for x in cmp.shortcuts],
-        transitive = transitive,
-    )
-
-    return srcs
+    return cmp.srcs
 
 def _all_files(ctx):
     srcs = depset(
@@ -1550,7 +1583,7 @@ def _options_doc_outputs(ctx, toolchain):
     md_file = ctx.actions.declare_file("{}_options_doc.md".format(ctx.attr.name))
     ctx.actions.write(output = json_file, content = json_text)
     ctx.actions.write(output = md_file, content = md_text)
-    return [OutputGroupInfo(options_doc = depset([json_file, md_file]))]
+    return depset([json_file, md_file])
 
 def _nsis_installer_impl(ctx):
     toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
@@ -1560,7 +1593,13 @@ def _nsis_installer_impl(ctx):
 
     script = _add_includes(ctx, toolchain, script)
 
-    return _makensis(ctx, toolchain, script, srcs, user_scripts) + _options_doc_outputs(ctx, toolchain) + [
+    validation = collect_shortcuts(ctx.label, _flatten_components(ctx)).validation
+
+    return _makensis(ctx, toolchain, script, srcs, user_scripts) + [
+        OutputGroupInfo(
+            options_doc = _options_doc_outputs(ctx, toolchain),
+            _validation = validation,
+        ),
         NsisInstallerInfo(
             name = ctx.attr.name,
             id = ctx.attr.id,
@@ -1743,6 +1782,22 @@ when attached to a console, to stdout.
             allow_empty = True,
             providers = [NsisOptionsPageInfo],
             doc = "Options pages that are always shown, at the position each page declares.",
+        ),
+        "shortcuts_enabled_default": attr.bool(
+            default = True,
+            doc = "Whether the Shortcuts page's master toggle is on by default. The user's choice is persisted for upgrades.",
+        ),
+        "shortcuts_start_menu_default": attr.bool(
+            default = True,
+            doc = "Whether Start Menu shortcuts are created by default.",
+        ),
+        "shortcuts_desktop_default": attr.bool(
+            default = False,
+            doc = "Whether Desktop shortcuts are created by default.",
+        ),
+        "start_menu_folder": attr.string(
+            default = "",
+            doc = "The default Start Menu folder, relative to the Programs folder. Defaults to `<vendor_path or vendor>\\<product_path>`.",
         ),
         "stamp_defaults": attr.string_dict(
             mandatory = False,

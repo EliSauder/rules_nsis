@@ -980,6 +980,7 @@ def _nsis_options_page_impl(ctx):
         "Always": True,
         "Internal": False,
         "PreCreate": "",
+        "PostCreate": "",
         "PostLeave": "",
         "Items": items,
         "Options": flat,
@@ -1084,3 +1085,92 @@ def collect_options_pages(label, installer_pages, components):
     for p in result:
         options.extend(p["Options"])
     return struct(pages = result, options = options)
+
+def internal_options_page(name, title, subtitle, position, specs, pre_create = "", post_create = "", post_leave = ""):
+    """Returns the data source entry of an installer-internal page.
+
+    Internal pages are not declared with rules, so they bypass validation: the
+    caller passes canonical defaults and valid specs. They may use
+    position `after_instfiles`.
+
+    Args:
+        name: The page name.
+        title: The page title.
+        subtitle: The page subtitle.
+        position: The page position.
+        specs: Dicts of `key`, `control`, `text`, `default`, and optionally
+            `required` and `enabled_by` (the key of a checkbox on the page).
+        pre_create: NSIS code run in the Create function, before the dialog
+            exists; `Pop $1`, `Pop $0` and `Abort` there skip the page.
+        post_create: NSIS code run once the controls exist.
+        post_leave: NSIS code run after the values were read and validated;
+            `Goto __fail` rejects them (with $__opt_chk_what and $__opt_chk_err set).
+
+    Returns:
+        The page data source entry, like those collected for `nsis_options_page`.
+    """
+    label = "//internal:{}".format(name)
+    parent_of = {s["key"]: s.get("enabled_by", "") for s in specs}
+    items = []
+    flat = []
+    dependents = {}
+    y = 0
+    for s in specs:
+        enabled_by = s.get("enabled_by", "")
+        info = NsisOptionInfo(
+            label = "{}:{}".format(label, s["key"]),
+            name = s["key"],
+            key = s["key"],
+            control = s["control"],
+            type = _CONTROLS[s["control"]]["type"],
+            text = s["text"],
+            description = "",
+            default = s["default"],
+            required = s.get("required", False),
+            enabled_by = enabled_by,
+            persist = True,
+            choices = [],
+            multi_select = False,
+            min = "",
+            max = "",
+            max_length = 0,
+            lines = 0,
+            filter = "",
+            save = False,
+            must_exist = False,
+            address_types = [],
+            net_flags = 0,
+        )
+        ds = _option_ds(name, info, "12u" if enabled_by else "0u", "90%" if enabled_by else "100%", y, False)
+        ds["EnabledBy"] = enabled_by
+        ds["EnabledChain"] = _enabled_chain(label, enabled_by, parent_of)
+        for k in ds["EnabledChain"]:
+            dependents[k] = True
+        flat.append(ds)
+        y += ds["Height"] + _GAP
+    for ds in flat:
+        ds["HasDependents"] = ds["Key"] in dependents
+        items.append(dict(ds, IsGroup = False))
+    if y - _GAP > _PAGE_HEIGHT:
+        _fail(label, "the page content needs {}u of height but only {}u are available".format(y - _GAP, _PAGE_HEIGHT))
+    return {
+        "Name": name,
+        "Label": label,
+        "Title": title,
+        "Subtitle": subtitle,
+        "Text": "",
+        "TextY": 0,
+        "TextHeight": 0,
+        "Position": position,
+        "PositionRank": _POSITION_RANK[position],
+        "Order": 0,
+        "OwningComponents": [],
+        "Always": True,
+        "Internal": True,
+        "PreCreate": pre_create,
+        "PostCreate": post_create,
+        "PostLeave": post_leave,
+        "Items": items,
+        "Options": flat,
+        "Groups": [],
+    }

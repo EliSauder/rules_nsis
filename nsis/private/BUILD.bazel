@@ -3,6 +3,7 @@ exports_files([
     "defs.bzl",
     "options.bzl",
     "cli.bzl",
+    "shortcuts.bzl",
 ], ["//visibility:public"])
 
 exports_files([

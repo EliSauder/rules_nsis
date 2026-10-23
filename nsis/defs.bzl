@@ -15,6 +15,11 @@ load(
     _nsis_options_page = "nsis_options_page",
 )
 load(
+    "//nsis/private:shortcuts.bzl",
+    _NsisShortcutInfo = "NsisShortcutInfo",
+    _nsis_shortcut = "nsis_shortcut",
+)
+load(
     "//nsis/private:defs.bzl",
     _nsis_installer = "nsis_installer",
     _nsis_component = "nsis_component",
@@ -34,3 +39,5 @@ nsis_options_page = _nsis_options_page
 NsisOptionInfo = _NsisOptionInfo
 NsisOptionGroupInfo = _NsisOptionGroupInfo
 NsisOptionsPageInfo = _NsisOptionsPageInfo
+nsis_shortcut = _nsis_shortcut
+NsisShortcutInfo = _NsisShortcutInfo

@@ -12,6 +12,7 @@ bzl_library(
         "//nsis/private:defs.bzl",
         "//nsis/private:options.bzl",
         "//nsis/private:cli.bzl",
+        "//nsis/private:shortcuts.bzl",
         "//nsis/private:transitions.bzl",
     ],
 )
