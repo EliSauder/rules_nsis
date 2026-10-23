@@ -32,10 +32,7 @@ download fails, Bazel builds upstream zlib 1.3.1 from GitHub sources with a
 Windows x86 platform transition and a pinned Zig compiler. It cross-compiles on
 Linux/macOS and builds Windows binaries on Windows, producing a static library,
 DLL, import library, headers, and license. Compilation failures are reported
-normally; no bundled ZIP is used. The download is currently disabled in
-`MODULE.bazel` (`download = False`) to exercise the source-build fallback;
-set it to `True` to restore the SourceForge-first behavior.
-The Windows bundle follows the layout in
+normally; no bundled ZIP is used. The Windows bundle follows the layout in
 [NSIS Appendix G](https://nsis.sourceforge.io/Docs/AppendixG.html).
 Building native `makensis` on POSIX still requires native zlib development
 headers and libraries, as before; the Windows bundle does not replace them.

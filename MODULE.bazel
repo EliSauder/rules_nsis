@@ -73,7 +73,7 @@ use_repo(pip_dev, "rules_nsis_pypi_dev")
 # GET ZLIB
 ############################
 zlib_repository = use_repo_rule("//nsis/private:zlib.bzl", "zlib_repository")
-zlib_repository(name = "zlib_nsis", download = False)
+zlib_repository(name = "zlib_nsis", download = True)
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 http_archive(
