@@ -1,4 +1,4 @@
-load("//tests:defs.bzl", "nsis_installer_test", "signing_env_test", "nsis_api_tests")
+load("//tests:defs.bzl", "nsis_installer_test", "signing_env_test")
 load("//tests:analysis_tests.bzl", "eventlog_requires_admin_test")
 load("//tests:include_api_tests.bzl", "nsis_include_api_tests")
 load(
