@@ -104,7 +104,8 @@ test executable without writing JSON. Parameters use `direction:name[:type]`,
 for example `["in:count:int", "in:enabled:bool", "out:result:string"]`.
 Supported types are `string` (default), signed 32-bit `int`, and `bool`.
 The Python `Harness` validates inputs, converts outputs to their declared types,
-captures stdout/stderr, and checks that all 20 NSIS registers are preserved.
+captures stdout/stderr, checks that all 20 NSIS registers are preserved and the
+stack is balanced, and can assert the NSIS error flag (`expect_errors`).
 
 See the [testing framework guide](nsis/testing/README.md) for Bazel definitions,
 typed Python assertions, installer/uninstaller support, and runnable examples.

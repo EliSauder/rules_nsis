@@ -20,6 +20,21 @@ def main():
                 AssertionError, r"(?s)NSIS registers changed:.*\$0:.*\$R9:"
             ):
                 harness.run()
+        elif name in ("stack_leak", "uninstaller_stack_leak"):
+            with unittest.TestCase().assertRaisesRegex(
+                AssertionError, r"NSIS stack is unbalanced.*found 'leaked'"
+            ):
+                harness.run()
+        elif name == "stack_consume":
+            with unittest.TestCase().assertRaisesRegex(
+                AssertionError, r"NSIS stack is unbalanced.*stack was empty"
+            ):
+                harness.run()
+        elif name == "error_flag":
+            assert harness.run(clear=False, expect_errors=True).errors is True
+            assert harness.run(clear=True, expect_errors=False).errors is False
+            with unittest.TestCase().assertRaisesRegex(AssertionError, "error flag"):
+                harness.run(clear=True, expect_errors=True)
         elif name == "typed":
             for number, enabled in [(-2147483648, False), (-1, True), (2147483646, False)]:
                 harness.run(number=number, enabled=enabled).assert_outputs(

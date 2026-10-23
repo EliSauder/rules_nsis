@@ -49,3 +49,20 @@ FunctionEnd
     IntOp ${NUMBER} ${NUMBER} + 1
     IntOp ${ENABLED} ${ENABLED} ^ 1
 !macroend
+
+!macro LeakStack
+    Push "leaked"
+!macroend
+
+!macro ConsumeStack
+    Pop $_example_scratch
+!macroend
+Var _example_scratch
+
+!macro SetErrorFlag CLEAR
+    ${If} ${CLEAR} = 1
+        ClearErrors
+    ${Else}
+        SetErrors
+    ${EndIf}
+!macroend

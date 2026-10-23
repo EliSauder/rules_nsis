@@ -6,6 +6,9 @@ import re
 from pathlib import Path
 
 REGISTERS = tuple([str(i) for i in range(10)] + [f"R{i}" for i in range(10)])
+HEADER = "NSIS-HARNESS-2"
+ERRORS_RECORD = "harness.errors"
+STACK_RECORDS = ("expected", "actual", "underflow")
 
 
 def validate(spec):
@@ -75,7 +78,7 @@ def write_records(path, records):
         "ClearErrors",
         f'FileOpen $_harness_file "{path}" w',
         "IfErrors harness_output_error",
-        'FileWriteUTF16LE $_harness_file "NSIS-HARNESS-1$\\n"',
+        f'FileWriteUTF16LE $_harness_file "{HEADER}$\\n"',
         "IfErrors harness_output_error",
     ]
     for name, variable in records:
@@ -119,6 +122,10 @@ def generate(spec, source, include_dirs=()):
         "Var _harness_length",
         "Var _harness_exitcode",
         "Var _harness_corrupted",
+        "Var _harness_errors",
+        "Var _harness_stack_sentinel",
+        "Var _harness_stack_actual",
+        "Var _harness_stack_underflow",
     ]
     for register in REGISTERS:
         lines += [f"Var _harness_before_{register}", f"Var _harness_after_{register}"]
@@ -141,6 +148,7 @@ def generate(spec, source, include_dirs=()):
     body += [
         'Delete "$_harness_output"',
         'Delete "$_harness_output.registers"',
+        'Delete "$_harness_output.stack"',
     ]
     # Generate every sentinel before assigning registers: even the random-value
     # provider must not be able to disturb a register already seeded for the API.
@@ -151,13 +159,20 @@ def generate(spec, source, include_dirs=()):
             'StrCmp $0 "0" 0 harness_random_error',
             f'StrCmp $_harness_before_{register} "" harness_random_error',
         ]
+    body += [
+        "System::Call 'ole32::CoCreateGuid(g .s) i.r0'",
+        "Pop $_harness_stack_sentinel",
+        'StrCmp $0 "0" 0 harness_random_error',
+        'StrCmp $_harness_stack_sentinel "" harness_random_error',
+    ]
     body += [f"StrCpy ${r} $_harness_before_{r}" for r in REGISTERS]
-    body += ["ClearErrors", "SetErrorLevel 0"]
+    # The sentinel sits beneath the API's operands; finding it on top afterwards
+    # proves the API neither left extra values nor consumed the caller's values.
+    body += ["Push $_harness_stack_sentinel", "SetErrorLevel 0", "ClearErrors"]
     symbol = spec["symbol"]
     if spec["kind"] == "function":
         body += [f'Push "$_harness_param_{p["name"]}"' for p in reversed(inputs)]
         body += [f"Call {symbol}"]
-        body += [f"Pop $_harness_param_{p['name']}" for p in outputs]
     elif spec.get("invocation") == "value":
         body += [f'StrCpy $_harness_param_{outputs[0]["name"]} "${{{symbol}}}"']
     else:
@@ -169,7 +184,23 @@ def generate(spec, source, include_dirs=()):
         )
         command = f"!insertmacro {symbol}" if spec["kind"] == "macro" else f"${{{symbol}}}"
         body += [f"{command} {arguments}".rstrip()]
-    body += ["GetErrorLevel $_harness_exitcode"]
+    # Capture the error flag before any harness instruction can change it.
+    body += [
+        'StrCpy $_harness_errors "0"',
+        "IfErrors 0 +2",
+        'StrCpy $_harness_errors "1"',
+        "GetErrorLevel $_harness_exitcode",
+    ]
+    if spec["kind"] == "function":
+        body += [f"Pop $_harness_param_{p['name']}" for p in outputs]
+    body += [
+        'StrCpy $_harness_stack_underflow "0"',
+        "ClearErrors",
+        "Pop $_harness_stack_actual",
+        "IfErrors 0 +3",
+        'StrCpy $_harness_stack_underflow "1"',
+        'StrCpy $_harness_stack_actual ""',
+    ]
     body += [f"StrCpy $_harness_after_{r} ${r}" for r in REGISTERS]
     body += ['StrCpy $_harness_corrupted "0"']
     for register in REGISTERS:
@@ -179,19 +210,37 @@ def generate(spec, source, include_dirs=()):
         ]
     body += write_records(
         "$_harness_output",
-        [(p["name"], f'$_harness_param_{p["name"]}') for p in outputs],
+        [(p["name"], f'$_harness_param_{p["name"]}') for p in outputs]
+        + [(ERRORS_RECORD, "$_harness_errors")],
     )
-    body += ['StrCmp $_harness_corrupted "0" harness_preserved']
+    body += ['StrCmp $_harness_corrupted "0" harness_check_stack']
     body += write_records(
         "$_harness_output.registers",
         [(f"{when}_{r}", f"$_harness_{when}_{r}")
          for r in REGISTERS for when in ("before", "after")],
     )
     body += [
-        "SetErrorLevel 65",
+        "harness_check_stack:",
+        'StrCmp $_harness_stack_underflow "1" harness_stack_imbalanced',
+        "StrCmpS $_harness_stack_actual $_harness_stack_sentinel harness_stack_balanced",
+        "harness_stack_imbalanced:",
+    ]
+    body += write_records(
+        "$_harness_output.stack",
+        [("expected", "$_harness_stack_sentinel"),
+         ("actual", "$_harness_stack_actual"),
+         ("underflow", "$_harness_stack_underflow")],
+    )
+    body += [
+        'StrCmp $_harness_corrupted "1" harness_corrupted',
+        "SetErrorLevel 66",
         "Goto harness_done",
-        "harness_preserved:",
+        "harness_stack_balanced:",
+        'StrCmp $_harness_corrupted "1" harness_corrupted',
         "SetErrorLevel $_harness_exitcode",
+        "Goto harness_done",
+        "harness_corrupted:",
+        "SetErrorLevel 65",
         "Goto harness_done",
         "harness_random_error:",
         "SetErrorLevel 70",

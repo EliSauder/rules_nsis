@@ -20,11 +20,15 @@ ECHO = {
 
 def record(**values):
     return (
-        "NSIS-HARNESS-1\n" + "".join(
+        "NSIS-HARNESS-2\n" + "".join(
             f"{name}:{len(value.encode('utf-16-le')) // 2}:{value}"
             for name, value in values.items()
         )
     ).encode("utf-16-le")
+
+
+def outputs(errors=False, **values):
+    return record(**values, **{"harness.errors": "1" if errors else "0"})
 
 
 class GeneratorTest(unittest.TestCase):
@@ -46,7 +50,8 @@ class GeneratorTest(unittest.TestCase):
             ],
         }
         script = generate(spec, "example.nsh")
-        self.assertIn('Push "$_harness_param_right"\nPush "$_harness_param_left"\nCall un.Add\nPop $_harness_param_sum', script)
+        self.assertIn('Push "$_harness_param_right"\nPush "$_harness_param_left"\nCall un.Add\n', script)
+        self.assertLess(script.index("Call un.Add"), script.index("Pop $_harness_param_sum"))
         self.assertIn('WriteUninstaller "$_harness_uninstaller"', script)
         self.assertGreater(script.index("Call un.Add"), script.index('Section "Uninstall"'))
 
@@ -86,8 +91,77 @@ class GeneratorTest(unittest.TestCase):
                         script,
                     )
 
+    def test_stack_sentinel_brackets_operands_and_error_flag_is_captured_first(self):
+        spec = {
+            "symbol": "Add", "kind": "function",
+            "parameters": [
+                {"name": "left", "direction": "in"},
+                {"name": "sum", "direction": "out"},
+            ],
+        }
+        script = generate(spec, "example.nsh")
+        sentinel = script.index("Push $_harness_stack_sentinel")
+        clear = script.index("ClearErrors", sentinel)
+        push = script.index('Push "$_harness_param_left"')
+        call = script.index("Call Add")
+        errors = script.index("IfErrors 0 +2", call)
+        output = script.index("Pop $_harness_param_sum")
+        check = script.index("Pop $_harness_stack_actual")
+        self.assertLess(sentinel, clear)
+        self.assertLess(clear, push)
+        self.assertLess(push, call)
+        self.assertLess(call, errors)
+        self.assertLess(errors, output)
+        self.assertLess(output, check)
+        self.assertIn("SetErrorLevel 66", script)
+        self.assertIn('FileWriteUTF16LE $_harness_file "harness.errors:', script)
+        self.assertIn('"$_harness_output.stack"', script)
+        # Sentinels for every register plus the stack sentinel.
+        self.assertEqual(
+            script.count("System::Call 'ole32::CoCreateGuid(g .s) i.r0'"),
+            len(REGISTERS) + 1,
+        )
+
 
 class RunnerTest(unittest.TestCase):
+    def test_error_flag_is_reported_and_optionally_asserted(self):
+        with Harness("example.exe", ECHO) as harness:
+            for flag in (False, True):
+                def execute(command):
+                    (harness.directory / "outputs.dat").write_bytes(
+                        outputs(errors=flag, result="x")
+                    )
+                    return subprocess.CompletedProcess(command, 0, "", "")
+                with self.subTest(flag=flag), patch.object(harness, "_execute", side_effect=execute):
+                    self.assertIs(harness.run(text="x").errors, flag)
+                    self.assertIs(harness.run(text="x", expect_errors=flag).errors, flag)
+                    with self.assertRaisesRegex(AssertionError, "error flag"):
+                        harness.run(text="x", expect_errors=not flag)
+            with self.assertRaises(ValueError):
+                harness.run(text="x", expect_errors=1)
+
+    def test_unreported_error_flag_fails_explicit_expectation(self):
+        with Harness("example.exe", ECHO) as harness:
+            failed = subprocess.CompletedProcess([], 3, "", "")
+            with patch.object(harness, "_execute", return_value=failed):
+                self.assertIsNone(harness.run(text="", expected_exitcode=3).errors)
+                with self.assertRaisesRegex(AssertionError, "not reported"):
+                    harness.run(text="", expected_exitcode=3, expect_errors=False)
+
+    def test_stack_imbalance_fails_even_when_exit_code_was_expected(self):
+        for underflow, message in [("0", "found 'leaked'"), ("1", "stack was empty")]:
+            with self.subTest(underflow=underflow), Harness("example.exe", ECHO) as harness:
+                def execute(command):
+                    (harness.directory / "outputs.dat.stack").write_bytes(record(
+                        expected="sentinel",
+                        actual="" if underflow == "1" else "leaked",
+                        underflow=underflow,
+                    ))
+                    return subprocess.CompletedProcess(command, 66, "", "")
+                with patch.object(harness, "_execute", side_effect=execute):
+                    with self.assertRaisesRegex(AssertionError, f"(?s)unbalanced.*'sentinel'.*{message}"):
+                        harness.run(text="", expected_exitcode=66)
+
     def test_typed_inputs_outputs_and_inout(self):
         spec = dict(ECHO, parameters=[
             {"name": "number", "direction": "inout", "type": "int"},
@@ -99,7 +173,7 @@ class RunnerTest(unittest.TestCase):
                     self.assertIn(f"/number={number}", command)
                     self.assertIn(f"/enabled={int(enabled)}", command)
                     (harness.directory / "outputs.dat").write_bytes(
-                        record(number=str(number), enabled=str(int(enabled)))
+                        outputs(number=str(number), enabled=str(int(enabled)))
                     )
                     return subprocess.CompletedProcess(command, 0, "", "")
                 with patch.object(harness, "_execute", side_effect=execute):
@@ -135,7 +209,7 @@ class RunnerTest(unittest.TestCase):
             with Harness("example.exe", spec) as harness:
                 for value in bad_values:
                     def execute(command):
-                        (harness.directory / "outputs.dat").write_bytes(record(result=value))
+                        (harness.directory / "outputs.dat").write_bytes(outputs(result=value))
                         return subprocess.CompletedProcess(command, 0, "", "")
                     with self.subTest(typ=typ, value=value):
                         with patch.object(harness, "_execute", side_effect=execute):
@@ -162,12 +236,12 @@ class RunnerTest(unittest.TestCase):
     def test_run_captures_streams_and_inputs_and_removes_stale_outputs(self):
         with Harness("example.exe", ECHO) as harness:
             output = harness.directory / "outputs.dat"
-            output.write_bytes(record(result="stale"))
+            output.write_bytes(outputs(result="stale"))
 
             def execute(command):
                 self.assertFalse(output.exists())
                 self.assertIn("/text=hello world", command)
-                output.write_bytes(record(result="hello world"))
+                output.write_bytes(outputs(result="hello world"))
                 return subprocess.CompletedProcess(command, 0, "stdout", "stderr")
 
             with patch.object(harness, "_execute", side_effect=execute):
@@ -200,7 +274,7 @@ class RunnerTest(unittest.TestCase):
                     (harness.directory / "uninstall.exe").touch()
                 else:
                     self.assertEqual(command[-1], f"_?={harness.directory}")
-                    (harness.directory / "outputs.dat").write_bytes(record(result="hello"))
+                    (harness.directory / "outputs.dat").write_bytes(outputs(result="hello"))
                 return subprocess.CompletedProcess(command, 0, "", "")
             with patch.object(harness, "_execute", side_effect=execute):
                 harness.run(text="hello").assert_outputs(result="hello")

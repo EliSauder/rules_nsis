@@ -268,6 +268,24 @@ and actual values in the Python assertion. This applies to installer and
 uninstaller calls. APIs that terminate the process cannot reach the post-check;
 their exit/output behavior is still checked by the runner.
 
+The harness also verifies that the API leaves the NSIS stack balanced. It pushes
+a 21st random GUID sentinel below the API's inputs; after the call (and after
+popping a function's declared outputs) the next pop must return exactly that
+sentinel. Values left behind or an extra pop both fail the test with an
+`AssertionError` naming the expected and actual top of the stack (or reporting
+that the stack was empty).
+
+The NSIS error flag is cleared immediately before the invocation and captured
+immediately after it, before outputs are popped. `Result.errors` reports it as
+`True`/`False`. By default it is not asserted; pass `expect_errors=True` or
+`expect_errors=False` to `run()` to require the flag to be set or clear:
+
+```python
+api.run(text="not hex", expect_errors=True)
+result = api.run(text="0A")
+assert result.errors is False
+```
+
 `run()` requires exactly the declared input/inout parameters, with their declared
 Python types. String outputs preserve whitespace, quotes, newlines and Unicode.
 String inputs currently cannot contain literal quotes, newlines or NUL because the
@@ -291,16 +309,21 @@ accepts `/harness_uninstaller=absolute-path`. The Python runner handles both.
 For typed parameters, use decimal integers and `1`/`0` booleans, for example
 `/number=41 /enabled=0`. Output records always contain strings on disk; the
 Python runner uses the symbol description to convert them to typed values.
-Missing arguments exit with 64; changed registers exit with 65; random sentinel
+Missing arguments exit with 64; changed registers exit with 65; an unbalanced
+stack exits with 66 (65 takes precedence when both occur); random sentinel
 generation failures exit with 70; output creation/write errors exit with 74.
 Otherwise, the API's exit code is preserved.
 
-The output file is UTF-16LE without a BOM: `NSIS-HARNESS-1\n` followed by
-`name:length:value` records in declared output order. Length is in UTF-16 code
+The output file is UTF-16LE without a BOM: `NSIS-HARNESS-2\n` followed by
+`name:length:value` records in declared output order, then a final
+`harness.errors` record (`1` when the error flag was set after the call, else
+`0`). Length is in UTF-16 code
 units. This avoids JSON/INI escaping and trimming in NSIS. The runner validates
 the complete record sequence and exposes a Python dictionary.
 On register corruption, a sibling `.registers` file uses the same encoding for
 all before/after snapshots; the runner reports every changed register.
+On stack imbalance, a sibling `.stack` file holds `expected`, `actual` and
+`underflow` records describing the sentinel check.
 
 ## Examples and checks
 

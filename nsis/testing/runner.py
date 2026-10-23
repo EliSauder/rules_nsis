@@ -8,7 +8,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from .generate import REGISTERS, validate
+from .generate import ERRORS_RECORD, HEADER, REGISTERS, STACK_RECORDS, validate
 
 
 def serialize_input(parameter, value):
@@ -60,7 +60,7 @@ def command_line(command):
 def read_outputs(path, names):
     """Read length-prefixed UTF-16 records without trimming or interpolation."""
     raw = Path(path).read_bytes()
-    header = "NSIS-HARNESS-1\n".encode("utf-16-le")
+    header = f"{HEADER}\n".encode("utf-16-le")
     if not raw.startswith(header):
         raise ValueError("Invalid harness output header")
     raw = raw[len(header):]
@@ -90,9 +90,14 @@ def read_outputs(path, names):
 
 @dataclass(frozen=True)
 class Result:
-    """API outputs converted to declared Python types, plus process diagnostics."""
+    """API outputs converted to declared Python types, plus process diagnostics.
+
+    errors is the NSIS error flag immediately after the API returned, or None
+    when the harness exited before reporting outputs.
+    """
 
     outputs: dict[str, str | int | bool]
+    errors: bool | None
     returncode: int
     stdout: str
     stderr: str
@@ -143,7 +148,14 @@ class Harness:
             encoding="utf-8", errors="replace", timeout=self.timeout, check=False,
         )
 
-    def run(self, *, expected_exitcode=0, **inputs):
+    def run(self, *, expected_exitcode=0, expect_errors=None, **inputs):
+        """Invoke the API once.
+
+        expect_errors=True/False asserts the NSIS error flag after the call;
+        None (default) leaves it unchecked but still reports Result.errors.
+        """
+        if not (expect_errors is None or type(expect_errors) is bool):
+            raise ValueError("expect_errors must be None, True, or False")
         parameters = self.spec.get("parameters", [])
         required = {p["name"] for p in parameters if p["direction"] != "out"}
         if inputs.keys() != required:
@@ -158,6 +170,8 @@ class Harness:
         output.unlink(missing_ok=True)
         registers = self.directory / "outputs.dat.registers"
         registers.unlink(missing_ok=True)
+        stack = self.directory / "outputs.dat.stack"
+        stack.unlink(missing_ok=True)
         executable = self.binary
         if self.spec.get("context", "installer") == "uninstaller":
             executable = self.directory / "uninstall.exe"
@@ -193,16 +207,30 @@ class Harness:
                 "NSIS registers changed:\n" + "\n".join(changes)
                 + f"\nstdout: {process.stdout}\nstderr: {process.stderr}"
             )
+        if stack.exists():
+            snapshot = read_outputs(stack, STACK_RECORDS)
+            actual = (
+                "the stack was empty" if snapshot["underflow"] == "1"
+                else f"found {snapshot['actual']!r}"
+            )
+            raise AssertionError(
+                "NSIS stack is unbalanced: expected the harness sentinel "
+                f"{snapshot['expected']!r} on top after the call, but {actual}"
+                f"\nstdout: {process.stdout}\nstderr: {process.stderr}"
+            )
         if process.returncode != expected_exitcode:
             raise AssertionError(
                 f"Expected exit {expected_exitcode}; got {process.returncode}\n"
                 f"stdout: {process.stdout}\nstderr: {process.stderr}"
             )
         values = {}
+        errors = None
         if output.exists():
-            values = read_outputs(
-                output, [p["name"] for p in parameters if p["direction"] != "in"]
-            )
+            names = [p["name"] for p in parameters if p["direction"] != "in"]
+            values = read_outputs(output, [*names, ERRORS_RECORD])
+            if values[ERRORS_RECORD] not in ("0", "1"):
+                raise ValueError(f"Invalid error flag record {values[ERRORS_RECORD]!r}")
+            errors = values[ERRORS_RECORD] == "1"
             values = {
                 p["name"]: deserialize_output(p, values[p["name"]])
                 for p in parameters if p["direction"] != "in"
@@ -212,6 +240,13 @@ class Harness:
                 f"Harness exited without returning outputs\n"
                 f"stdout: {process.stdout}\nstderr: {process.stderr}"
             )
+        if expect_errors is not None and errors is not expect_errors:
+            raise AssertionError(
+                f"Expected the NSIS error flag to be "
+                f"{'set' if expect_errors else 'clear'}; it was "
+                f"{'not reported' if errors is None else 'set' if errors else 'clear'}"
+                f"\nstdout: {process.stdout}\nstderr: {process.stderr}"
+            )
         return Result(
-            values, process.returncode, process.stdout, process.stderr, self.directory
+            values, errors, process.returncode, process.stdout, process.stderr, self.directory
         )
