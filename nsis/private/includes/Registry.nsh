@@ -186,6 +186,12 @@ FunctionEnd
 !macroend
 !define un.FormatStrToDWORD `!insertmacro un.FormatStrToDWORD`
 
+;FormatStrToBin
+;
+;Converts a value to a binary string. When ISINT is "1" the value is treated as
+;an integer, otherwise as a single character whose ASCII code is used.
+;The error flag from Hex2Bin is forwarded: if conversion fails the error flag
+;is set and an empty string is returned.
 !macro _FormatStrToBin PREFIX
 Function ${PREFIX}FormatStrToBin
     Exch $1 ; whether the input is already numeric

@@ -58,51 +58,68 @@ FunctionEnd
 !define un.Hex2Bin `!insertmacro un.Hex2Bin`
 
 ;Hex2Bin
-
-;Converts a hexadecimal number string to binary.
-
+;
+;Converts a hexadecimal string (with an optional 0x/0X prefix) to a binary
+;string, e.g. "0x4F" -> "01001111". Hex digits are case-insensitive.
+;On invalid input (a non-hex character, or a bare "0x") the error flag is set
+;and an empty string is returned. Empty input returns "" without an error.
+;
 ;Push "HexadecimalNumber"
-;Call bin2dec
+;Call Hex2Bin
 ;Pop "BinaryNumberVariable"
 !macro _Hex2Bin PREFIX
 Function ${PREFIX}Hex2Bin
-    Exch $0
-    Push $1
-    Push $2
-    Push $3
-    Push $4
-    Push $5
-    Push $6
-    Push $7
+    Exch $0 ; input
+    Push $1 ; result
+    Push $2 ; input length
+    Push $3 ; input index
+    Push $4 ; current character
+    Push $5 ; nibble value
+    Push $6 ; bit mask
+    Push $7 ; scratch
 
+    ClearErrors
     StrCpy $1 ""
+
+    StrCpy $4 $0 2
+    ${If} $4 == "0x" ; LogicLib == is case-insensitive, so this also matches 0X
+        StrCpy $0 $0 "" 2
+        StrCmp $0 "" ${PREFIX}Hex2BinInvalid
+    ${EndIf}
+
     StrLen $2 $0
     StrCpy $3 0
 ${PREFIX}Hex2BinNextChar:
-    StrCmp $3 $2 ${PREFIX}Hex2BinDone
+    IntCmp $3 $2 ${PREFIX}Hex2BinDone
     StrCpy $4 $0 1 $3
-    ClearErrors
-    IntOp $4 0x$4 & 0xF
-    IfErrors ${PREFIX}Hex2BinInvalid
-    StrCpy $5 8
-    StrCpy $6 ""
+
+    ; The nibble value is the character's position in the digit table.
+    StrCpy $5 0
+${PREFIX}Hex2BinLookup:
+    StrCpy $7 "0123456789ABCDEF" 1 $5
+    StrCmp $7 "" ${PREFIX}Hex2BinInvalid
+    StrCmp $7 $4 ${PREFIX}Hex2BinFound ; StrCmp is case-insensitive
+    IntOp $5 $5 + 1
+    Goto ${PREFIX}Hex2BinLookup
+
+${PREFIX}Hex2BinFound:
+    StrCpy $6 8
 ${PREFIX}Hex2BinNextBit:
-    IntOp $7 $4 & $5
-    ${If} $7 == 0
+    IntOp $7 $5 & $6
+    ${If} $7 = 0
         StrCpy $7 "0"
     ${Else}
         StrCpy $7 "1"
     ${EndIf}
-    StrCpy $6 "$6$7"
-    IntOp $5 $5 / 2
-    StrCmp $5 0 ${PREFIX}Hex2BinNextNibble
-    Goto ${PREFIX}Hex2BinNextBit
-${PREFIX}Hex2BinNextNibble:
-    StrCpy $1 "$1$6"
+    StrCpy $1 "$1$7"
+    IntOp $6 $6 / 2
+    IntCmp $6 0 0 0 ${PREFIX}Hex2BinNextBit
     IntOp $3 $3 + 1
     Goto ${PREFIX}Hex2BinNextChar
+
 ${PREFIX}Hex2BinInvalid:
     StrCpy $1 ""
+    SetErrors
 ${PREFIX}Hex2BinDone:
     StrCpy $0 $1
     Pop $7
