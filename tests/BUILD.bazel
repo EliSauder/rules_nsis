@@ -696,6 +696,41 @@ nsis_installer_test(
     must_have_files = ["README.md"],
 )
 
+
+_CONTROLS_DEFAULTS = "\n".join([
+    "release_date=2024-02-29",
+    "server_ip=10.0.0.1",
+    "gateway=10.0.0.2:8080",
+    "peer=::1",
+    "flavor=choc",
+    "toppings=sprinkles|nuts",
+    "extras=",
+    "note=first\\nsecond",
+    "note_text=first",
+    "second",
+    "config_file=",
+    "data_dir=",
+    "host_name=alpha",
+    "",
+])
+
+_CONTROLS_CLI = "\n".join([
+    "release_date=2030-12-31",
+    "server_ip=192.168.1.10",
+    "gateway=10.1.2.3:99",
+    "peer=2001:db8::1",
+    "flavor=mint",
+    "toppings=sprinkles|fudge",
+    "extras=a|c",
+    "note=x\\\\y\\nz",
+    "note_text=x\\y",
+    "z",
+    "config_file=C:\\Windows\\notepad.exe",
+    "data_dir=C:\\Windows",
+    "host_name=gamma",
+    "",
+])
+
 nsis_option(name = "enable_extras", key = "enable_extras", control = "checkbox", default = "1", label_text = "Install extras")
 
 nsis_option(name = "extras_name", control = "text", default = "extra", enabled_by = ":enable_extras", required = True, max_length = 20)
@@ -805,3 +840,119 @@ nsis_installer_test(
     installer_args = ["/O:install_settings.nope=1"],
     expected_installer_exitcode = 2,
 )
+
+# One page per group of controls; together they cover every control kind.
+nsis_option(name = "note", control = "richedit", lines = 2, max_length = 60, default = "first\\nsecond")
+
+nsis_option(name = "config_file", control = "file_request", filter = "Executables|*.exe|All files|*.*", must_exist = True)
+
+nsis_option(name = "data_dir", control = "dir_request", must_exist = True)
+
+nsis_option(name = "host_name", control = "combobox", choices = ["alpha", "beta"], default = "alpha", max_length = 20)
+
+nsis_options_page(
+    name = "text_controls",
+    position = "after_directory",
+    options = [":note", ":config_file", ":data_dir", ":host_name"],
+)
+
+nsis_option(name = "flavor", control = "listbox", choices = ["vanilla", "choc", "mint"], default = "choc", lines = 2)
+
+nsis_option(name = "toppings", control = "sorted_listbox", multi_select = True, choices = ["sprinkles", "nuts", "fudge"], default = "nuts|sprinkles", lines = 3)
+
+nsis_option(name = "extras", control = "listbox", multi_select = True, choices = ["a", "b", "c"], lines = 2)
+
+nsis_options_page(
+    name = "list_controls",
+    position = "after_license",
+    options = [":flavor", ":toppings", ":extras"],
+)
+
+nsis_option(name = "release_date", control = "date", min = "2020-01-01", max = "2030-12-31", default = "2024-02-29")
+
+nsis_option(name = "server_ip", control = "ip_address", default = "10.0.0.1")
+
+nsis_option(name = "gateway", control = "net_address", address_types = ["ipv4", "with_port"], default = "10.0.0.2:8080")
+
+nsis_option(name = "peer", control = "net_address", address_types = ["ipv6"], default = "::1")
+
+nsis_options_page(
+    name = "value_controls",
+    position = "after_welcome",
+    options = [":release_date", ":server_ip", ":gateway", ":peer"],
+)
+
+nsis_component(
+    name = "controls_component",
+    srcs = [":nsis_files"],
+    selection_mode = "default",
+    post_install = "//tests/testdata:controls_post_install.nsh",
+    pre_uninstall = "//tests/testdata:controls_pre_uninstall.nsh",
+)
+
+nsis_installer(
+    name = "installer_with_controls",
+    testable = True,
+    id = "3f6a8c21-5b7e-4d90-a1c4-8e2b7d9f0a15",
+    components = [":controls_component"],
+    options_pages = [":text_controls", ":list_controls", ":value_controls"],
+    product = "Installer With Controls",
+    product_path = "Installer With Controls",
+)
+
+nsis_installer_test(
+    name = "installer_with_controls_test",
+    installer = ":installer_with_controls",
+    must_have_files = ["README.md"],
+    expected_file_contents = {
+        "controls_install.txt": _CONTROLS_DEFAULTS,
+    },
+    expected_uninstall_file_contents = {
+        "controls_uninstall.txt": _CONTROLS_DEFAULTS,
+    },
+)
+
+nsis_installer_test(
+    name = "installer_with_controls_cli_test",
+    installer = ":installer_with_controls",
+    must_have_files = ["README.md"],
+    installer_args = [
+        "/O:value_controls.release_date=2030-12-31",
+        "/O:value_controls.server_ip=192.168.001.010",
+        "/O:value_controls.gateway=10.1.2.3:99",
+        "/O:value_controls.peer=2001:db8::1",
+        "/O:list_controls.flavor=MINT",
+        "/O:list_controls.toppings=fudge|SPRINKLES",
+        "/O:list_controls.extras=c|a",
+        "/O:text_controls.note=x\\\\y\\nz",
+        "/O:text_controls.config_file=C:\\Windows\\notepad.exe",
+        "/O:text_controls.data_dir=C:\\Windows",
+        "/O:text_controls.host_name=gamma",
+    ],
+    expected_file_contents = {
+        "controls_install.txt": _CONTROLS_CLI,
+    },
+    expected_uninstall_file_contents = {
+        "controls_uninstall.txt": _CONTROLS_CLI,
+    },
+)
+
+[
+    nsis_installer_test(
+        # Short names: the Windows runfiles paths would exceed MAX_PATH.
+        name = "controls_invalid_{}_test".format(case),
+        installer = ":installer_with_controls",
+        installer_args = ["/O:{}".format(arg)],
+        expected_installer_exitcode = 2,
+    )
+    for case, arg in {
+        "date_after_max": "value_controls.release_date=2031-01-01",
+        "date_bad_day": "value_controls.release_date=2023-02-29",
+        "ip_incomplete": "value_controls.server_ip=1.2.3",
+        "list_unknown_item": "list_controls.toppings=fudge|nope",
+        "single_unknown_choice": "list_controls.flavor=nope",
+        "bad_escape": "text_controls.note=bad\\q",
+        "relative_dir": "text_controls.data_dir=relative\\dir",
+        "missing_dir": "text_controls.data_dir=C:\\definitely\\missing\\dir",
+    }.items()
+]
