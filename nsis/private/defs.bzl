@@ -1259,6 +1259,16 @@ def _build_data_structure(ctx, toolchain):
 
     cmps, grps, deps, component_map = _build_recursive_structure(ctx, toolchain, inst_cat)
 
+    # Event sources live under HKLM, which only an admin installer can write.
+    if ctx.attr.execution_level != "admin":
+        eventlog_components = sorted([n for n, c in component_map.items() if c["HasEventLog"]])
+        if eventlog_components:
+            fail("{}: components {} register event log sources, which requires execution_level = \"admin\" (got \"{}\")".format(
+                ctx.label,
+                eventlog_components,
+                ctx.attr.execution_level,
+            ))
+
     inst_data[_COMPONENTS_KEY] = cmps
     inst_data[_COMPONENT_GROUPS_KEY] = grps
     inst_data[_COMPONENT_DEPS_KEY] = deps

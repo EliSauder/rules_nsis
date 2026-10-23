@@ -1,4 +1,5 @@
 load("//tests:defs.bzl", "nsis_installer_test", "signing_env_test")
+load("//tests:analysis_tests.bzl", "eventlog_requires_admin_test")
 load(
     "//nsis:defs.bzl",
     "nsis_component",
@@ -583,6 +584,21 @@ nsis_installer(
 nsis_installer_test(
     name = "minimal_installer_eventlog_test",
     installer = ":minimal_installer_eventlog",
+)
+
+nsis_installer(
+    name = "minimal_installer_eventlog_user",
+    id = "e3a1c9d4-7b2f-4f6e-8a10-3c5d7e9f1b42",
+    components = [":minimal_component_eventlog"],
+    product = "Minimal Installer Eventlog User",
+    product_path = "Minimal Installer Eventlog User",
+    execution_level = "user",
+    tags = ["manual"],
+)
+
+eventlog_requires_admin_test(
+    name = "eventlog_requires_admin_test",
+    target_under_test = ":minimal_installer_eventlog_user",
 )
 
 nsis_installer(

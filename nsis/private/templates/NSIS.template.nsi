@@ -340,9 +340,7 @@ RMDir "{{.Path}}"
 
 {{- if .EventLog }}
 {{- with .EventLog}}
-${If} ${IS_ADMIN_EXECUTION_LEVEL} = 1
-    !insertmacro un.EventLog_RemoveSource "{{.Key}}" "{{.Source}}"
-${EndIf}
+!insertmacro un.EventLog_RemoveSource "{{.Key}}" "{{.Source}}"
 {{- end}}
 {{- end}}
 

@@ -136,8 +136,9 @@ The installer action preserves the signing environment, including on Windows.
   keys it uses. This is to handle race conditions while testing installers.
 - If version is not provided, will default to `0.0.0.0`.
 - EventLog keys written to `SYSTEM\CurrentControlSet\Services\EventLog\Application\{{.Id}}`
-  under `HKLM` (always, since the Event Log service only reads `HKLM`; this
-  requires an admin installer). Message file paths are stored as
+  under `HKLM` (always, since the Event Log service only reads `HKLM`). Using an
+  `eventlog` component in an installer whose `execution_level` is not `admin`
+  fails the build. Message file paths are stored as
   `REG_EXPAND_SZ`, so environment variables such as `%SystemRoot%` expand.
 
 ### Stamping
