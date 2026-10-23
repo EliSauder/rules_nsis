@@ -5,7 +5,8 @@ import time
 import psutil
 import json
 import pathlib
-import platform
+import ctypes
+from ctypes import wintypes
 import shutil
 import subprocess
 import sys
@@ -99,9 +100,33 @@ def _get_reg_access(bitwidth: str) -> int:
     access |= _get_reg_view(bitwidth)
     return access
 
+_IMAGE_FILE_MACHINE_64BIT = (
+    0x8664,  # AMD64
+    0xAA64,  # ARM64
+)
+
+def _is_native_os_64bit() -> bool:
+    # platform.machine() reports the Python process architecture under WOW64,
+    # so ask Windows for the native machine instead.
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    process = kernel32.GetCurrentProcess
+    process.restype = wintypes.HANDLE
+
+    if hasattr(kernel32, "IsWow64Process2"):
+        process_machine = wintypes.USHORT()
+        native_machine = wintypes.USHORT()
+        if kernel32.IsWow64Process2(
+            process(), ctypes.byref(process_machine), ctypes.byref(native_machine)
+        ):
+            return native_machine.value in _IMAGE_FILE_MACHINE_64BIT
+
+    is_wow64 = wintypes.BOOL()
+    if kernel32.IsWow64Process(process(), ctypes.byref(is_wow64)) and is_wow64.value:
+        return True
+    return ctypes.sizeof(ctypes.c_void_p) == 8
+
 def _set_expected_registry_view(config: dict):
-    machine = platform.machine().lower()
-    bitwidth = "64" if machine in ("amd64", "x86_64", "arm64", "aarch64") else "32"
+    bitwidth = "64" if _is_native_os_64bit() else "32"
     config["expected_bitwidth"] = bitwidth
     for installer in config.get("install_first_and_remove", []):
         installer["expected_bitwidth"] = bitwidth
@@ -283,6 +308,15 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, sub
     _reg_value(root, unpath, access, "NoRepair")
     _reg_value(root, unpath, access, "NoModify")
     instlocval, instloctyp = _reg_value(root, unpath, access, "InstallLocation")
+
+    if config.get("expected_icon"):
+        iconval, icontyp = _reg_value(root, unpath, access, "DisplayIcon")
+        testcase.assertEqual(icontyp, winreg.REG_SZ)
+        testcase.assertEqual(
+            f"{inst_root}\\Uninstall.exe,0",
+            iconval,
+            f"expected {unpath}\\DisplayIcon to reference the uninstaller icon",
+        )
 
     testcase.assertEqual(
         inst_root,

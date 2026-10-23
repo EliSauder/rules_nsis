@@ -124,6 +124,7 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_vendor": inst.vendor or "",
         "expected_install_path": inst.install_path or "",
         "expected_id": inst.id or "",
+        "expected_icon": inst.icon != None,
         "expected_execution_level": inst.execution_level,
         "expected_services": services,
         "expected_eventlog": elsrcs,

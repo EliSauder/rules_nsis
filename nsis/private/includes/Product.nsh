@@ -16,8 +16,9 @@ Var product_code
 
     ${If} "$0" == ""
         !insertmacro LogError "Invalid uuid/guid ${GUID}"
-        Abort 5
         Pop $0
+        SetErrorLevel 5
+        Abort
     ${EndIf}
 
     StrCpy $product_code "$0"
@@ -32,7 +33,8 @@ Var product_code
     ${If} "$0" == ""
         !insertmacro LogError "Invalid uuid/guid ${GUID}"
         Pop $0
-        Abort 5
+        SetErrorLevel 5
+        Abort
     ${EndIf}
 
     StrCpy $product_code "$0"
@@ -43,7 +45,8 @@ Var product_code
 !macro GetProductCode OUT
     ${If} $product_code == ""
         !insertmacro LogError "No product code set"
-        Abort 6
+        SetErrorLevel 6
+        Abort
     ${EndIf}
     StrCpy ${OUT} $product_code
 !macroend
@@ -52,7 +55,8 @@ Var product_code
 !macro un.GetProductCode OUT
     ${If} $product_code == ""
         !insertmacro LogError "No product code set"
-        Abort 6
+        SetErrorLevel 6
+        Abort
     ${EndIf}
     StrCpy ${OUT} $product_code
 !macroend
@@ -61,16 +65,18 @@ Var product_code
 !macro GetUninstallRegistry SUBKEY OUT
     Push $0
     !insertmacro GetProductCode $0
-    !insertmacro GetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$0" "${SUBKEY}" ${OUT}
-    Pop $0
+    !insertmacro GetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$0" "${SUBKEY}" $0
+    Exch $0
+    Pop ${OUT}
 !macroend
 !define GetUninstallRegistry `!insertmacro GetUninstallRegistry`
 
 !macro un.GetUninstallRegistry SUBKEY OUT
     Push $0
     !insertmacro un.GetProductCode $0
-    !insertmacro un.GetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$0" "${SUBKEY}" ${OUT}
-    Pop $0
+    !insertmacro un.GetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$0" "${SUBKEY}" $0
+    Exch $0
+    Pop ${OUT}
 !macroend
 !define un.GetUninstallRegistry `!insertmacro un.GetUninstallRegistry`
 

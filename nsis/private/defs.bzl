@@ -1085,8 +1085,8 @@ def _get_installer_ds(ctx, toolchain):
         "Description": str(ctx.attr.description),
         "Copyright": str(ctx.attr.copyright),
         "LicenseFile": (
-            str(_make_sys_path(toolchain, ctx.attr.license_file.path))
-            if ctx.attr.license_file != None
+            str(_make_sys_path(toolchain, ctx.file.license_file.path))
+            if ctx.file.license_file != None
             else None
         ),
         "Version": str(ctx.attr.version),
@@ -1105,18 +1105,18 @@ def _get_installer_ds(ctx, toolchain):
         "CompressorDictSize": int(ctx.attr.compressor_dictsize),
         "TestableInstaller": bool(ctx.attr.testable),
         "Icon": (
-            str(_make_sys_path(toolchain, ctx.attr.icon.path))
-            if ctx.attr.icon != None
+            str(_make_sys_path(toolchain, ctx.file.icon.path))
+            if ctx.file.icon != None
             else None
         ),
         "HeaderImage": (
-            str(_make_sys_path(toolchain, ctx.attr.header_image.path))
-            if ctx.attr.header_image != None
+            str(_make_sys_path(toolchain, ctx.file.header_image.path))
+            if ctx.file.header_image != None
             else None
         ),
         "MenuImage": (
-            str(_make_sys_path(toolchain, ctx.attr.menu_image.path))
-            if ctx.attr.menu_image != None
+            str(_make_sys_path(toolchain, ctx.file.menu_image.path))
+            if ctx.file.menu_image != None
             else None
         ),
         "Outfile": str(ctx.attr.outfile),
@@ -1293,10 +1293,10 @@ def _all_files_component(cmp):
 def _all_files(ctx):
     srcs = depset(
         direct = [x for x in [
-            ctx.attr.license_file,
-            ctx.attr.icon,
-            ctx.attr.header_image,
-            ctx.attr.menu_image,
+            ctx.file.license_file,
+            ctx.file.icon,
+            ctx.file.header_image,
+            ctx.file.menu_image,
         ] if x != None],
         transitive = [
             _all_files_component_list(ctx.attr.components),

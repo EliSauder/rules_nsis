@@ -2,6 +2,7 @@ load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 
 exports_files([
     "README.md",
+    "test_icon.ico",
 ])
 
 # Built rather than checked in so the signing tests have a genuine PE

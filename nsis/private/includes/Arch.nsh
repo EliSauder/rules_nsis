@@ -126,9 +126,9 @@ FunctionEnd
         StrCpy $0 $current_arch
         !insertmacro LogError "Current arch '$0' is not expected ${EXPECTED}"
         MessageBox MB_ICONSTOP "This installer requires a ${EXPECTED} version of windows. You are running with $0." /SD IDOK
+        Pop $0
         SetErrorLevel 3
         Abort
-        Pop $0
     ${EndIf}
 !macroend
 !define ValidateArch `!insertmacro ValidateArch`
@@ -142,9 +142,9 @@ FunctionEnd
         StrCpy $0 $current_arch
         !insertmacro LogError "Current architecture '$0' is not expected ${EXPECTED}"
         MessageBox MB_ICONSTOP "This installer requires a ${EXPECTED} version of windows. You are running with $0." /SD IDOK
+        Pop $0
         SetErrorLevel 3
         Abort
-        Pop $0
     ${EndIf}
 !macroend
 !define un.ValidateArch `!insertmacro un.ValidateArch`

@@ -556,3 +556,19 @@ nsis_installer_test(
     installer = ":minimal_installer_withpostinit",
     expected_installer_exitcode = 10654,
 )
+
+nsis_installer(
+    name = "minimal_installer_with_icon",
+    testable = True,
+    id = "5f0c6a4e-2d8b-4e7a-9c1f-3b6d8e2a7f14",
+    components = [":minimal_component"],
+    product = "Minimal Installer Icon",
+    product_path = "Minimal Installer Icon",
+    icon = "//tests/testdata:test_icon.ico",
+)
+
+nsis_installer_test(
+    name = "minimal_installer_with_icon_test",
+    installer = ":minimal_installer_with_icon",
+    must_have_files = ["README.md"],
+)

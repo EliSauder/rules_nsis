@@ -484,9 +484,10 @@ Section "-Core Installation"
     !insertmacro UpdateUninstallRegistry "${UnComments}" "${PRODUCT_DESCRIPTION}"
     !insertmacro UpdateUninstallRegistry "${UnInstallSource}" "$EXEPATH"
 
-    ${If} "${ICON_FILE}" != ""
-        !insertmacro UpdateUninstallRegistry "${UnDisplayIcon}" "$INSTDIR\${ICON_FILE}"
-    ${EndIf}
+    !if "${ICON_FILE}" != ""
+    ; The icon is embedded in the uninstaller via MUI_UNICON.
+    !insertmacro UpdateUninstallRegistry "${UnDisplayIcon}" "$INSTDIR\${UNINSTALLER_NAME},0"
+    !endif
 
     Push $R0
     Push $R1
@@ -515,13 +516,13 @@ Section "-Core Installation"
 SectionEnd
 
 Function .onInit
-    {{ if (ds "in").HasPreInit }}
-    !insertmacro PreInit
-    {{ end }}
-
     {{- if (ds "in").TestableInstaller }}
     !insertmacro TestIdInit
     {{- end }}
+
+    {{ if (ds "in").HasPreInit }}
+    !insertmacro PreInit
+    {{ end }}
     !insertmacro SetShellContext
     !insertmacro DefineRegView
 
@@ -557,13 +558,13 @@ Function .onInit
 FunctionEnd
 
 Function un.onInit
-    {{ if (ds "in").HasPreUninit }}
-    !insertmacro PreUnInit
-    {{ end }}
-
     {{- if (ds "in").TestableInstaller }}
     !insertmacro TestIdInit
     {{- end }}
+
+    {{ if (ds "in").HasPreUninit }}
+    !insertmacro PreUnInit
+    {{ end }}
     !insertmacro un.SetShellContext
     !insertmacro un.DefineRegView
 

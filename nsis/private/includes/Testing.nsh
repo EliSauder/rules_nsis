@@ -2,6 +2,7 @@
 !define __INCLUDE_TESTING
 
 !include LogicLib.nsh
+!include FileFunc.nsh
 
 !ifdef TESTABLE_INSTALLER
 Var TestId
