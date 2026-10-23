@@ -3,6 +3,7 @@
 
 !include LogicLib.nsh
 !include Logging.nsh
+!include FileFunc.nsh
 
 ; Runs icacls and stores its exit code in OUT_RC (0 on success). /C is not
 ; used: it makes icacls exit 0 even when a path could not be processed, which
@@ -64,8 +65,47 @@
 !macroend
 !define iCacls_IntegrityLevel `!insertmacro iCacls_IntegrityLevel`
 
+; icacls only supports /substitute together with /restore, so the ACLs of PATH
+; are saved to a temporary file and restored onto PATH's parent directory with
+; SIDOLD replaced by SIDNEW. OUT_RC is the first nonzero icacls exit code, or 0.
 !macro iCacls_Substitute PATH SIDOLD SIDNEW RECURSIVE OUT_RC
-    !insertmacro _iCaclsExec `"${PATH}" /substitute "${SIDOLD}" "${SIDNEW}"` ${RECURSIVE} ${OUT_RC}
+    Push "${PATH}"
+    Push "${SIDOLD}"
+    Push "${SIDNEW}"
+    Push "${RECURSIVE}"
+    Exch $3 ; recursive
+    Exch
+    Exch $2 ; new sid
+    Exch 2
+    Exch $1 ; old sid
+    Exch 3
+    Exch $0 ; path
+    Push $4 ; parent directory
+    Push $5 ; saved ACL file / exit code
+
+    ${GetParent} "$0" $4
+    GetTempFileName $5
+    !insertmacro _iCaclsExec `"$0" /save "$5"` $3 $4
+    ${If} $4 == "0"
+        ${GetParent} "$0" $4
+        !insertmacro _iCaclsExec `"$4" /substitute "$1" "$2" /restore "$5"` 0 $4
+    ${EndIf}
+    Delete "$5"
+    StrCpy $5 $4
+
+    ; Restore $0-$5 while leaving the exit code on the stack for OUT_RC.
+    Exch $5
+    Exch
+    Pop $4
+    Exch
+    Pop $0
+    Exch
+    Pop $3
+    Exch
+    Pop $2
+    Exch
+    Pop $1
+    Pop ${OUT_RC}
 !macroend
 !define iCacls_Substitute `!insertmacro iCacls_Substitute`
 
