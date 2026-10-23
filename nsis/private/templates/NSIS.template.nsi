@@ -942,7 +942,11 @@ Function __Opt_IniIsKnown
     StrCpy $1 $__opt_chk_val
     StrCpy $__opt_chk_enabled 0
     ${If} $0 == "setup"
-        StrCpy $__opt_chk_enabled 1
+        ${If} $1 == ""
+        ${OrIf} $1 == "components"
+        ${OrIf} $1 == "insttype"
+            StrCpy $__opt_chk_enabled 1
+        ${EndIf}
     {{- range (ds "in").OptionsPages }}
     ${ElseIf} $0 == "{{.Name}}"
         ${If} $1 == ""
@@ -1015,6 +1019,10 @@ Function __Options_ApplyIni
     ClearErrors
     ReadINIStr $__opt_chk_val $0 "{{.Page}}" "{{.Key}}"
     ${IfNot} ${Errors}
+{{- if .Secret }}
+    {{- /* An answer file written by /HELP leaves secrets empty. */}}
+    ${AndIf} $__opt_chk_val != ""
+{{- end }}
 {{- template "optApplyOne" . }}
     ${EndIf}
     {{- end }}
@@ -1415,6 +1423,562 @@ FunctionEnd
 {{ template "optCli" }}
 {{- end }}
 
+; ----------------------------------------------------
+; BEGIN command line: /COMPONENTS, /INSTTYPE and /HELP
+; ----------------------------------------------------
+{{- $cli := (ds "in").Cli }}
+
+Var __cmp_name
+Var __cmp_val
+Var __cmp_rest
+Var __cmp_tok
+Var __cmp_more
+{{- range $cli.Components }}
+Var __cmp_w_{{.Name}}
+{{- end }}
+
+{{- /* Desired state per component: 0 unselected, 1 selected, 2 explicitly deselected. */}}
+Function __Components_Mark
+{{- range $cli.Components }}
+    ${If} $__cmp_name == "{{.Name}}"
+{{- if .Required }}
+        ${If} $__cmp_val = 2
+            ${Cli_Fail} "Component {{.Name}} is required and cannot be deselected."
+        ${EndIf}
+{{- end }}
+        StrCpy $__cmp_w_{{.Name}} $__cmp_val
+        Return
+    ${EndIf}
+{{- end }}
+{{- range $cli.Groups }}
+    ${If} $__cmp_name == "{{.Name}}"
+{{- range .Members }}
+{{- if .Required }}
+        ${If} $__cmp_val = 2
+            ${Cli_Fail} "Component {{.Name}} is required and cannot be deselected."
+        ${EndIf}
+{{- end }}
+        StrCpy $__cmp_w_{{.Name}} $__cmp_val
+{{- end }}
+        Return
+    ${EndIf}
+{{- end }}
+    ${Cli_Fail} "Unknown component: $__cmp_name"
+FunctionEnd
+
+{{- /* Splits the next entry off $__cmp_rest into $__cmp_tok; $__cmp_more is 1 when more follow. */}}
+Function __Components_Next
+    Push $0
+    Push $1
+    StrCpy $0 0
+    ${Do}
+        StrCpy $1 $__cmp_rest 1 $0
+        ${If} $1 == ""
+        ${OrIf} $1 == ","
+            ${Break}
+        ${EndIf}
+        IntOp $0 $0 + 1
+    ${Loop}
+    StrCpy $__cmp_tok $__cmp_rest $0
+    ${If} $1 == ","
+        IntOp $0 $0 + 1
+        StrCpy $__cmp_rest $__cmp_rest "" $0
+        StrCpy $__cmp_more 1
+    ${Else}
+        StrCpy $__cmp_rest ""
+        StrCpy $__cmp_more 0
+    ${EndIf}
+    StrCpy $1 $__cmp_tok 1
+    ${While} $1 == " "
+        StrCpy $__cmp_tok $__cmp_tok "" 1
+        StrCpy $1 $__cmp_tok 1
+    ${EndWhile}
+    StrCpy $1 $__cmp_tok 1 -1
+    ${While} $1 == " "
+        StrCpy $__cmp_tok $__cmp_tok -1
+        StrCpy $1 $__cmp_tok 1 -1
+    ${EndWhile}
+    Pop $1
+    Pop $0
+FunctionEnd
+
+{{- /* /COMPONENTS= and /INSTTYPE= (the command line wins over [setup] of /OPTIONS=). */}}
+Function __Components_ApplyCli
+    Push $0
+    Push $1
+    Push $2
+    Push $3
+    Push $4
+    Push $5
+    Push $6
+    StrCpy $0 ""
+    StrCpy $1 ""
+    ClearErrors
+    ${Cli_GetArgValue} "/OPTIONS" $2
+    ${IfNot} ${Errors}
+        ${IfNot} ${FileExists} "$2"
+            ${Cli_Fail} "The options file given with /OPTIONS= does not exist."
+        ${EndIf}
+        ReadINIStr $0 "$2" "setup" "components"
+        ReadINIStr $1 "$2" "setup" "insttype"
+    ${EndIf}
+    ${If} ${Cli_HasArg} "/COMPONENTS"
+        ClearErrors
+        ${Cli_GetArgValue} "/COMPONENTS" $2
+        ${If} ${Errors}
+        ${OrIf} $2 == ""
+            ${Cli_Fail} "/COMPONENTS= needs a list of component names."
+        ${EndIf}
+        StrCpy $0 $2
+    ${EndIf}
+    ${If} ${Cli_HasArg} "/INSTTYPE"
+        ClearErrors
+        ${Cli_GetArgValue} "/INSTTYPE" $2
+        ${If} ${Errors}
+        ${OrIf} $2 == ""
+            ${Cli_Fail} "/INSTTYPE= needs an install type name."
+        ${EndIf}
+        StrCpy $1 $2
+    ${EndIf}
+    ${If} $0 == ""
+    ${AndIf} $1 == ""
+        Goto __cmp_done
+    ${EndIf}
+
+    StrCpy $4 ""
+    ${If} $1 != ""
+{{- range $cli.InstTypes }}
+        ${If} $1 == "{{ template "nsq" .Name }}"
+            StrCpy $4 {{.Index}}
+        ${EndIf}
+{{- end }}
+        ${If} $4 == ""
+            ${Cli_Fail} "Unknown install type: $1"
+        ${EndIf}
+    ${EndIf}
+
+    StrCpy $5 0
+    StrCpy $6 0
+    StrCpy $__cmp_rest $0
+    ${Do}
+        Call __Components_Next
+        ${If} $__cmp_tok != ""
+            StrCpy $2 $__cmp_tok 1
+            ${If} $2 == "+"
+            ${OrIf} $2 == "-"
+                IntOp $5 $5 + 1
+            ${Else}
+                IntOp $6 $6 + 1
+            ${EndIf}
+        ${EndIf}
+        ${If} $__cmp_more = 0
+            ${Break}
+        ${EndIf}
+    ${Loop}
+    ${If} $5 > 0
+    ${AndIf} $6 > 0
+        ${Cli_Fail} "/COMPONENTS cannot mix entries with and without a + or - prefix."
+    ${EndIf}
+    ${If} $6 > 0
+    ${AndIf} $4 != ""
+        ${Cli_Fail} "/INSTTYPE cannot be combined with an absolute /COMPONENTS list; prefix the entries with + or -."
+    ${EndIf}
+    {{- /* $3: 1 when the list is absolute. */}}
+    StrCpy $3 0
+    ${If} $6 > 0
+        StrCpy $3 1
+    ${EndIf}
+
+    ${If} $4 != ""
+        IntOp $2 $4 - 1
+        SetCurInstType $2
+    ${EndIf}
+
+{{- range $cli.Components }}
+{{- $n := .Name }}
+    ${If} $3 = 1
+        StrCpy $__cmp_w_{{.Name}} 0
+    ${ElseIf} $4 != ""
+{{- if .Required }}
+        StrCpy $__cmp_w_{{.Name}} 1
+{{- else }}
+        StrCpy $__cmp_w_{{.Name}} 0
+{{- range .InstTypeIdx }}
+        ${If} $4 = {{.}}
+            StrCpy $__cmp_w_{{$n}} 1
+        ${EndIf}
+{{- end }}
+{{- end }}
+    ${Else}
+        SectionGetFlags {{printf "${%v}" .Name}} $2
+        IntOp $2 $2 & ${SF_SELECTED}
+        StrCpy $__cmp_w_{{.Name}} $2
+    ${EndIf}
+{{- end }}
+
+    StrCpy $__cmp_rest $0
+    ${Do}
+        Call __Components_Next
+        ${If} $__cmp_tok != ""
+            StrCpy $__cmp_val 1
+            ${If} $3 = 0
+                StrCpy $2 $__cmp_tok 1
+                ${If} $2 == "-"
+                    StrCpy $__cmp_val 2
+                ${EndIf}
+                StrCpy $__cmp_tok $__cmp_tok "" 1
+            ${EndIf}
+            StrCpy $__cmp_name $__cmp_tok
+            Call __Components_Mark
+        ${EndIf}
+        ${If} $__cmp_more = 0
+            ${Break}
+        ${EndIf}
+    ${Loop}
+
+{{- range $cli.Components }}
+{{- if .Required }}
+    StrCpy $__cmp_w_{{.Name}} 1
+{{- end }}
+{{- end }}
+{{- /* The closure is precomputed, so a single pass is enough. */}}
+{{- range $cli.Components }}
+{{- if .AllDeps }}
+{{- $n := .Name }}
+    ${If} $__cmp_w_{{.Name}} = 1
+{{- range .AllDeps }}
+        ${If} $__cmp_w_{{.}} = 2
+            ${Cli_Fail} "Cannot deselect component {{.}}: component {{$n}} depends on it."
+        ${EndIf}
+        StrCpy $__cmp_w_{{.}} 1
+{{- end }}
+    ${EndIf}
+{{- end }}
+{{- end }}
+
+{{- range $cli.Components }}
+    StrCpy $SelectRefCnt_{{.Name}} 0
+{{- end }}
+{{- range $cli.Components }}
+    ${If} $__cmp_w_{{.Name}} = 1
+        !insertmacro SelectSection {{printf "${%v}" .Name}}
+        StrCpy $SectionSelected_{{.Name}} 1
+        StrCpy $SelectedExplicit_{{.Name}} 1
+{{- range .AllDeps }}
+        IntOp $SelectRefCnt_{{.}} $SelectRefCnt_{{.}} + 1
+{{- end }}
+    ${Else}
+        !insertmacro UnselectSection {{printf "${%v}" .Name}}
+        StrCpy $SectionSelected_{{.Name}} 0
+        StrCpy $SelectedExplicit_{{.Name}} 0
+    ${EndIf}
+{{- end }}
+    __cmp_done:
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+
+; ---- /HELP ----
+
+Var __help_fh
+Var __help_buf
+
+!macro __HelpW TEXT
+    Push `${TEXT}`
+    Call __Help_W
+!macroend
+!macro __HelpNL
+    Push "$\r$\n"
+    Call __Help_W
+!macroend
+
+{{- /* Output goes to the file, else the console, else a buffer shown in a message box. */}}
+Function __Help_W
+    Exch $0
+    ${If} $__help_fh != ""
+        FileWriteUTF16LE $__help_fh $0
+    ${ElseIf} $__help_buf != ""
+        System::Call 'kernel32::lstrcatW(p $__help_buf, w r0)'
+    ${Else}
+        ${Console_Write} "$0"
+    ${EndIf}
+    Pop $0
+FunctionEnd
+
+Function __Help_TextUsage
+    !insertmacro __HelpW "Usage:"
+    !insertmacro __HelpNL
+{{- range $cli.Usage }}
+    !insertmacro __HelpW "{{ template "nsq" .Text }}"
+    !insertmacro __HelpNL
+{{- end }}
+    !insertmacro __HelpNL
+FunctionEnd
+
+Function __Help_TextOptions
+    !insertmacro __HelpW "Options:"
+    !insertmacro __HelpNL
+{{- range $cli.Pages }}
+{{- range .Options }}
+    !insertmacro __HelpW "{{ template "nsq" .TextPrefix }}"
+{{- if .Secret }}
+    !insertmacro __HelpW "<secret>"
+{{- else }}
+    !insertmacro __HelpW "${{.Var}}"
+{{- end }}
+    !insertmacro __HelpNL
+    !insertmacro __HelpW "{{ template "nsq" .TextDetail }}"
+    !insertmacro __HelpNL
+{{- if .TextDescription }}
+    !insertmacro __HelpW "{{ template "nsq" .TextDescription }}"
+    !insertmacro __HelpNL
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if not $cli.HasOptions }}
+    !insertmacro __HelpW "  (none)"
+    !insertmacro __HelpNL
+{{- end }}
+    !insertmacro __HelpNL
+FunctionEnd
+
+Function __Help_TextComponents
+    Push $0
+    !insertmacro __HelpW "Components:"
+    !insertmacro __HelpNL
+{{- range $cli.Components }}
+    !insertmacro __HelpW "{{ template "nsq" .TextPrefix }}"
+    SectionGetFlags {{printf "${%v}" .Name}} $0
+    IntOp $0 $0 & ${SF_SELECTED}
+    ${If} $0 = 1
+        !insertmacro __HelpW "yes"
+    ${Else}
+        !insertmacro __HelpW "no"
+    ${EndIf}
+    !insertmacro __HelpW "{{ template "nsq" .TextSuffix }}"
+    !insertmacro __HelpNL
+{{- end }}
+    !insertmacro __HelpNL
+    Pop $0
+FunctionEnd
+
+Function __Help_TextInstTypes
+    !insertmacro __HelpW "Install types:"
+    !insertmacro __HelpNL
+{{- range $cli.InstTypes }}
+    !insertmacro __HelpW "{{ template "nsq" .Text }}"
+    !insertmacro __HelpNL
+{{- end }}
+    !insertmacro __HelpNL
+FunctionEnd
+
+Function __Help_IniUsage
+    !insertmacro __HelpW "; usage:"
+    !insertmacro __HelpNL
+{{- range $cli.Usage }}
+    !insertmacro __HelpW "{{ template "nsq" .Ini }}"
+    !insertmacro __HelpNL
+{{- end }}
+FunctionEnd
+
+Function __Help_IniOptions
+{{- range $cli.Pages }}
+{{- if .Options }}
+    !insertmacro __HelpW "[{{.Name}}]"
+    !insertmacro __HelpNL
+{{- range .Options }}
+    !insertmacro __HelpW "{{ template "nsq" .IniComment }}"
+    !insertmacro __HelpNL
+    !insertmacro __HelpW "{{.Key}}="
+{{- if not .Secret }}
+    !insertmacro __HelpW "${{.Var}}"
+{{- end }}
+    !insertmacro __HelpNL
+{{- end }}
+{{- end }}
+{{- end }}
+FunctionEnd
+
+Function __Help_IniInstTypes
+    !insertmacro __HelpW "; insttypes: {{ range $i, $t := $cli.InstTypes }}{{ if $i }}, {{ end }}{{ template "nsq" $t.Name }}{{ end }}"
+    !insertmacro __HelpNL
+    !insertmacro __HelpW "insttype="
+    !insertmacro __HelpNL
+FunctionEnd
+
+Function __Help_IniComponents
+    Push $0
+    Push $1
+    !insertmacro __HelpW "; components: "
+{{- range $i, $c := $cli.Components }}
+{{- if $i }}
+    !insertmacro __HelpW " | "
+{{- end }}
+    !insertmacro __HelpW "{{ template "nsq" $c.IniPiece }}"
+{{- end }}
+    !insertmacro __HelpNL
+    !insertmacro __HelpW "components="
+    StrCpy $1 ""
+{{- range $cli.Components }}
+    SectionGetFlags {{printf "${%v}" .Name}} $0
+    IntOp $0 $0 & ${SF_SELECTED}
+    ${If} $0 = 1
+        ${If} $1 != ""
+            !insertmacro __HelpW ","
+        ${EndIf}
+        StrCpy $1 1
+        !insertmacro __HelpW "{{.Name}}"
+    ${EndIf}
+{{- end }}
+    !insertmacro __HelpNL
+    Pop $1
+    Pop $0
+FunctionEnd
+
+{{- /* Topic in $0, format in $1; the output sink is already open. */}}
+Function __Help_Emit
+    ${If} $1 == "ini"
+        !insertmacro __HelpW "; {{ template "nsq" $cli.Heading }} - generated by /HELP /FORMAT=ini"
+        !insertmacro __HelpNL
+        ${If} $0 == "all"
+        ${OrIf} $0 == "usage"
+            Call __Help_IniUsage
+        ${EndIf}
+        ${If} $0 == "all"
+        ${OrIf} $0 == "components"
+        ${OrIf} $0 == "insttypes"
+            !insertmacro __HelpW "[setup]"
+            !insertmacro __HelpNL
+            ${If} $0 == "all"
+            ${OrIf} $0 == "insttypes"
+                Call __Help_IniInstTypes
+            ${EndIf}
+            ${If} $0 == "all"
+            ${OrIf} $0 == "components"
+                Call __Help_IniComponents
+            ${EndIf}
+        ${EndIf}
+        ${If} $0 == "all"
+        ${OrIf} $0 == "options"
+            Call __Help_IniOptions
+        ${EndIf}
+    ${Else}
+        !insertmacro __HelpW "{{ template "nsq" $cli.Heading }}"
+        !insertmacro __HelpNL
+        !insertmacro __HelpNL
+        ${If} $0 == "all"
+        ${OrIf} $0 == "usage"
+            Call __Help_TextUsage
+        ${EndIf}
+        ${If} $0 == "all"
+        ${OrIf} $0 == "options"
+            Call __Help_TextOptions
+        ${EndIf}
+        ${If} $0 == "all"
+        ${OrIf} $0 == "components"
+            Call __Help_TextComponents
+        ${EndIf}
+        ${If} $0 == "all"
+        ${OrIf} $0 == "insttypes"
+            Call __Help_TextInstTypes
+        ${EndIf}
+    ${EndIf}
+FunctionEnd
+
+{{- /* Never returns. */}}
+Function __Help_Run
+    StrCpy $0 "all"
+    ${If} ${Cli_HasArg} "/HELP"
+        ClearErrors
+        ${Cli_GetArgValue} "/HELP" $1
+        ${IfNot} ${Errors}
+        ${AndIf} $1 != ""
+            StrCpy $0 $1
+        ${EndIf}
+    ${EndIf}
+    ${If} $0 != "all"
+    ${AndIf} $0 != "usage"
+    ${AndIf} $0 != "options"
+    ${AndIf} $0 != "components"
+    ${AndIf} $0 != "insttypes"
+        ${Cli_Fail} "Unknown help topic: $0. Use usage, options, components, insttypes or all."
+    ${EndIf}
+    StrCpy $2 "text"
+    ${If} ${Cli_HasArg} "/FORMAT"
+        ClearErrors
+        ${Cli_GetArgValue} "/FORMAT" $2
+        ${If} ${Errors}
+            ${Cli_Fail} "/FORMAT= needs a value. Use text or ini."
+        ${EndIf}
+        ${If} $2 != "text"
+        ${AndIf} $2 != "ini"
+            ${Cli_Fail} "Unknown /FORMAT value. Use text or ini."
+        ${EndIf}
+    ${EndIf}
+    StrCpy $3 ""
+    ${If} ${Cli_HasArg} "/HELP-OUT"
+        ClearErrors
+        ${Cli_GetArgValue} "/HELP-OUT" $3
+        ${If} ${Errors}
+        ${OrIf} $3 == ""
+            ${Cli_Fail} "/HELP-OUT= needs a file name."
+        ${EndIf}
+        ClearErrors
+        FileOpen $__help_fh "$3" w
+        ${If} ${Errors}
+            ${Cli_Fail} "Could not write the help output to $3."
+        ${EndIf}
+        FileWriteWord $__help_fh 65279
+    ${Else}
+        ${IfNot} ${Console_IsAvailable}
+            System::Alloc 2097152
+            Pop $__help_buf
+        ${EndIf}
+    ${EndIf}
+    StrCpy $1 $2
+    Call __Help_Emit
+    ${If} $__help_fh != ""
+        FileClose $__help_fh
+    ${ElseIf} $__help_buf != ""
+        IfSilent +2
+        System::Call 'user32::MessageBoxW(p 0, p $__help_buf, w "${PRODUCT}", i 0x40)'
+        System::Free $__help_buf
+    ${EndIf}
+    SetErrorLevel 0
+    Quit
+FunctionEnd
+
+{{- /* Runs early in .onInit: reports the effective state, so /COMPONENTS and the options apply first. */}}
+Function __Help_Request
+    ${If} ${Cli_HasArg} "/HELP"
+    ${OrIf} ${Cli_HasArg} "/?"
+        Push $0
+        Push $1
+        Push $2
+        Push $3
+        {{- range (ds "in").Components }}
+        {{- template "sectionVarInit" .}}
+        {{- end}}
+        {{- range (ds "in").ComponentGroups }}
+        {{- template "sectionGroupVarInit" .}}
+        {{- end}}
+        Call __Components_ApplyCli
+        {{- if (ds "in").HasOptions }}
+        Call __Options_ApplyCli
+        {{- end }}
+        Call __Help_Run
+    ${EndIf}
+FunctionEnd
+; ----------------------------------------------------
+; END command line
+; ----------------------------------------------------
+
+
 Function .onInit
     {{- if (ds "in").TestableInstaller }}
     !insertmacro TestIdInit
@@ -1436,6 +2000,9 @@ Function .onInit
     {{- /* Before UninstallExisting, which removes the key the values live in. */}}
     ${Option_LoadPersisted}
     {{- end }}
+
+    ${Cli_Init}
+    Call __Help_Request
 
     {{ if and (ds "in").ArchitectureAllow32On64 (not (ds "in").ArchitectureIs64) }}
     !insertmacro ValidateArch32On64 "{{ (ds "in").Architecture }}"
@@ -1462,6 +2029,8 @@ Function .onInit
     {{- template "sectionGroupVarInit" .}}
     {{- end}}
     Pop $0
+
+    Call __Components_ApplyCli
 
     {{- if (ds "in").HasOptions }}
     ${Cli_Init}
