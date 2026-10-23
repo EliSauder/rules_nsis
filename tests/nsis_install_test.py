@@ -74,7 +74,7 @@ def _get_sub_path(product_path, vendor_path, install_path) -> str:
 def _get_reg_paths(subpath, appkey) -> (str, str):
     return (
         f"Software\\{subpath}\\{TEST_ID}",
-        f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{appkey}\\{TEST_ID}"
+        f"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{{{appkey.upper()}}}\\{TEST_ID}"
     )
 
 def _get_reg_db(execution_level: str) -> int:
@@ -212,13 +212,15 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
             emf,
             f"EventMessageFile {valEmh} != '{emf}'"
         )
+        testcase.assertEqual(typEmh, winreg.REG_EXPAND_SZ)
 
         valTs, typTs = _reg_value(root, reg_path, access, "TypesSupported")
         testcase.assertEqual(
             valTs,
-            str(st),
-            f"TypesSupported {valTs} != {str(st)} (1 | 2 | 4 [Error | Warn | Info])"
+            st,
+            f"TypesSupported {valTs} != {st} (1 | 2 | 4 [Error | Warn | Info])"
         )
+        testcase.assertEqual(typTs, winreg.REG_DWORD)
 
         cmf = ";".join(v["category_message_files"])
         if cmf and len(cmf) > 0:
@@ -228,14 +230,16 @@ def _validate_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
                 cmf,
                 f"CategoryMessageFile {valcmf} != {cmf}"
             )
+            testcase.assertEqual(typcmf, winreg.REG_EXPAND_SZ)
         pmf = ";".join(v["parameter_message_files"])
         if pmf and len(pmf) > 0:
             valpmf, typpmf = _reg_value(root, reg_path, access, "ParameterMessageFile")
             testcase.assertEqual(
-                valcmf,
-                cmf,
+                valpmf,
+                pmf,
                 f"ParameterMessageFile {valpmf} != {pmf}"
             )
+            testcase.assertEqual(typpmf, winreg.REG_EXPAND_SZ)
 
 
 def _validate_removed_eventlog(testcase: unittest.TestCase, config: dict, appkey: str):
@@ -273,8 +277,16 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, sub
     unstr, unstrtyp = _reg_value(root, unpath, access, "UninstallString")
     _reg_value(root, unpath, access, "NoRepair")
     _reg_value(root, unpath, access, "NoModify")
-    _reg_value(root, unpath, access, "DisplayIcon")
     instlocval, instloctyp = _reg_value(root, unpath, access, "InstallLocation")
+
+    if config.get("expected_icon"):
+        iconval, icontyp = _reg_value(root, unpath, access, "DisplayIcon")
+        testcase.assertEqual(icontyp, winreg.REG_SZ)
+        testcase.assertEqual(
+            f"{inst_root}\\Uninstall.exe,0",
+            iconval,
+            f"expected {unpath}\\DisplayIcon to reference the uninstaller icon",
+        )
 
     testcase.assertEqual(
         inst_root,
@@ -369,7 +381,7 @@ def _validate_removed_directories(testcase: unittest.TestCase, config):
     expected_dirs = config.get("expected_dirs", {})
 
     for key, val in expected_dirs.items():
-        testcase.assertFalse(os.path.exists(key), f"Directory stil exsts after uninstall: {key}")
+        testcase.assertFalse(os.path.exists(key), f"Directory still exists after uninstall: {key}")
 
 def _validate_directories(testcase: unittest.TestCase, config):
     expected_dirs = config.get("expected_dirs", {})

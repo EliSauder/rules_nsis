@@ -28,6 +28,15 @@ _COMPONENT_GROUPS_KEY = "ComponentGroups"
 
 _COMPONENT_DEPS_KEY = "ComponentDependencies"
 
+# Maps the `log_level` attribute to the Logging.nsh level define.
+_LOG_LEVEL_DEFINES = {
+    "none": "",
+    "debug": "LOGLEVEL_DEBUG",
+    "info": "LOGLEVEL_INFO",
+    "warn": "LOGLEVEL_WARN",
+    "error": "LOGLEVEL_ERR",
+}
+
 toolchains = [
     "//nsis/toolchain:toolchain_type"
 ]
@@ -37,7 +46,7 @@ NsisInstallerInfo = provider(
     fields = {
         "name": "The name of the installer",
         "id": """
-The unique identifier for this product. This should be the same accross all
+The unique identifier for this product. This should be the same across all
 versions, names, and install locations of the product. It will be used to
 identify the product inside the windows registry.
 """,
@@ -47,7 +56,7 @@ identify the product inside the windows registry.
         "vendor_path": "The optional path to use after the root by default. E.g. Company\\Vendor. Defaults to the vendor field.",
         "description": "The descripiton of the software being packaged.",
         "copyright": "The copyright of the software being packaged.",
-        "license_file": "The licens file to use for the installer",
+        "license_file": "The license file to use for the installer",
         "version": "The numric version for the installer.",
         "install_root": """
 The root path to install the software into. Defaults to NSIS's built in
@@ -57,19 +66,21 @@ installed as a user, defaults to $LOCALAPPDATA\\Programs.
 The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
 """,
         "install_path": "Overrides product_path and vendor_path with a specific path.",
+        "testable": "Whether test-ID based isolation is enabled.",
+        "log_level": "The runtime logging level: none, debug, info, warn or error.",
         "execution_level": "Set the execution level for the installer.",
         "compressor": "Set the compressor to be used for building the installer.",
         "compressor_dictsize": "Set the compressor dict size for the lzma compression alg.",
         "icon": "The icon file for the installer.",
         "header_image": "The header image to use.",
-        "menu_image": "The image to ues for the welcome and finsih installer pages.",
+        "menu_image": "The image to use for the welcome and finish installer pages.",
         "install_categories": "The possible install types to use when selecting components.",
         "defines": "The defines to use for the installer.",
-        "verbosity": "The verbosity of outupt.",
+        "verbosity": "The verbosity of output.",
         "components": "List of root components and component groups.",
         "outfile": "Specify the outfile.",
         "arch": "The architecture to built the installer for.",
-        "allow_32bit_on_64bit": "Allow 32bit installers to run on 64bit OS.",
+        "allow_32bit_on_64bit": "Allow a 32bit installer to run on the 64bit OS of the same ISA (x86_32 on x86_64, arm32 on arm64).",
         "post_init": "The post .onInit nsh script to run.",
         "pre_init": "The pre .onInit nsh script to run.",
         "post_uninit": "The post un.onInit nsh script to run.",
@@ -456,7 +467,7 @@ disabled: The service will not be started.
 Defines how the component shows up in the UI when selecting.
 
 hidden: The component will always be installed and is hidden from the user.
-required: The compenent is visible to the user, but will always be selected.
+required: The component is visible to the user, but will always be selected.
 default: The component is optional but will be selected by default.
 optional: The component is optional but will be deselected by default.
 """,
@@ -547,7 +558,7 @@ Example:
 {{ (ds "component_<bazel name>").InstallCategories }}
 ```
 
-Like the installer, component fields are avilable via their CamelCaseName.
+Like the installer, component fields are available via their CamelCaseName.
 
 Notes:
 - InstallCategories will be a single string value with the calculated install category numbers to be used with nsis's SectionIn
@@ -834,7 +845,7 @@ def _makensis(ctx, toolchain, script, options_file, inputs, user_scripts):
     )
 
     inputs = depset(
-        direct = [script, options_file],
+        direct = [script, options_file, ctx.file._includes],
         transitive = [
             user_scripts,
             makensis_dir,
@@ -913,12 +924,12 @@ def _add_dep_key(deps, rev_deps, source, dest):
     deps[source].add(dest)
     rev_deps[dest].add(source)
 
-def _build_flat_dependency_list(verticies):
+def _build_flat_dependency_list(vertices):
     deps = {}
     rev_deps = {}
 
-    for key in verticies:
-        v = verticies[key]
+    for key in vertices:
+        v = vertices[key]
         if NsisComponentInfo not in v:
             continue
 
@@ -950,14 +961,14 @@ def _build_flat_dependency_list(verticies):
 
 
 def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
-    verticies = {}
+    vertices = {}
     edges = []
 
     for dep in inst_ctx.attr.components:
         edges.append({_EDGE_PARENT_KEY: None, _EDGE_CHILD_KEY: dep})
         if NsisComponentInfo in dep:
             cmp = dep[NsisComponentInfo]
-            verticies[cmp.name] = dep
+            vertices[cmp.name] = dep
         elif NsisComponentGroupInfo in dep:
             grp = dep[NsisComponentGroupInfo]
             edges.extend(grp.components)
@@ -976,7 +987,7 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
             child_name = child[NsisComponentInfo].name
         elif NsisComponentGroupInfo in child:
             child_name = child[NsisComponentGroupInfo].name
-        verticies[child_name] = child
+        vertices[child_name] = child
 
         if parent == None:
             next_stack.append((child_name, data_components, data_groups))
@@ -988,17 +999,17 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
             parent_name = parent[NsisComponentInfo].name
         elif NsisComponentGroupInfo in parent:
             parent_name = parent[NsisComponentGroupInfo].name
-        verticies[parent_name] = parent
+        vertices[parent_name] = parent
 
         if parent_name in edges_map:
             edges_map[parent_name].add(child_name)
         else:
             edges_map[parent_name] = set([child_name])
 
-    dep_lst, rev_dep_lst = _build_flat_dependency_list(verticies)
+    dep_lst, rev_dep_lst = _build_flat_dependency_list(vertices)
 
     n_edges = len(edges)
-    n_vert = len(verticies)
+    n_vert = len(vertices)
 
     component_map = dict()
 
@@ -1008,7 +1019,7 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
 
         current, current_components_data, current_groups_data = next_stack.pop()
 
-        v = verticies[current]
+        v = vertices[current]
         es = edges_map[current] if current in edges_map else {}
 
         next_components = []
@@ -1035,7 +1046,7 @@ def _build_recursive_structure(inst_ctx, toolchain, inst_cat):
 
     deps = []
 
-    for k, v in verticies.items():
+    for k, v in vertices.items():
         if NsisComponentInfo not in v:
             continue
 
@@ -1084,8 +1095,8 @@ def _get_installer_ds(ctx, toolchain):
         "Description": str(ctx.attr.description),
         "Copyright": str(ctx.attr.copyright),
         "LicenseFile": (
-            str(_make_sys_path(toolchain, ctx.attr.license_file.path))
-            if ctx.attr.license_file != None
+            str(_make_sys_path(toolchain, ctx.file.license_file.path))
+            if ctx.file.license_file != None
             else None
         ),
         "Version": str(ctx.attr.version),
@@ -1102,19 +1113,21 @@ def _get_installer_ds(ctx, toolchain):
         "InstallTypes": [str(x) for x in ctx.attr.install_categories],
         "Compressor": str(ctx.attr.compressor),
         "CompressorDictSize": int(ctx.attr.compressor_dictsize),
+        "TestableInstaller": bool(ctx.attr.testable),
+        "LogLevelDefine": _LOG_LEVEL_DEFINES[ctx.attr.log_level],
         "Icon": (
-            str(_make_sys_path(toolchain, ctx.attr.icon.path))
-            if ctx.attr.icon != None
+            str(_make_sys_path(toolchain, ctx.file.icon.path))
+            if ctx.file.icon != None
             else None
         ),
         "HeaderImage": (
-            str(_make_sys_path(toolchain, ctx.attr.header_image.path))
-            if ctx.attr.header_image != None
+            str(_make_sys_path(toolchain, ctx.file.header_image.path))
+            if ctx.file.header_image != None
             else None
         ),
         "MenuImage": (
-            str(_make_sys_path(toolchain, ctx.attr.menu_image.path))
-            if ctx.attr.menu_image != None
+            str(_make_sys_path(toolchain, ctx.file.menu_image.path))
+            if ctx.file.menu_image != None
             else None
         ),
         "Outfile": str(ctx.attr.outfile),
@@ -1246,6 +1259,16 @@ def _build_data_structure(ctx, toolchain):
 
     cmps, grps, deps, component_map = _build_recursive_structure(ctx, toolchain, inst_cat)
 
+    # Event sources live under HKLM, which only an admin installer can write.
+    if ctx.attr.execution_level != "admin":
+        eventlog_components = sorted([n for n, c in component_map.items() if c["HasEventLog"]])
+        if eventlog_components:
+            fail("{}: components {} register event log sources, which requires execution_level = \"admin\" (got \"{}\")".format(
+                ctx.label,
+                eventlog_components,
+                ctx.attr.execution_level,
+            ))
+
     inst_data[_COMPONENTS_KEY] = cmps
     inst_data[_COMPONENT_GROUPS_KEY] = grps
     inst_data[_COMPONENT_DEPS_KEY] = deps
@@ -1291,10 +1314,10 @@ def _all_files_component(cmp):
 def _all_files(ctx):
     srcs = depset(
         direct = [x for x in [
-            ctx.attr.license_file,
-            ctx.attr.icon,
-            ctx.attr.header_image,
-            ctx.attr.menu_image,
+            ctx.file.license_file,
+            ctx.file.icon,
+            ctx.file.header_image,
+            ctx.file.menu_image,
         ] if x != None],
         transitive = [
             _all_files_component_list(ctx.attr.components),
@@ -1461,12 +1484,37 @@ def _read_stamp_values(ctx, stamp):
     if not stamp:
         return None
 
+def _add_includes(ctx, toolchain, script):
+    outfile = _get_render_file(ctx, "nsis-with-include", script)
+    ctx.actions.run_shell(
+        outputs = [outfile],
+        inputs = [script, ctx.file._includes],
+        arguments = [
+            script.path,
+            outfile.path,
+            ctx.file._includes.path,
+        ],
+        command = """
+infile="$1"
+outfile="$2"
+includes="$3"
+
+touch "$outfile"
+echo "!addincludedir \\"$3\\"" > "$outfile"
+cat - "$1" >> "$outfile"
+"""
+    )
+
+    return outfile
+
 
 def _nsis_installer_impl(ctx):
     toolchain = ctx.toolchains[_NSIS_TOOLCHAIN_TYPE].nsis
 
     srcs = _all_files(ctx)
     script, options, user_scripts = _build_rendered_templates(ctx, toolchain)
+
+    script = _add_includes(ctx, toolchain, script)
 
     return _makensis(ctx, toolchain, script, options, srcs, user_scripts) + [
         NsisInstallerInfo(
@@ -1494,10 +1542,12 @@ def _nsis_installer_impl(ctx):
             components = ctx.attr.components,
             outfile = ctx.attr.outfile,
             arch = ctx.attr.arch,
+            testable = ctx.attr.testable,
+            log_level = ctx.attr.log_level,
             post_init = ctx.file.post_init,
-            pre_init = ctx.file.post_init,
+            pre_init = ctx.file.pre_init,
             post_uninit = ctx.file.post_uninit,
-            pre_uninit = ctx.file.post_uninit,
+            pre_uninit = ctx.file.pre_uninit,
         ),
     ]
 
@@ -1509,7 +1559,7 @@ nsis_installer = rule(
         "id": attr.string(
             mandatory = True,
             doc = """
-The unique identifier for this product. This should be the same accross all
+The unique identifier for this product. This should be the same across all
 versions, names, and install locations of the product. It will be used to
 identify the product inside the windows registry.
 """,
@@ -1620,6 +1670,21 @@ user: Install software as user.
             default = {},
             doc = "A list of additional defines to include in the installer.",
         ),
+        "testable": attr.bool(
+            mandatory = False,
+            default = False,
+            doc = "Enable test-ID based isolation for installer tests.",
+        ),
+        "log_level": attr.string(
+            mandatory = False,
+            default = "info",
+            values = _LOG_LEVEL_DEFINES.keys(),
+            doc = """
+The installer's runtime logging level. `none` disables logging; otherwise
+messages at the given level and above are written to the details view and,
+when attached to a console, to stdout.
+""",
+        ),
         "components": attr.label_list(
             mandatory = False,
             allow_empty = False,
@@ -1653,7 +1718,11 @@ user: Install software as user.
         "allow_32bit_on_64bit": attr.bool(
             mandatory = False,
             default = True,
-            doc = "Whether to allow 32bit installers to run on 64bit OS.",
+            doc = """
+Whether to allow a 32bit installer to run on the 64bit OS of the same
+instruction set: x86_32 on x86_64 and arm32 on arm64. Cross-ISA hosts (x86 on
+arm, arm on x86) are always rejected.
+""",
         ),
         "post_init": attr.label(
             mandatory = False,
@@ -1752,6 +1821,10 @@ For more details see `post_init`.
             allow_single_file = True,
             executable = True,
             cfg = "exec",
+        ),
+        "_includes": attr.label(
+            default = Label("//nsis/private/includes:includes_dir"),
+            allow_single_file = True,
         ),
     }, **dict(SIGNING_ATTRS, **STAMP_ATTRS)),
     toolchains = [

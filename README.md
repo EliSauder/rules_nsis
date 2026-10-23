@@ -115,10 +115,18 @@ The installer action preserves the signing environment, including on Windows.
 - Writes to `32` or `64` registry depending on arch selected.
 - Asserts that the installer is being run on the correct architecture based
   on provided arch.
-- By default will allow 32bit installers to be installed on 64bit systems. This
-  can be disabled.
+- By default will allow 32bit installers to be installed on the 64bit system of
+  the same instruction set (`allow_32bit_on_64bit`): `x86_32` on `x86_64` and
+  `arm32` on `arm64`. Cross-ISA hosts (`x86_32` on `arm32`/`arm64`, `arm32` on
+  `x86_32`/`x86_64`) are always rejected. Disabling the flag requires an exact
+  architecture match.
 - Uses MUI for the UI.
-- Logs to StdOut if run from a console.
+- Logs to the details view, and to StdOut if run from a console. `log_level`
+  selects `none` (disabled), `debug`, `info` (default), `warn` or `error`.
+- The shell context (`SetShellVarContext` and the HKLM/HKCU choice) defaults to
+  the execution level. It is applied before the `pre_init`/`pre_uninit` hooks
+  and re-applied after them, so a hook may switch it with
+  `UpdateShellContextToAdmin`/`UpdateShellContextToCurrent`.
 - Ensures only one installer is running using a mutex.
 - Uninstalls previous installs when run.
 - Installs and updates windows services using `sc.exe`
@@ -128,6 +136,10 @@ The installer action preserves the signing environment, including on Windows.
   keys it uses. This is to handle race conditions while testing installers.
 - If version is not provided, will default to `0.0.0.0`.
 - EventLog keys written to `SYSTEM\CurrentControlSet\Services\EventLog\Application\{{.Id}}`
+  under `HKLM` (always, since the Event Log service only reads `HKLM`). Using an
+  `eventlog` component in an installer whose `execution_level` is not `admin`
+  fails the build. Message file paths are stored as
+  `REG_EXPAND_SZ`, so environment variables such as `%SystemRoot%` expand.
 
 ### Stamping
 - Stamp values will be substituted with their workspace avlues when built with
@@ -146,7 +158,7 @@ The installer action preserves the signing environment, including on Windows.
 ### Component Dependencies
 
 Based on dependencies provided in each component, a dependency graph between
-components is created and then embeded in the installer. In the component
+components is created and then embedded in the installer. In the component
 selection screen the following behavior will be seen:
 
 1. When a component is selected, all of its dependencies (including transitive
@@ -154,6 +166,6 @@ selection screen the following behavior will be seen:
 2. When a component is unselected, the all of its dependencies (including
    transitive dependencies) will be unselected, unless:
    1. They were selected manually.
-   2. They are dependend on by another component (either directly or transitively).
+   2. They are depended on by another component (either directly or transitively).
 3. When a component is unselected, all dependents (either direct or transitive)
    will be unselected (even if they were selected manually).
