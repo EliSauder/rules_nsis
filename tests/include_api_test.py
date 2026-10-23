@@ -144,6 +144,16 @@ def _run_case(case, harness, child_binaries=()):
     elif base == "shell_context_aliases":
         for mode, expected in [("current", "current"), ("admin", "admin"), ("reset", "current")]:
             harness.run(mode=mode).assert_outputs(context=expected)
+    elif base == "arch_allows_32_on_64":
+        # Flags for installer arch x86_32, x86_64, arm32, arm64: a 32bit
+        # installer may only use the 64bit host of its own instruction set.
+        for host, expected in [
+            ("x86_32", "1000"),
+            ("x86_64", "1100"),
+            ("arm32", "0010"),
+            ("arm64", "0011"),
+        ]:
+            harness.run(host=host).assert_outputs(accepted=expected)
     elif base == "native_arch_define":
         result = harness.run()
         expected = "arm32" if arch == "arm32" else "other"

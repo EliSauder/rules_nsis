@@ -121,6 +121,7 @@ _BRANCH_ADAPTERS = [
     ("test_id_set", "HarnessSetTestId", ["in:id", "out:value"], {}),
     ("shell_context_aliases", "HarnessShellContext", ["in:mode", "out:context"], {}),
     ("native_arch_define", "HarnessNativeArch", ["out:arch"], {}),
+    ("arch_allows_32_on_64", "HarnessArchAllows32On64", ["in:host", "out:accepted"], {}),
     ("trim_quotes_special", "HarnessTrimQuotesSpecial", [
         "out:quoted", "out:empty", "out:left",
     ], {}),

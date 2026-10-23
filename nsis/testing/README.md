@@ -1,24 +1,17 @@
 # NSIS API test harnesses
 
-Write an include, describe one entry point with `nsis_symbol`, and build a
-standalone test executable. Bazel generates the JSON description automatically;
-no handwritten JSON is needed. These harnesses do not use the installer
-end-to-end test rule. The include API unit tests use one generated harness per
-entry point, so they can run independently and in parallel.
+Unit-test individual NSIS macros, definitions and functions. Describe one entry
+point with `nsis_symbol`, build it into a standalone executable with
+`nsis_test_harness`, and drive it from a Python test with typed inputs and
+outputs. Every call automatically checks that the API preserves all 20 NSIS
+registers, leaves the stack balanced, and reports the NSIS error flag.
 
-Run `bazel build //tests:include_api_test_binaries` to cross-compile the suite.
-On Windows, run `bazel test //tests:include_api_tests`. Installer end-to-end
-tests remain separate `nsis_installer_test` targets.
-On any host, `bazel test //tests:include_api_contract_test` validates dispatch
-input names/types against every generated symbol, typed assertion expectations,
-and the audited mutex/registry operand preservation paths without running Windows.
-The Windows suite additionally exercises uninstall subprocess success/failure
-and `$0` output aliases under the normal register guards.
+Harnesses test one API at a time. To test a complete installer built by
+`nsis_installer`, use the separate `nsis_installer_test` rule instead.
 
-Numeric and boolean APIs use typed symbols. Service and ACL command results stay
-strings because `nsExec` can return `error` or `timeout`, not just decimal exit
-codes. Hex conversion emits four bits per hexadecimal digit (`f` becomes `1111`);
-invalid digits return an empty string.
+## Quick start
+
+`BUILD.bazel`:
 
 ```starlark
 load("@rules_nsis//nsis/testing:defs.bzl", "nsis_symbol", "nsis_test_harness")
@@ -44,10 +37,43 @@ resolve `$(rlocationpath :echo_symbol)` and pass that path to `Harness`. Add the
 symbol target to the Python test's `data` along with the harness binary.
 Symbols can be reused by multiple harness targets.
 
+A minimal Python test:
+
+```python
+from nsis.testing import Harness
+
+with Harness(binary_path, description_path, directory=test_tmpdir) as api:
+    result = api.run(text="hello world")
+    result.assert_outputs(result="hello world")
+    assert result.returncode == 0
+    assert result.stderr == ""
+```
+
+## Declaring symbols
+
 `kind` is `macro` (`!insertmacro`), `definition` (`${...}`), or `function`
 (`Call`). `parameters` is an ordered list of `direction:name[:type]` strings,
 where direction is `in`, `out`, or `inout`. Types are `string` (default),
-`int`, and `bool`. For example:
+`int`, and `bool`. Declare the actual symbol, including `un.` when
+appropriate.
+
+Macros and callable definitions receive input values and output variable
+operands in that order. For constant definitions, set `invocation = "value"`
+and declare exactly one output. Definitions otherwise default to callable
+shorthand expansion, including output-only helpers. For functions, inputs are
+pushed in reverse declaration order (the first input is on top), and outputs
+are popped in declaration order (the first output must be on top).
+Stack functions use separate input and output parameters.
+
+`context` defaults to `installer`. For `uninstaller`, the executable first
+creates an uninstaller; the Python runner invokes it directly and waits for its
+exit. Optional `defines` maps preprocessor names to string values defined before
+including the source. Harnesses run at user execution level; they do not elevate.
+
+
+## Parameter types
+
+Append `:int` or `:bool` to a parameter to give it a Python type:
 
 ```starlark
 nsis_symbol(
@@ -78,53 +104,7 @@ The generated executable does not independently enforce types when invoked
 directly from a shell. The Python runner validates inputs before execution and
 converts outputs after reading the result file.
 
-Macros and callable definitions receive input values and output variable
-operands in that order. For constant definitions, set `invocation = "value"`
-and declare exactly one output. Definitions otherwise default to callable
-shorthand expansion, including output-only helpers. For functions, inputs are
-pushed in reverse declaration order (the first input is on top), and outputs
-are popped in declaration order (the first output must be on top).
-Stack functions use separate input and output parameters.
-Declare the actual symbol, including `un.` when appropriate.
-
-`context` defaults to `installer`. For `uninstaller`, the executable first
-creates an uninstaller; the Python runner invokes it directly and waits for its
-exit. Optional `defines` maps preprocessor names to string values defined before
-including the source. Harnesses run at user execution level; they do not elevate.
-
-Standalone JSON files remain accepted by `description` and the generator CLI.
-The equivalent standalone description for the Echo example is:
-
-```json
-{
-  "symbol": "Echo",
-  "kind": "macro",
-  "parameters": [
-    {"name": "text", "direction": "in", "type": "string"},
-    {"name": "result", "direction": "out", "type": "string"}
-  ]
-}
-```
-
-For typed standalone descriptions, use `"type": "int"` or `"type": "bool"`.
-Omitting `type` defaults to `string`, just as in the Bazel rule.
-
-## Python tests
-
-Depend on `@rules_nsis//nsis/testing`, add the binary and symbol to test `data`,
-resolve their runfile paths, and use the context manager:
-
-```python
-from nsis.testing import Harness
-
-with Harness(binary_path, description_path, directory=test_tmpdir) as api:
-    result = api.run(text="hello world")
-    result.assert_outputs(result="hello world")
-    assert result.returncode == 0
-    assert result.stderr == ""
-```
-
-For the `Typed` example, resolve the typed harness and symbol paths instead:
+Using the `Typed` harness from Python:
 
 ```python
 with Harness(typed_binary_path, typed_description_path, directory=test_tmpdir) as api:
@@ -134,10 +114,80 @@ with Harness(typed_binary_path, typed_description_path, directory=test_tmpdir) a
     assert type(result.outputs["enabled"]) is bool
 ```
 
-## Testing installer behavior with `py_test`
 
-An installer behavior test can use the same harness to exercise a macro that
-creates a file and writes a registry value. This example also demonstrates
+## Running an API
+
+`run()` requires exactly the declared input/inout parameters, with their declared
+Python types. String outputs preserve whitespace, quotes, newlines and Unicode.
+String inputs currently cannot contain literal quotes, newlines or NUL because the
+NSIS command-line parser cannot round-trip them reliably. Characters that
+Windows string comparison ignores (for example the soft hyphen U+00AD) also
+truncate the value, because `GetOptions` treats them as the end of the string;
+embed such characters in an adapter macro (for example `${U+00AD}`) instead.
+NSIS's compiled string length limit still applies. Use file inputs for larger or arbitrary data.
+`expected_exitcode=N` supports failure tests. A zero exit without an output
+record is an error, including an API that silently calls `Abort` or `Quit`.
+
+`Result.outputs` is a dictionary of `str`, `int`, or `bool` values according to
+the declaration. `assert_outputs` checks both values and exact Python types;
+expecting `1` for a declared boolean returned as `True` fails.
+
+Each harness instance owns a unique temporary directory, also used as the
+process working directory. Files remain available for inspection until context
+exit. Use normal Python libraries (`pathlib`, `winreg`, etc.) for assertions;
+pass unique file paths and registry keys as inputs and clean up external state
+in `finally` blocks. The runner does not redirect or virtualize registry access.
+Independent Bazel test targets can run in parallel.
+
+`Result.stdout` and `Result.stderr` capture inherited process pipes, decoded as
+UTF-8 with replacement for invalid bytes. APIs must actually write to those
+handles; `DetailPrint` is UI output, not stdout. Console-attachment-only loggers
+may need to support inherited handles to be observable. The logging example
+demonstrates writing to both handles without a console.
+
+
+## Built-in checks
+
+### Registers
+
+Every generated harness validates register preservation automatically. It creates
+20 fresh random GUID sentinels at runtime using `CoCreateGuid`, fills `$0`–`$9`
+and `$R0`–`$R9` immediately before invoking the API, and snapshots and compares
+them case-sensitively immediately after it returns. Argument parsing, random
+generation and output serialization run outside that boundary. Output arguments
+use dedicated named variables, so returning values does not mask register
+corruption. Any changed register fails the test, with each register's expected
+and actual values in the Python assertion. This applies to installer and
+uninstaller calls. APIs that terminate the process cannot reach the post-check;
+their exit/output behavior is still checked by the runner.
+
+### Stack balance
+
+The harness also verifies that the API leaves the NSIS stack balanced. It pushes
+a 21st random GUID sentinel below the API's inputs; after the call (and after
+popping a function's declared outputs) the next pop must return exactly that
+sentinel. Values left behind or an extra pop both fail the test with an
+`AssertionError` naming the expected and actual top of the stack (or reporting
+that the stack was empty).
+
+### Error flag
+
+The NSIS error flag is cleared immediately before the invocation and captured
+immediately after it, before outputs are popped. `Result.errors` reports it as
+`True`/`False`. By default it is not asserted; pass `expect_errors=True` or
+`expect_errors=False` to `run()` to require the flag to be set or clear:
+
+```python
+api.run(text="not hex", expect_errors=True)
+result = api.run(text="0A")
+assert result.errors is False
+```
+
+
+## Example: testing installer behavior with `py_test`
+
+A complete Bazel and Python setup for a macro that creates a file and writes a
+registry value. This example also demonstrates
 typed inout/output values. The fixture preserves its scratch register; the
 harness independently checks all 20 NSIS registers around the API invocation.
 
@@ -246,62 +296,26 @@ it asserts those side effects directly. Tests for logging APIs can assert
 `result.stdout` and `result.stderr` when the API writes to the inherited process
 handles.
 
-`Result.outputs` is a dictionary of `str`, `int`, or `bool` values according to
-the declaration. `assert_outputs` checks both values and exact Python types;
-expecting `1` for a declared boolean returned as `True` fails.
 
-Each harness instance owns a unique temporary directory, also used as the
-process working directory. Files remain available for inspection until context
-exit. Use normal Python libraries (`pathlib`, `winreg`, etc.) for assertions;
-pass unique file paths and registry keys as inputs and clean up external state
-in `finally` blocks. The runner does not redirect or virtualize registry access.
-Independent Bazel test targets can run in parallel.
+## Standalone JSON descriptions
 
-Every generated harness validates register preservation automatically. It creates
-20 fresh random GUID sentinels at runtime using `CoCreateGuid`, fills `$0`–`$9`
-and `$R0`–`$R9` immediately before invoking the API, and snapshots and compares
-them case-sensitively immediately after it returns. Argument parsing, random
-generation and output serialization run outside that boundary. Output arguments
-use dedicated named variables, so returning values does not mask register
-corruption. Any changed register fails the test, with each register's expected
-and actual values in the Python assertion. This applies to installer and
-uninstaller calls. APIs that terminate the process cannot reach the post-check;
-their exit/output behavior is still checked by the runner.
+`nsis_symbol` generates the JSON description, so no handwritten JSON is needed.
+Standalone JSON files are still accepted by `nsis_test_harness.description` and
+the generator CLI. The equivalent description for the Echo example is:
 
-The harness also verifies that the API leaves the NSIS stack balanced. It pushes
-a 21st random GUID sentinel below the API's inputs; after the call (and after
-popping a function's declared outputs) the next pop must return exactly that
-sentinel. Values left behind or an extra pop both fail the test with an
-`AssertionError` naming the expected and actual top of the stack (or reporting
-that the stack was empty).
-
-The NSIS error flag is cleared immediately before the invocation and captured
-immediately after it, before outputs are popped. `Result.errors` reports it as
-`True`/`False`. By default it is not asserted; pass `expect_errors=True` or
-`expect_errors=False` to `run()` to require the flag to be set or clear:
-
-```python
-api.run(text="not hex", expect_errors=True)
-result = api.run(text="0A")
-assert result.errors is False
+```json
+{
+  "symbol": "Echo",
+  "kind": "macro",
+  "parameters": [
+    {"name": "text", "direction": "in", "type": "string"},
+    {"name": "result", "direction": "out", "type": "string"}
+  ]
+}
 ```
 
-`run()` requires exactly the declared input/inout parameters, with their declared
-Python types. String outputs preserve whitespace, quotes, newlines and Unicode.
-String inputs currently cannot contain literal quotes, newlines or NUL because the
-NSIS command-line parser cannot round-trip them reliably. Characters that
-Windows string comparison ignores (for example the soft hyphen U+00AD) also
-truncate the value, because `GetOptions` treats them as the end of the string;
-embed such characters in an adapter macro (for example `${U+00AD}`) instead. NSIS's compiled string
-length limit still applies. Use file inputs for larger or arbitrary data.
-`expected_exitcode=N` supports failure tests. A zero exit without an output
-record is an error, including an API that silently calls `Abort` or `Quit`.
-
-`Result.stdout` and `Result.stderr` capture inherited process pipes, decoded as
-UTF-8 with replacement for invalid bytes. APIs must actually write to those
-handles; `DetailPrint` is UI output, not stdout. Console-attachment-only loggers
-may need to support inherited handles to be observable. The logging example
-demonstrates writing to both handles without a console.
+For typed standalone descriptions, use `"type": "int"` or `"type": "bool"`.
+Omitting `type` defaults to `string`, just as in the Bazel rule.
 
 ## Generated executable protocol
 
@@ -328,6 +342,7 @@ all before/after snapshots; the runner reports every changed register.
 On stack imbalance, a sibling `.stack` file holds `expected`, `actual` and
 `underflow` records describing the sentinel check.
 
+
 ## Examples and checks
 
 ```sh
@@ -344,3 +359,31 @@ target. See [`examples/BUILD.bazel`](examples/BUILD.bazel) for symbol declaratio
 and [`examples/example_test.py`](examples/example_test.py) for Python usage.
 Two negative examples intentionally corrupt `$0` and `$R9` and assert that the
 framework detects both changes, in installer and uninstaller contexts.
+
+## This repository's include API suite
+
+`//tests:include_api_tests` uses this framework to test every public macro,
+definition and function in `nsis/private/includes`, with one generated harness
+per entry point (and an `un.` variant where applicable) so cases run
+independently and in parallel. `tests/include_api_tests.bzl` declares the
+matrix, `tests/include_api_test.py` holds the per-case assertions, and
+`tests/include_api_fixture.nsh` is the shared harness source: it includes every
+API and adds `Harness*` adapter macros for cases that a direct symbol call
+cannot express.
+
+```sh
+bazel build //tests:include_api_test_binaries  # cross-compile on any host
+bazel test //tests:include_api_tests           # Windows only
+bazel test //tests:include_api_contract_test   # any host
+```
+
+The contract test runs every case's dispatch against its generated symbol
+without executing Windows binaries, validating input names/types and typed
+output expectations. It also symbolically replays the register/stack handling
+of `ValidateMutex`, `GetUninstallRegistry` and `UninstallExisting` by parsing
+their NSIS source.
+
+Numeric and boolean APIs use typed symbols. Service and ACL command results stay
+strings because `nsExec` can return `error` or `timeout`, not just decimal exit
+codes. Hex conversion emits four bits per hexadecimal digit (`f` becomes
+`1111`); invalid digits return an empty string and set the error flag.
