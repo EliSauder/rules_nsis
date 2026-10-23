@@ -3,24 +3,34 @@
 
 !include LogicLib.nsh
 
+; CharToASCII
+;
+; Returns the code (1-255) of a single-character string, or 0 when the input is
+; empty, longer than one character, or outside 1-255. The UTF-16 code unit is
+; read directly: string comparison instructions use locale-aware lstrcmp, which
+; treats characters such as the soft hyphen (173) as equal to the empty string.
 !macro _CharToASCII PREFIX
 Function ${PREFIX}CharToASCII
   Exch $0 ; given character
-  Push $1 ; current character
-  Push $2 ; current Ascii Code
+  Push $1
 
-  StrCpy $2 1 ; right from start
-${PREFIX}CharToASCIILoop:
-  IntFmt $1 %c $2 ; Get character from current ASCII code
-  ${If} $1 S== $0 ; case sensitive string comparison
-     StrCpy $0 $2
-     Goto ${PREFIX}CharToASCIIDone
+  StrLen $1 $0
+  ${If} $1 = 1
+    System::Call '*(&t2 r0)p.r1'
+    ${If} $1 P<> 0
+      System::Call '*$1(&i2 .r0)'
+      System::Free $1
+      IntOp $0 $0 & 0xFFFF
+      ${If} $0 > 255
+        StrCpy $0 0
+      ${EndIf}
+    ${Else}
+      StrCpy $0 0
+    ${EndIf}
+  ${Else}
+    StrCpy $0 0
   ${EndIf}
-  IntOp $2 $2 + 1
-  StrCmp $2 255 0 ${PREFIX}CharToASCIILoop ; ascii from 1 to 255
-  StrCpy $0 0 ; ASCII code wasn't found -> return 0
-${PREFIX}CharToASCIIDone:
-  Pop $2
+
   Pop $1
   Exch $0
 FunctionEnd
