@@ -20,6 +20,11 @@ def main():
                 AssertionError, r"(?s)NSIS registers changed:.*\$0:.*\$R9:"
             ):
                 harness.run()
+        elif name == "typed":
+            for number, enabled in [(-2147483648, False), (-1, True), (2147483646, False)]:
+                harness.run(number=number, enabled=enabled).assert_outputs(
+                    number=number + 1, enabled=not enabled
+                )
         elif name == "definition":
             harness.run().assert_outputs(result="42")
         elif name == "file":

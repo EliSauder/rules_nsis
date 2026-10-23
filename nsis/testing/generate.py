@@ -33,8 +33,14 @@ def validate(spec):
         raise ValueError("parameters must be an array")
     names = set()
     for parameter in parameters:
-        if not isinstance(parameter, dict) or parameter.keys() != {"name", "direction"}:
-            raise ValueError("Each parameter requires exactly name and direction")
+        if (
+            not isinstance(parameter, dict)
+            or not {"name", "direction"} <= parameter.keys()
+            or parameter.keys() - {"name", "direction", "type"}
+        ):
+            raise ValueError("Each parameter requires name and direction, with optional type")
+        if parameter.get("type", "string") not in ("string", "int", "bool"):
+            raise ValueError("Parameter type must be string, int, or bool")
         name = parameter["name"]
         if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", name):
             raise ValueError("Parameter names must match [a-z][a-z0-9_]*")

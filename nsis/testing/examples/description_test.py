@@ -21,9 +21,9 @@ class DescriptionTest(unittest.TestCase):
             "kind": "definition",
             "context": "uninstaller",
             "parameters": [
-                {"name": "second", "direction": "in"},
-                {"name": "first", "direction": "out"},
-                {"name": "third", "direction": "inout"},
+                {"name": "second", "direction": "in", "type": "int"},
+                {"name": "first", "direction": "out", "type": "bool"},
+                {"name": "third", "direction": "inout", "type": "string"},
             ],
             "invocation": "call",
             "defines": {"TEST_MODE": "value with spaces"},

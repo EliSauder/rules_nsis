@@ -44,3 +44,8 @@ FunctionEnd
     StrCpy $0 "clobbered"
     StrCpy $R9 "clobbered"
 !macroend
+
+!macro Typed NUMBER ENABLED
+    IntOp ${NUMBER} ${NUMBER} + 1
+    IntOp ${ENABLED} ${ENABLED} ^ 1
+!macroend

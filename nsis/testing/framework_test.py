@@ -63,6 +63,7 @@ class GeneratorTest(unittest.TestCase):
             {"parameters": [{"name": "output", "direction": "in"}]},
             {"parameters": [{"name": "a", "direction": "invalid"}]},
             {"parameters": [{"name": "a", "direction": "in"}] * 2},
+            {"parameters": [{"name": "a", "direction": "in", "type": "float"}]},
         ]:
             with self.subTest(change=change), self.assertRaises(ValueError):
                 validate(dict(ECHO, **change))
@@ -87,6 +88,60 @@ class GeneratorTest(unittest.TestCase):
 
 
 class RunnerTest(unittest.TestCase):
+    def test_typed_inputs_outputs_and_inout(self):
+        spec = dict(ECHO, parameters=[
+            {"name": "number", "direction": "inout", "type": "int"},
+            {"name": "enabled", "direction": "inout", "type": "bool"},
+        ])
+        with Harness("example.exe", spec) as harness:
+            for number, enabled in [(-2147483648, False), (2147483647, True)]:
+                def execute(command):
+                    self.assertIn(f"/number={number}", command)
+                    self.assertIn(f"/enabled={int(enabled)}", command)
+                    (harness.directory / "outputs.dat").write_bytes(
+                        record(number=str(number), enabled=str(int(enabled)))
+                    )
+                    return subprocess.CompletedProcess(command, 0, "", "")
+                with patch.object(harness, "_execute", side_effect=execute):
+                    result = harness.run(number=number, enabled=enabled)
+                result.assert_outputs(number=number, enabled=enabled)
+                self.assertIs(type(result.outputs["number"]), int)
+                self.assertIs(type(result.outputs["enabled"]), bool)
+                with self.assertRaises(AssertionError):
+                    result.assert_outputs(number=number, enabled=int(enabled))
+
+    def test_invalid_typed_inputs_fail_before_execution(self):
+        spec = dict(ECHO, parameters=[
+            {"name": "number", "direction": "in", "type": "int"},
+            {"name": "enabled", "direction": "in", "type": "bool"},
+        ])
+        with Harness("example.exe", spec) as harness:
+            with patch.object(harness, "_execute") as execute:
+                for number, enabled in [
+                    (True, True), ("1", True), (1.0, True),
+                    (-2147483649, True), (2147483648, True),
+                    (1, 1), (1, "true"), (1, None),
+                ]:
+                    with self.subTest(number=number, enabled=enabled), self.assertRaises(ValueError):
+                        harness.run(number=number, enabled=enabled)
+                execute.assert_not_called()
+
+    def test_invalid_typed_outputs_report_parameter(self):
+        for typ, bad_values in [
+            ("int", ["", "1.5", "0x10", " 1", "2147483648", "-2147483649"]),
+            ("bool", ["", "true", "2", "-1"]),
+        ]:
+            spec = dict(ECHO, parameters=[{"name": "result", "direction": "out", "type": typ}])
+            with Harness("example.exe", spec) as harness:
+                for value in bad_values:
+                    def execute(command):
+                        (harness.directory / "outputs.dat").write_bytes(record(result=value))
+                        return subprocess.CompletedProcess(command, 0, "", "")
+                    with self.subTest(typ=typ, value=value):
+                        with patch.object(harness, "_execute", side_effect=execute):
+                            with self.assertRaisesRegex(ValueError, "result"):
+                                harness.run()
+
     def test_nsis_command_line_quotes_values_not_entire_options(self):
         self.assertEqual(
             command_line([r"C:\a b\test.exe", "/S", "/text=  a /other=value  ", "/empty=", r"_?=C:\a b"]),

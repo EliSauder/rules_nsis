@@ -30,8 +30,29 @@ symbol target to the Python test's `data` along with the harness binary.
 Symbols can be reused by multiple harness targets.
 
 `kind` is `macro` (`!insertmacro`), `definition` (`${...}`), or `function`
-(`Call`). `parameters` is an ordered list of `direction:name` strings, where
-direction is `in`, `out`, or `inout`.
+(`Call`). `parameters` is an ordered list of `direction:name[:type]` strings,
+where direction is `in`, `out`, or `inout`. Types are `string` (default),
+`int`, and `bool`. For example:
+
+```starlark
+nsis_symbol(
+    name = "typed_symbol",
+    symbol = "Typed",
+    kind = "macro",
+    parameters = ["inout:number:int", "inout:enabled:bool"],
+)
+```
+
+Python inputs must match the declared types: strings, signed 32-bit integers,
+or booleans. Booleans are sent to NSIS as `1`/`0`; integers as decimal strings.
+Returned values are converted to the corresponding Python types, including
+inout parameters. Invalid input types/ranges and malformed returned values
+raise `ValueError` identifying the parameter. Integer outputs must be decimal;
+boolean outputs must be exactly `0` or `1`. Python's `bool` is not accepted as
+an `int`, and `assert_outputs` distinguishes them. For standalone JSON, set
+`"type": "int"` or `"type": "bool"` on each parameter; omitted types remain
+strings for backward compatibility.
+
 Macros and callable definitions receive input values and output variable
 operands in that order. For constant definitions, set `invocation = "value"`
 and declare exactly one output. Definitions otherwise default to callable
@@ -93,9 +114,9 @@ and actual values in the Python assertion. This applies to installer and
 uninstaller calls. APIs that terminate the process cannot reach the post-check;
 their exit/output behavior is still checked by the runner.
 
-`run()` requires exactly the declared input/inout parameters, as strings. All
-outputs are strings, with whitespace, quotes, newlines and Unicode preserved.
-Inputs currently cannot contain literal quotes, newlines or NUL because the
+`run()` requires exactly the declared input/inout parameters, with their declared
+Python types. String outputs preserve whitespace, quotes, newlines and Unicode.
+String inputs currently cannot contain literal quotes, newlines or NUL because the
 NSIS command-line parser cannot round-trip them reliably. NSIS's compiled string
 length limit still applies. Use file inputs for larger or arbitrary data.
 `expected_exitcode=N` supports failure tests. A zero exit without an output

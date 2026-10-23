@@ -13,6 +13,7 @@ _EXAMPLES = [
     "inout",
     "corruption",
     "uninstaller_corruption",
+    "typed",
 ]
 
 [
@@ -36,6 +37,7 @@ _EXAMPLES = [
         ("inout", "Append", "macro", "installer", ["inout:value"], ""),
         ("corruption", "CorruptRegisters", "macro", "installer", [], ""),
         ("uninstaller_corruption", "CorruptRegisters", "macro", "uninstaller", [], ""),
+        ("typed", "Typed", "macro", "installer", ["inout:number:int", "inout:enabled:bool"], ""),
     ]
 ]
 
@@ -60,7 +62,7 @@ nsis_symbol(
     symbol = "un.Example",
     kind = "definition",
     context = "uninstaller",
-    parameters = ["in:second", "out:first", "inout:third"],
+    parameters = ["in:second:int", "out:first:bool", "inout:third"],
     invocation = "call",
     defines = {"TEST_MODE": "value with spaces"},
     testonly = True,

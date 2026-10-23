@@ -2,12 +2,46 @@
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from .generate import REGISTERS, validate
+
+
+def serialize_input(parameter, value):
+    name = parameter["name"]
+    typ = parameter.get("type", "string")
+    if typ == "bool":
+        if type(value) is not bool:
+            raise ValueError(f"{name} must be a bool")
+        return "1" if value else "0"
+    if typ == "int":
+        if type(value) is not int or not -(2**31) <= value < 2**31:
+            raise ValueError(f"{name} must be a signed 32-bit int")
+        return str(value)
+    if not isinstance(value, str) or any(c in value for c in '\x00\r\n"'):
+        raise ValueError(f"{name} must be a single-line string without quotes or NUL")
+    return value
+
+
+def deserialize_output(parameter, value):
+    name = parameter["name"]
+    typ = parameter.get("type", "string")
+    if typ == "bool":
+        if value not in ("0", "1"):
+            raise ValueError(f"{name}: expected bool output 0 or 1; got {value!r}")
+        return value == "1"
+    if typ == "int":
+        if not re.fullmatch(r"-?[0-9]+", value):
+            raise ValueError(f"{name}: expected decimal int output; got {value!r}")
+        result = int(value)
+        if not -(2**31) <= result < 2**31:
+            raise ValueError(f"{name}: int output outside signed 32-bit range: {value!r}")
+        return result
+    return value
 
 
 def command_line(command):
@@ -56,14 +90,17 @@ def read_outputs(path, names):
 
 @dataclass(frozen=True)
 class Result:
-    outputs: dict[str, str]
+    outputs: dict[str, str | int | bool]
     returncode: int
     stdout: str
     stderr: str
     directory: Path
 
     def assert_outputs(self, **expected):
-        if self.outputs != expected:
+        if self.outputs != expected or any(
+            type(value) is not type(expected[name])
+            for name, value in self.outputs.items()
+        ):
             raise AssertionError(f"Expected {expected!r}; got {self.outputs!r}")
         return self
 
@@ -106,9 +143,10 @@ class Harness:
             raise ValueError(
                 f"Expected inputs {sorted(required)}; got {sorted(inputs)}"
             )
-        for name, value in inputs.items():
-            if not isinstance(value, str) or any(c in value for c in '\x00\r\n"'):
-                raise ValueError(f"{name} must be a single-line string without quotes or NUL")
+        serialized = {
+            p["name"]: serialize_input(p, inputs[p["name"]])
+            for p in parameters if p["direction"] != "out"
+        }
         output = self.directory / "outputs.dat"
         output.unlink(missing_ok=True)
         registers = self.directory / "outputs.dat.registers"
@@ -126,7 +164,7 @@ class Harness:
                 )
         command = [
             str(executable), "/S", f"/output={output}",
-            *(f"/{name}={value}" for name, value in inputs.items()),
+            *(f"/{name}={value}" for name, value in serialized.items()),
         ]
         if self.spec.get("context", "installer") == "uninstaller":
             command.append(f"_?={self.directory}")
@@ -158,6 +196,10 @@ class Harness:
             values = read_outputs(
                 output, [p["name"] for p in parameters if p["direction"] != "in"]
             )
+            values = {
+                p["name"]: deserialize_output(p, values[p["name"]])
+                for p in parameters if p["direction"] != "in"
+            }
         elif expected_exitcode == 0:
             raise AssertionError(
                 f"Harness exited without returning outputs\n"

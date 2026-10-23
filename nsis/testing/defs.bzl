@@ -12,12 +12,15 @@ def _symbol_impl(ctx):
     names = []
     for parameter in ctx.attr.parameters:
         parts = parameter.split(":")
-        if len(parts) != 2 or parts[0] not in ["in", "out", "inout"] or not parts[1]:
-            fail("parameters must use 'in:name', 'out:name', or 'inout:name': " + parameter)
+        if len(parts) not in [2, 3] or parts[0] not in ["in", "out", "inout"] or not parts[1]:
+            fail("parameters must use 'direction:name[:type]': " + parameter)
+        typ = parts[2] if len(parts) == 3 else "string"
+        if typ not in ["string", "int", "bool"]:
+            fail("parameter type must be string, int, or bool: " + parameter)
         if parts[1] in names:
             fail("duplicate parameter name: " + parts[1])
         names.append(parts[1])
-        parameters.append({"name": parts[1], "direction": parts[0]})
+        parameters.append({"name": parts[1], "direction": parts[0], "type": typ})
     description = {
         "symbol": ctx.attr.symbol,
         "kind": ctx.attr.kind,
@@ -42,7 +45,7 @@ nsis_symbol = rule(
         "kind": attr.string(mandatory = True, values = ["macro", "definition", "function"]),
         "context": attr.string(default = "installer", values = ["installer", "uninstaller"]),
         "parameters": attr.string_list(
-            doc = "Ordered operands, written as 'in:name', 'out:name', or 'inout:name'.",
+            doc = "Ordered 'direction:name[:type]' operands; type is string (default), int, or bool.",
         ),
         "invocation": attr.string(
             default = "",
