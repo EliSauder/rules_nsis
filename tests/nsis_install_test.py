@@ -109,19 +109,30 @@ def _is_native_os_64bit() -> bool:
     # platform.machine() reports the Python process architecture under WOW64,
     # so ask Windows for the native machine instead.
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    process = kernel32.GetCurrentProcess
-    process.restype = wintypes.HANDLE
 
-    if hasattr(kernel32, "IsWow64Process2"):
+    get_current_process = kernel32.GetCurrentProcess
+    get_current_process.argtypes = []
+    get_current_process.restype = wintypes.HANDLE
+    process = get_current_process()
+
+    is_wow64_process2 = getattr(kernel32, "IsWow64Process2", None)
+    if is_wow64_process2 is not None:
+        is_wow64_process2.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(wintypes.USHORT),
+            ctypes.POINTER(wintypes.USHORT),
+        ]
+        is_wow64_process2.restype = wintypes.BOOL
         process_machine = wintypes.USHORT()
         native_machine = wintypes.USHORT()
-        if kernel32.IsWow64Process2(
-            process(), ctypes.byref(process_machine), ctypes.byref(native_machine)
-        ):
+        if is_wow64_process2(process, ctypes.byref(process_machine), ctypes.byref(native_machine)):
             return native_machine.value in _IMAGE_FILE_MACHINE_64BIT
 
+    is_wow64_process = kernel32.IsWow64Process
+    is_wow64_process.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.BOOL)]
+    is_wow64_process.restype = wintypes.BOOL
     is_wow64 = wintypes.BOOL()
-    if kernel32.IsWow64Process(process(), ctypes.byref(is_wow64)) and is_wow64.value:
+    if is_wow64_process(process, ctypes.byref(is_wow64)) and is_wow64.value:
         return True
     return ctypes.sizeof(ctypes.c_void_p) == 8
 
@@ -620,11 +631,12 @@ if __name__ == "__main__":
         with open(RUNFILES.Rlocation(sys.argv[2]), "r", encoding="utf-8") as f:
             content = f.read()
             CONFIG = json.loads(content)
-            _set_expected_registry_view(CONFIG)
     except json.JSONDecodeError as e:
         raise SystemExit(f"Invalid config JSON: {e}\nFile: {sys.argv[2]}\nContent: {content}")
     except:
         raise SystemExit(f"error parsing json parameter: {sys.argv[2]}\nContent: {content}")
+
+    _set_expected_registry_view(CONFIG)
 
     logging.basicConfig(stream=sys.stderr)
     logging.getLogger("NsisInstallerTest.test_installer").setLevel(logging.DEBUG)
