@@ -147,6 +147,65 @@ FunctionEnd
 !macroend
 !define un.ValidateArch `!insertmacro un.ValidateArch`
 
+; Sets OUT to 1 when the detected architecture may run an EXPECTED installer
+; under allow_32bit_on_64bit, else 0: EXPECTED itself, or the 64bit host of the
+; same instruction set (x86_32 on x86_64, arm32 on arm64). Cross-ISA hosts are
+; rejected. A 64bit EXPECTED only accepts itself.
+!macro _ArchAllows32On64 PREFIX EXPECTED OUT
+    !if "${EXPECTED}" == "x86_32"
+        !define /redef _ARCH_32ON64_HOST "x86_64"
+    !else if "${EXPECTED}" == "arm32"
+        !define /redef _ARCH_32ON64_HOST "arm64"
+    !else
+        !define /redef _ARCH_32ON64_HOST "${EXPECTED}"
+    !endif
+    ${If} $current_arch == ""
+        Call ${PREFIX}DetectArch
+    ${EndIf}
+    ${If} $current_arch == "${EXPECTED}"
+    ${OrIf} $current_arch == "${_ARCH_32ON64_HOST}"
+        StrCpy ${OUT} "1"
+    ${Else}
+        StrCpy ${OUT} "0"
+    ${EndIf}
+    !undef _ARCH_32ON64_HOST
+!macroend
+
+!macro ArchAllows32On64 EXPECTED OUT
+    !insertmacro _ArchAllows32On64 "" "${EXPECTED}" ${OUT}
+!macroend
+!define ArchAllows32On64 `!insertmacro ArchAllows32On64`
+
+!macro un.ArchAllows32On64 EXPECTED OUT
+    !insertmacro _ArchAllows32On64 "un." "${EXPECTED}" ${OUT}
+!macroend
+!define un.ArchAllows32On64 `!insertmacro un.ArchAllows32On64`
+
+; Aborts unless ArchAllows32On64 accepts the detected architecture.
+!macro _ValidateArch32On64 PREFIX EXPECTED
+    Push $0
+    !insertmacro _ArchAllows32On64 "${PREFIX}" "${EXPECTED}" $0
+    ${If} $0 != "1"
+        StrCpy $0 $current_arch
+        !insertmacro LogError "Current architecture '$0' cannot run a ${EXPECTED} installer."
+        MessageBox MB_ICONSTOP "This installer requires a ${EXPECTED} compatible version of windows. You are running with $0." /SD IDOK
+        Pop $0
+        SetErrorLevel 3
+        Abort
+    ${EndIf}
+    Pop $0
+!macroend
+
+!macro ValidateArch32On64 EXPECTED
+    !insertmacro _ValidateArch32On64 "" "${EXPECTED}"
+!macroend
+!define ValidateArch32On64 `!insertmacro ValidateArch32On64`
+
+!macro un.ValidateArch32On64 EXPECTED
+    !insertmacro _ValidateArch32On64 "un." "${EXPECTED}"
+!macroend
+!define un.ValidateArch32On64 `!insertmacro un.ValidateArch32On64`
+
 !macro ValidateBitwidth EXPECTED
     ${If} $current_arch == ""
         Call DetectArch

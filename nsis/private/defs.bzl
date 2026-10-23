@@ -28,6 +28,15 @@ _COMPONENT_GROUPS_KEY = "ComponentGroups"
 
 _COMPONENT_DEPS_KEY = "ComponentDependencies"
 
+# Maps the `log_level` attribute to the Logging.nsh level define.
+_LOG_LEVEL_DEFINES = {
+    "none": "",
+    "debug": "LOGLEVEL_DEBUG",
+    "info": "LOGLEVEL_INFO",
+    "warn": "LOGLEVEL_WARN",
+    "error": "LOGLEVEL_ERR",
+}
+
 toolchains = [
     "//nsis/toolchain:toolchain_type"
 ]
@@ -58,6 +67,7 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
 """,
         "install_path": "Overrides product_path and vendor_path with a specific path.",
         "testable": "Whether test-ID based isolation is enabled.",
+        "log_level": "The runtime logging level: none, debug, info, warn or error.",
         "execution_level": "Set the execution level for the installer.",
         "compressor": "Set the compressor to be used for building the installer.",
         "compressor_dictsize": "Set the compressor dict size for the lzma compression alg.",
@@ -70,7 +80,7 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "components": "List of root components and component groups.",
         "outfile": "Specify the outfile.",
         "arch": "The architecture to built the installer for.",
-        "allow_32bit_on_64bit": "Allow 32bit installers to run on 64bit OS.",
+        "allow_32bit_on_64bit": "Allow a 32bit installer to run on the 64bit OS of the same ISA (x86_32 on x86_64, arm32 on arm64).",
         "post_init": "The post .onInit nsh script to run.",
         "pre_init": "The pre .onInit nsh script to run.",
         "post_uninit": "The post un.onInit nsh script to run.",
@@ -1104,6 +1114,7 @@ def _get_installer_ds(ctx, toolchain):
         "Compressor": str(ctx.attr.compressor),
         "CompressorDictSize": int(ctx.attr.compressor_dictsize),
         "TestableInstaller": bool(ctx.attr.testable),
+        "LogLevelDefine": _LOG_LEVEL_DEFINES[ctx.attr.log_level],
         "Icon": (
             str(_make_sys_path(toolchain, ctx.file.icon.path))
             if ctx.file.icon != None
@@ -1522,6 +1533,7 @@ def _nsis_installer_impl(ctx):
             outfile = ctx.attr.outfile,
             arch = ctx.attr.arch,
             testable = ctx.attr.testable,
+            log_level = ctx.attr.log_level,
             post_init = ctx.file.post_init,
             pre_init = ctx.file.pre_init,
             post_uninit = ctx.file.post_uninit,
@@ -1653,6 +1665,16 @@ user: Install software as user.
             default = False,
             doc = "Enable test-ID based isolation for installer tests.",
         ),
+        "log_level": attr.string(
+            mandatory = False,
+            default = "info",
+            values = _LOG_LEVEL_DEFINES.keys(),
+            doc = """
+The installer's runtime logging level. `none` disables logging; otherwise
+messages at the given level and above are written to the details view and,
+when attached to a console, to stdout.
+""",
+        ),
         "components": attr.label_list(
             mandatory = False,
             allow_empty = False,
@@ -1686,7 +1708,11 @@ user: Install software as user.
         "allow_32bit_on_64bit": attr.bool(
             mandatory = False,
             default = True,
-            doc = "Whether to allow 32bit installers to run on 64bit OS.",
+            doc = """
+Whether to allow a 32bit installer to run on the 64bit OS of the same
+instruction set: x86_32 on x86_64 and arm32 on arm64. Cross-ISA hosts (x86 on
+arm, arm on x86) are always rejected.
+""",
         ),
         "post_init": attr.label(
             mandatory = False,

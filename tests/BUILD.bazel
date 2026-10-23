@@ -484,6 +484,50 @@ nsis_installer_test(
     target_compatible_with = ["@platforms//cpu:x86_64"]
 )
 
+nsis_installer(
+    name = "minimal_installer_arm32_allowed_on64",
+    testable = True,
+    id = "5b0f6f7e-3d55-4b8e-9a43-6b2f0b7c1d2e",
+    components = [":minimal_component"],
+    product = "Minimal Installer arm32 allowed 64",
+    product_path = "Minimal Installer",
+    arch = "arm32",
+)
+
+# allow_32bit_on_64bit never crosses instruction sets.
+nsis_installer_test(
+    name = "arm32_fail_install_on_x86_64",
+    installer = ":minimal_installer_arm32_allowed_on64",
+    expected_installer_exitcode = 3,
+    target_compatible_with = ["@platforms//cpu:x86_64"]
+)
+
+[
+    nsis_installer(
+        name = "minimal_installer_log_" + level,
+        testable = True,
+        id = id,
+        components = [":minimal_component"],
+        product = "Minimal Installer Log " + level,
+        product_path = "Minimal Installer",
+        log_level = level,
+    )
+    for level, id in {
+        "none": "0e6c1f43-58a2-4c55-b0a5-3f6d2a9e8b01",
+        "debug": "8f2b5a10-6c3e-4d7f-a1b9-2e4c6d8f0a12",
+        "warn": "c3d9e7a1-2b4f-4e6a-8c0d-5f7a9b1c3e23",
+        "error": "6a8c0e2f-4d1b-4f3a-9e5c-7b9d1f3a5c34",
+    }.items()
+]
+
+[
+    nsis_installer_test(
+        name = "log_level_{}_install".format(level),
+        installer = ":minimal_installer_log_" + level,
+    )
+    for level in ["none", "debug", "warn", "error"]
+]
+
 nsis_directory(
     name = "test_root_dir",
     path = "C:\\ROOT",

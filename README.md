@@ -115,12 +115,18 @@ The installer action preserves the signing environment, including on Windows.
 - Writes to `32` or `64` registry depending on arch selected.
 - Asserts that the installer is being run on the correct architecture based
   on provided arch.
-- By default will allow 32bit installers to be installed on 64bit systems. This
-  can be disabled. The flag only relaxes bitwidth: 32bit installers that allow
-  64bit hosts skip architecture validation entirely, so (for example) an
-  `x86_32` installer may run under emulation on `arm64` Windows.
+- By default will allow 32bit installers to be installed on the 64bit system of
+  the same instruction set (`allow_32bit_on_64bit`): `x86_32` on `x86_64` and
+  `arm32` on `arm64`. Cross-ISA hosts (`x86_32` on `arm32`/`arm64`, `arm32` on
+  `x86_32`/`x86_64`) are always rejected. Disabling the flag requires an exact
+  architecture match.
 - Uses MUI for the UI.
-- Logs to StdOut if run from a console.
+- Logs to the details view, and to StdOut if run from a console. `log_level`
+  selects `none` (disabled), `debug`, `info` (default), `warn` or `error`.
+- The shell context (`SetShellVarContext` and the HKLM/HKCU choice) defaults to
+  the execution level. It is applied before the `pre_init`/`pre_uninit` hooks
+  and re-applied after them, so a hook may switch it with
+  `UpdateShellContextToAdmin`/`UpdateShellContextToCurrent`.
 - Ensures only one installer is running using a mutex.
 - Uninstalls previous installs when run.
 - Installs and updates windows services using `sc.exe`

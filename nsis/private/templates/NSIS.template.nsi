@@ -9,9 +9,16 @@ Unicode True
 {{- else }}
 !define REGISTRY_VIEW 32
 {{- end }}
-; Preserve the always-on, verbose logging of the original template.
+{{- with (ds "in").LogLevelDefine }}
 !define LOGGING_ENABLE
-!define LOGLEVEL_DEBUG
+!define {{ . }}
+{{- end }}
+{{- /* Defined before the includes so their compiled shell-context defaults match. */}}
+{{- if eq (ds "in").ExecutionLevel "admin" }}
+!define IS_ADMIN_EXECUTION_LEVEL 1
+{{- else }}
+!define IS_ADMIN_EXECUTION_LEVEL 0
+{{- end }}
 SetCompressor {{ (ds "in").Compressor }}
 SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 
@@ -112,10 +119,8 @@ RequestExecutionLevel admin
 
 {{- if eq (ds "in").ExecutionLevel "admin"}}
 InstallDirRegKey HKLM "${REG_KEY}" "${REG_KEY_INSTLOC}"
-!define IS_ADMIN_EXECUTION_LEVEL 1
 {{- else }}
 InstallDirRegKey HKCU "${REG_KEY}" "${REG_KEY_INSTLOC}"
-!define IS_ADMIN_EXECUTION_LEVEL 0
 {{- end}}
 
 VIProductVersion "${PRODUCT_VERSION}"
@@ -300,7 +305,7 @@ Var SectionSelected_{{.Name}}
 !insertmacro PreUninstall_{{.Name}} "$INSTDIR\{{.Directory}}"
 {{ end }}
 
-!insertmacro Log "Removing section {{.Name}}-{{.DisplayName}}"
+!insertmacro LogInfo "Removing section {{.Name}}-{{.DisplayName}}"
 {{- if .Service }}
 !insertmacro Service_Stop "{{ .Name }}" $0
 Sleep 2000
@@ -368,7 +373,7 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     {{ end }}
 
     Push $0
-    !insertmacro Log "Entering Section {{.Name}}-{{.DisplayName}}"
+    !insertmacro LogInfo "Entering Section {{.Name}}-{{.DisplayName}}"
 
     !insertmacro SetShellContext
     !insertmacro DefineRegView
@@ -527,15 +532,18 @@ Function .onInit
     {{- if (ds "in").TestableInstaller }}
     !insertmacro TestIdInit
     {{- end }}
+    !insertmacro SetShellContext
 
     {{ if (ds "in").HasPreInit }}
     !insertmacro PreInit
     {{ end }}
+    {{- /* Re-apply in case the hook changed the shell context. */}}
     !insertmacro SetShellContext
     !insertmacro DefineRegView
 
-    {{- /* allow_32bit_on_64bit relaxes bitwidth only; it never adds an ISA check. */}}
-    {{ if or (not (ds "in").ArchitectureAllow32On64) (ds "in").ArchitectureIs64 }}
+    {{ if and (ds "in").ArchitectureAllow32On64 (not (ds "in").ArchitectureIs64) }}
+    !insertmacro ValidateArch32On64 "{{ (ds "in").Architecture }}"
+    {{ else }}
     !insertmacro ValidateArch "{{ (ds "in").Architecture }}"
     {{ end }}
 
@@ -568,17 +576,20 @@ Function un.onInit
     {{- if (ds "in").TestableInstaller }}
     !insertmacro TestIdInit
     {{- end }}
+    !insertmacro un.SetShellContext
 
     {{ if (ds "in").HasPreUninit }}
     !insertmacro PreUnInit
     {{ end }}
+    {{- /* Re-apply in case the hook changed the shell context. */}}
     !insertmacro un.SetShellContext
     !insertmacro un.DefineRegView
 
     !insertmacro un.SetProductCode "${PRODUCT_ID}"
 
-    {{- /* allow_32bit_on_64bit relaxes bitwidth only; it never adds an ISA check. */}}
-    {{ if or (not (ds "in").ArchitectureAllow32On64) (ds "in").ArchitectureIs64 }}
+    {{ if and (ds "in").ArchitectureAllow32On64 (not (ds "in").ArchitectureIs64) }}
+    !insertmacro un.ValidateArch32On64 "{{ (ds "in").Architecture }}"
+    {{ else }}
     !insertmacro un.ValidateArch "{{ (ds "in").Architecture }}"
     {{ end }}
 
@@ -587,7 +598,7 @@ Function un.onInit
     !insertmacro un.GetRegistrySubKey "${_UNINSTALLER_BASE_KEY}\$product_code" "${UnInstallLocation}" $0
 
     ${If} "$0" == ""
-        !insertmacro Log "No install exists."
+        !insertmacro LogError "No install exists."
         MessageBox MB_ICONSTOP "No install exists." /SD IDOK
         Abort
     ${EndIf}
