@@ -7,6 +7,11 @@ def formatting_cases():
     for name, symbol, parameters in [
         ("char_to_ascii", "CharToASCII", ["in:character", "out:value:int"]),
         ("hex_to_bin", "Hex2Bin", ["in:value", "out:binary"]),
+        ("parse_bool", "ParseBool", ["in:value", "out:result"]),
+        ("parse_int", "ParseInt", ["in:value", "out:result"]),
+        ("parse_date", "ParseDate", ["in:value", "out:result"]),
+        ("parse_ipv4", "ParseIPv4", ["in:value", "out:result"]),
+        ("parse_net_address", "ParseNetAddress", ["in:value", "in:flags:int", "out:result"]),
     ]:
         cases += include_api_case(
             name = name,
