@@ -21,7 +21,7 @@ CASES = {}
 # first invocation is checked.
 _IMPURE = (
     "registry_set_", "registry_get_", "registry_remove", "registry_view_", "registry_pinned_", "uninstall_registry_",
-    "install_detail_", "eventlog_", "move_", "uninstall_existing", "icacls_", "mutex", "log",
+    "install_detail_", "eventlog_", "move_", "uninstall_existing", "icacls_", "mutex", "log", "console",
 )
 
 

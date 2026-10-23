@@ -1,6 +1,7 @@
 load("@rules_python//python:py_library.bzl", "py_library")
 load("//nsis/testing:defs.bzl", "nsis_compile_test")
 load(":arch.bzl", "arch_cases")
+load(":console.bzl", "console_cases")
 load(":defs.bzl", "include_api_suite", "include_label")
 load(":event_log.bzl", "event_log_cases")
 load(":formatting.bzl", "formatting_cases")
@@ -22,6 +23,7 @@ package(default_visibility = ["//visibility:private"])
 
 _INCLUDES = [
     "Arch.nsh",
+    "Console.nsh",
     "EventLog.nsh",
     "Formatting.nsh",
     "Guid.nsh",
@@ -72,6 +74,7 @@ _SC = sc_cases()
 include_api_suite(
     name = "tests",
     cases = arch_cases() +
+            console_cases() +
             event_log_cases() +
             formatting_cases() +
             guid_cases() +
