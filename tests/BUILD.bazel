@@ -1,6 +1,5 @@
 load("//tests:defs.bzl", "nsis_installer_test", "signing_env_test")
 load("//tests:analysis_tests.bzl", "eventlog_requires_admin_test")
-load("//tests:include_api_tests.bzl", "nsis_include_api_tests")
 load(
     "//nsis:defs.bzl",
     "nsis_component",
@@ -12,6 +11,7 @@ load(
 load("//nsis/private:transitions.bzl", "windows_source")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 load("@rules_python//python:py_test.bzl", "py_test")
+load("@rules_python//python:py_library.bzl", "py_library")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_signing//signing:defs.bzl", "self_signed_certificate", "sign")
 
@@ -20,6 +20,14 @@ exports_files([
     "__init__.py",
     "nsis_install_test.py",
 ], ["//visibility:private"])
+
+# Makes `tests` a regular package for the test modules beneath it.
+py_library(
+    name = "package",
+    testonly = True,
+    srcs = ["__init__.py"],
+    visibility = ["//tests:__subpackages__"],
+)
 
 package(default_visibility = ["//visibility:private"])
 
@@ -649,5 +657,3 @@ nsis_installer_test(
     installer = ":minimal_installer_user",
     must_have_files = ["README.md"],
 )
-
-nsis_include_api_tests()

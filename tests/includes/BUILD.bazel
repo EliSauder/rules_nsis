@@ -1,0 +1,92 @@
+load("@rules_python//python:py_library.bzl", "py_library")
+load("//nsis/testing:defs.bzl", "nsis_compile_test")
+load(":arch.bzl", "arch_cases")
+load(":defs.bzl", "include_api_suite", "include_label")
+load(":event_log.bzl", "event_log_cases")
+load(":formatting.bzl", "formatting_cases")
+load(":guid.bzl", "guid_cases")
+load(":icacls.bzl", "icacls_cases")
+load(":logging.bzl", "logging_cases")
+load(":move_file_folder.bzl", "move_file_folder_cases")
+load(":mutex.bzl", "mutex_cases")
+load(":product.bzl", "product_cases")
+load(":registry.bzl", "registry_cases")
+load(":sc.bzl", "sc_cases")
+load(":shell_context.bzl", "shell_context_cases")
+load(":testing.bzl", "testing_cases")
+load(":uninstall.bzl", "uninstall_cases")
+load(":utility.bzl", "utility_cases")
+load(":version.bzl", "version_cases")
+
+package(default_visibility = ["//visibility:private"])
+
+_INCLUDES = [
+    "Arch.nsh",
+    "EventLog.nsh",
+    "Formatting.nsh",
+    "Guid.nsh",
+    "iCacls.nsh",
+    "Logging.nsh",
+    "MoveFileFolder.nsh",
+    "Mutex.nsh",
+    "Product.nsh",
+    "Registry.nsh",
+    "Sc.nsh",
+    "ShellContext.nsh",
+    "Testing.nsh",
+    "Uninstall.nsh",
+    "Utility.nsh",
+    "Version.nsh",
+]
+
+py_library(
+    name = "common",
+    testonly = True,
+    srcs = [
+        "__init__.py",
+        "common.py",
+    ],
+    deps = [
+        "//nsis/testing",
+        "//tests:package",
+        "@rules_python//python/runfiles",
+    ],
+)
+
+# Every include must compile on its own, in both production and test builds.
+[
+    nsis_compile_test(
+        name = include.removesuffix(".nsh").lower() + suffix + "_compile_test",
+        src = include_label(include),
+        defines = defines,
+    )
+    for include in _INCLUDES
+    for suffix, defines in [
+        ("", {}),
+        ("_testable", {"TESTABLE_INSTALLER": ""}),
+    ]
+]
+
+_SC = sc_cases()
+
+include_api_suite(
+    name = "tests",
+    cases = arch_cases() +
+            event_log_cases() +
+            formatting_cases() +
+            guid_cases() +
+            icacls_cases() +
+            logging_cases() +
+            move_file_folder_cases() +
+            mutex_cases() +
+            product_cases() +
+            registry_cases() +
+            _SC.cases +
+            shell_context_cases() +
+            testing_cases() +
+            uninstall_cases() +
+            utility_cases() +
+            version_cases(),
+    extra_binaries = _SC.binaries,
+    extra_tests = _SC.tests,
+)

@@ -9,6 +9,18 @@ REGISTERS = tuple([str(i) for i in range(10)] + [f"R{i}" for i in range(10)])
 HEADER = "NSIS-HARNESS-2"
 ERRORS_RECORD = "harness.errors"
 STACK_RECORDS = ("expected", "actual", "underflow")
+KINDS = ("macro", "definition", "function", "condition")
+INVOCATIONS = {"definition": ("call", "value"), "condition": ("operand", "statement")}
+
+
+def inputs(spec):
+    """Parameters the caller supplies at run time, in declaration order."""
+    return [p for p in spec.get("parameters", []) if p["direction"] in ("in", "inout")]
+
+
+def outputs(spec):
+    """Parameters the harness reports back, in declaration order."""
+    return [p for p in spec.get("parameters", []) if p["direction"] in ("out", "inout")]
 
 
 def validate(spec):
@@ -19,12 +31,13 @@ def validate(spec):
     }
     if unknown:
         raise ValueError(f"Unknown description fields: {sorted(unknown)}")
-    if spec.get("kind") not in ("macro", "definition", "function"):
-        raise ValueError("kind must be macro, definition, or function")
-    if "invocation" in spec and (
-        spec["kind"] != "definition" or spec["invocation"] not in ("call", "value")
-    ):
-        raise ValueError("invocation must be call or value, for definitions only")
+    if spec.get("kind") not in KINDS:
+        raise ValueError("kind must be macro, definition, function, or condition")
+    if "invocation" in spec and spec["invocation"] not in INVOCATIONS.get(spec["kind"], ()):
+        raise ValueError(
+            "invocation must be call or value for definitions, "
+            "or operand or statement for conditions"
+        )
     if spec.get("context", "installer") not in ("installer", "uninstaller"):
         raise ValueError("context must be installer or uninstaller")
     if not isinstance(spec.get("symbol"), str) or not re.fullmatch(
@@ -39,7 +52,7 @@ def validate(spec):
         if (
             not isinstance(parameter, dict)
             or not {"name", "direction"} <= parameter.keys()
-            or parameter.keys() - {"name", "direction", "type"}
+            or parameter.keys() - {"name", "direction", "type", "value"}
         ):
             raise ValueError("Each parameter requires name and direction, with optional type")
         if parameter.get("type", "string") not in ("string", "int", "bool"):
@@ -50,14 +63,28 @@ def validate(spec):
         if name in names or name in ("output", "harness_uninstaller", "expected_exitcode", "self"):
             raise ValueError(f"Duplicate or reserved parameter name: {name}")
         names.add(name)
-        if parameter["direction"] not in ("in", "out", "inout"):
+        if parameter["direction"] not in ("in", "out", "inout", "const"):
             raise ValueError(f"Invalid direction for {name}")
+        if (parameter["direction"] == "const") != ("value" in parameter):
+            raise ValueError(f"Only const parameters, and every const parameter, need a value: {name}")
+        if parameter["direction"] == "const" and (
+            not isinstance(parameter["value"], str) or "type" in parameter
+            or any(c in parameter["value"] for c in "\r\n")
+        ):
+            raise ValueError(f"const {name} needs a single-line string value and no type")
         if spec["kind"] == "function" and parameter["direction"] == "inout":
             raise ValueError("Stack functions use separate in and out parameters")
     if spec.get("invocation") == "value" and (
         len(parameters) != 1 or parameters[0]["direction"] != "out"
     ):
         raise ValueError("A value definition requires exactly one out parameter")
+    if spec["kind"] == "condition":
+        results = [p for p in parameters if p["direction"] != "in" and p["direction"] != "const"]
+        operands = [p for p in parameters if p["direction"] in ("in", "const")]
+        if len(results) != 1 or results[0]["direction"] != "out" or results[0].get("type") != "bool":
+            raise ValueError("A condition requires exactly one out bool parameter")
+        if spec.get("invocation", "operand") == "operand" and len(operands) > 2:
+            raise ValueError("An operand condition takes at most two operands")
     defines = spec.get("defines", {})
     if not isinstance(defines, dict):
         raise ValueError("defines must be an object")
@@ -90,11 +117,62 @@ def write_records(path, records):
     return lines + ["FileClose $_harness_file"]
 
 
-def generate(spec, source, include_dirs=()):
-    validate(spec)
+def _operand(parameter):
+    if parameter["direction"] == "const":
+        return parameter["value"]
+    # Macro output operands must be variables, not quoted literal values.
+    variable = f'$_harness_param_{parameter["name"]}'
+    return f'"{variable}"' if parameter["direction"] == "in" else variable
+
+
+def _invocation(spec):
+    symbol = spec["symbol"]
     parameters = spec.get("parameters", [])
-    inputs = [p for p in parameters if p["direction"] != "out"]
-    outputs = [p for p in parameters if p["direction"] != "in"]
+    if spec["kind"] == "function":
+        pushed = [p for p in parameters if p["direction"] in ("in", "const")]
+        return [f"Push {_operand(p)}" for p in reversed(pushed)] + [f"Call {symbol}"]
+    if spec.get("invocation") == "value":
+        return [f'StrCpy $_harness_param_{outputs(spec)[0]["name"]} "${{{symbol}}}"']
+    if spec["kind"] == "condition":
+        result = f'$_harness_param_{outputs(spec)[0]["name"]}'
+        operands = [_operand(p) for p in parameters if p["direction"] in ("in", "const")]
+        if spec.get("invocation") == "statement":
+            opening = " ".join([f"${{{symbol}}}", *operands])
+        elif len(operands) == 2:
+            opening = f"${{If}} {operands[0]} ${{{symbol}}} {operands[1]}"
+        else:
+            opening = " ".join(["${If}", f"${{{symbol}}}", *operands])
+        return [opening, f'StrCpy {result} "1"', "${Else}", f'StrCpy {result} "0"', "${EndIf}"]
+    arguments = " ".join(_operand(p) for p in parameters)
+    command = f"!insertmacro {symbol}" if spec["kind"] == "macro" else f"${{{symbol}}}"
+    return [f"{command} {arguments}".rstrip()]
+
+
+def _defines(defines):
+    lines = []
+    for name, value in defines.items():
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+            raise ValueError(f"Invalid define name: {name}")
+        lines.append(f"!define {name} {literal(value)}")
+    return lines
+
+
+def _on_init(context, on_init):
+    if not on_init:
+        return []
+    name = "un.onInit" if context == "uninstaller" else ".onInit"
+    return [f"Function {name}", *on_init, "FunctionEnd"]
+
+
+def generate(spec, source, include_dirs=(), defines=None, on_init=()):
+    """Generates a harness script; spec=None only checks that source compiles."""
+    defines = dict(defines or {})
+    if spec is not None:
+        validate(spec)
+        overlap = defines.keys() & spec.get("defines", {}).keys()
+        if overlap:
+            raise ValueError(f"Defines set by both the harness and description: {sorted(overlap)}")
+        defines.update(spec.get("defines", {}))
     lines = [
         "Unicode true",
         "!pragma warning disable 6001",
@@ -109,12 +187,20 @@ def generate(spec, source, include_dirs=()):
     ]
     for directory in include_dirs:
         lines.append(f"!addincludedir {literal(str(directory))}")
-    for name, value in spec.get("defines", {}).items():
-        lines.append(f"!define {name} {literal(value)}")
+    lines += _defines(defines)
     # Include by basename: makensis also searches relative to the current script.
     lines += [
         f"!addincludedir {literal(str(Path(source).parent))}",
         f"!include {literal(Path(source).name)}",
+    ]
+    if spec is None:
+        if on_init:
+            raise ValueError("on_init requires a description")
+        return "\n".join(lines + ["Section", "SectionEnd"]) + "\n"
+    context = spec.get("context", "installer")
+    lines += _on_init(context, on_init)
+    parameters = spec.get("parameters", [])
+    lines += [
         "Var _harness_args",
         "Var _harness_output",
         "Var _harness_uninstaller",
@@ -129,7 +215,7 @@ def generate(spec, source, include_dirs=()):
     ]
     for register in REGISTERS:
         lines += [f"Var _harness_before_{register}", f"Var _harness_after_{register}"]
-    lines += [f"Var _harness_param_{p['name']}" for p in parameters]
+    lines += [f"Var _harness_param_{p['name']}" for p in parameters if p["direction"] != "const"]
     body = [
         "${GetParameters} $_harness_args",
         "ClearErrors",
@@ -137,7 +223,7 @@ def generate(spec, source, include_dirs=()):
         "IfErrors harness_bad_arguments",
         'StrCmp $_harness_output "" harness_bad_arguments',
     ]
-    for parameter in inputs:
+    for parameter in inputs(spec):
         name = parameter["name"]
         body += [
             "ClearErrors",
@@ -169,21 +255,7 @@ def generate(spec, source, include_dirs=()):
     # The sentinel sits beneath the API's operands; finding it on top afterwards
     # proves the API neither left extra values nor consumed the caller's values.
     body += ["Push $_harness_stack_sentinel", "SetErrorLevel 0", "ClearErrors"]
-    symbol = spec["symbol"]
-    if spec["kind"] == "function":
-        body += [f'Push "$_harness_param_{p["name"]}"' for p in reversed(inputs)]
-        body += [f"Call {symbol}"]
-    elif spec.get("invocation") == "value":
-        body += [f'StrCpy $_harness_param_{outputs[0]["name"]} "${{{symbol}}}"']
-    else:
-        # Macro output operands must be variables, not quoted literal values.
-        arguments = " ".join(
-            f'"$_harness_param_{p["name"]}"' if p["direction"] == "in"
-            else f'$_harness_param_{p["name"]}'
-            for p in parameters
-        )
-        command = f"!insertmacro {symbol}" if spec["kind"] == "macro" else f"${{{symbol}}}"
-        body += [f"{command} {arguments}".rstrip()]
+    body += _invocation(spec)
     # Capture the error flag before any harness instruction can change it.
     body += [
         'StrCpy $_harness_errors "0"',
@@ -192,7 +264,7 @@ def generate(spec, source, include_dirs=()):
         "GetErrorLevel $_harness_exitcode",
     ]
     if spec["kind"] == "function":
-        body += [f"Pop $_harness_param_{p['name']}" for p in outputs]
+        body += [f"Pop $_harness_param_{p['name']}" for p in outputs(spec)]
     body += [
         'StrCpy $_harness_stack_underflow "0"',
         "ClearErrors",
@@ -210,7 +282,7 @@ def generate(spec, source, include_dirs=()):
         ]
     body += write_records(
         "$_harness_output",
-        [(p["name"], f'$_harness_param_{p["name"]}') for p in outputs]
+        [(p["name"], f'$_harness_param_{p["name"]}') for p in outputs(spec)]
         + [(ERRORS_RECORD, "$_harness_errors")],
     )
     body += ['StrCmp $_harness_corrupted "0" harness_check_stack']
@@ -254,7 +326,7 @@ def generate(spec, source, include_dirs=()):
         "Quit",
         "harness_done:",
     ]
-    if spec.get("context", "installer") == "uninstaller":
+    if context == "uninstaller":
         lines += [
             "Section",
             "${GetParameters} $_harness_args",
@@ -279,13 +351,20 @@ def generate(spec, source, include_dirs=()):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--spec", required=True, type=Path)
+    parser.add_argument("--spec", type=Path)
     parser.add_argument("--source", required=True)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--include-dir", action="append", default=[])
+    parser.add_argument("--define", action="append", default=[], help="NAME=VALUE")
+    parser.add_argument("--on-init", action="append", default=[], help="NSIS line")
     args = parser.parse_args()
+    defines = {}
+    for define in args.define:
+        name, _, value = define.partition("=")
+        defines[name] = value
+    spec = json.loads(args.spec.read_text(encoding="utf-8")) if args.spec else None
     args.output.write_text(
-        generate(json.loads(args.spec.read_text(encoding="utf-8")), args.source, args.include_dir),
+        generate(spec, args.source, args.include_dir, defines, args.on_init),
         encoding="utf-8",
     )
 

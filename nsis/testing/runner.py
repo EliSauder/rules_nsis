@@ -8,7 +8,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from .generate import ERRORS_RECORD, HEADER, REGISTERS, STACK_RECORDS, validate
+from .generate import ERRORS_RECORD, HEADER, REGISTERS, STACK_RECORDS, inputs as input_parameters, outputs as output_parameters, validate
 
 
 def serialize_input(parameter, value):
@@ -156,15 +156,14 @@ class Harness:
         """
         if not (expect_errors is None or type(expect_errors) is bool):
             raise ValueError("expect_errors must be None, True, or False")
-        parameters = self.spec.get("parameters", [])
-        required = {p["name"] for p in parameters if p["direction"] != "out"}
+        required = {p["name"] for p in input_parameters(self.spec)}
         if inputs.keys() != required:
             raise ValueError(
                 f"Expected inputs {sorted(required)}; got {sorted(inputs)}"
             )
         serialized = {
             p["name"]: serialize_input(p, inputs[p["name"]])
-            for p in parameters if p["direction"] != "out"
+            for p in input_parameters(self.spec)
         }
         output = self.directory / "outputs.dat"
         output.unlink(missing_ok=True)
@@ -226,14 +225,14 @@ class Harness:
         values = {}
         errors = None
         if output.exists():
-            names = [p["name"] for p in parameters if p["direction"] != "in"]
+            names = [p["name"] for p in output_parameters(self.spec)]
             values = read_outputs(output, [*names, ERRORS_RECORD])
             if values[ERRORS_RECORD] not in ("0", "1"):
                 raise ValueError(f"Invalid error flag record {values[ERRORS_RECORD]!r}")
             errors = values[ERRORS_RECORD] == "1"
             values = {
                 p["name"]: deserialize_output(p, values[p["name"]])
-                for p in parameters if p["direction"] != "in"
+                for p in output_parameters(self.spec)
             }
         elif expected_exitcode == 0:
             raise AssertionError(
