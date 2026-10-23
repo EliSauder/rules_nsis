@@ -476,3 +476,19 @@ Numeric and boolean APIs use typed symbols. Service and ACL command results stay
 strings because `nsExec` can return `error` or `timeout`, not just decimal exit
 codes. Hex conversion emits four bits per hexadecimal digit (`f` becomes
 `1111`); invalid digits return an empty string and set the error flag.
+
+## Command line arguments
+
+The harness passes inputs as `/name=value` args, and the API runs in the same
+process, so it sees the real command line. `run()` accepts two keyword-only
+sequences of strings for APIs that parse it. They are passed verbatim, so
+quotes are kept as written:
+
+- `command_args` are inserted right after the executable. Put quoted args here:
+  the harness reads its own args with `GetOptions`, which mishandles quoted
+  args that follow a quoted value.
+- `command_tail` goes at the very end, where NSIS expects a `/D=` arg.
+
+```python
+api.run(command_args=['"/x=with spaces"', "/flag"])
+```

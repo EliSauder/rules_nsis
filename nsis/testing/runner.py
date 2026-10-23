@@ -44,12 +44,18 @@ def deserialize_output(parameter, value):
     return value
 
 
+class Raw(str):
+    """A command line arg passed verbatim, without the harness's quoting."""
+
+
 def command_line(command):
     # NSIS reads the raw Windows command line, not CRT argv. GetOptions needs
     # /name="value with spaces", not "/name=value with spaces".
     arguments = [subprocess.list2cmdline([command[0]])]
     for argument in command[1:]:
-        if argument.startswith("/") and "=" in argument:
+        if isinstance(argument, Raw):
+            arguments.append(str(argument))
+        elif argument.startswith("/") and "=" in argument:
             name, value = argument.split("=", 1)
             arguments.append(f'{name}="{value}"')
         else:
@@ -148,12 +154,20 @@ class Harness:
             encoding="utf-8", errors="replace", timeout=self.timeout, check=False,
         )
 
-    def run(self, *, expected_exitcode=0, expect_errors=None, **inputs):
+    def run(self, *, expected_exitcode=0, expect_errors=None, command_args=(), command_tail=(), **inputs):
         """Invoke the API once.
 
         expect_errors=True/False asserts the NSIS error flag after the call;
         None (default) leaves it unchecked but still reports Result.errors.
+        For APIs that read the command line, command_args are inserted verbatim
+        right after the executable, and command_tail is appended verbatim at the very
+        end, where NSIS expects a /D= arg. Quoted args must come first because
+        GetOptions, which the harness reads its own args with, mishandles
+        quoted args that follow a quoted value.
         """
+        for name, extra in (("command_args", command_args), ("command_tail", command_tail)):
+            if isinstance(extra, str) or not all(isinstance(a, str) for a in extra):
+                raise ValueError(f"{name} must be a sequence of strings")
         if not (expect_errors is None or type(expect_errors) is bool):
             raise ValueError("expect_errors must be None, True, or False")
         required = {p["name"] for p in input_parameters(self.spec)}
@@ -188,6 +202,7 @@ class Harness:
         ]
         if self.spec.get("context", "installer") == "uninstaller":
             command.append(f"_?={self.directory}")
+        command = [command[0], *map(Raw, command_args), *command[1:], *map(Raw, command_tail)]
         process = self._execute(command)
         if registers.exists():
             snapshots = read_outputs(
