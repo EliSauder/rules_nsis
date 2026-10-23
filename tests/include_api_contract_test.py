@@ -27,6 +27,7 @@ class ReachedInvocation(Exception):
 
 class ContractResult:
     returncode = 0
+    errors = False
 
     def __init__(self, spec):
         self.parameters = [p for p in spec["parameters"] if p["direction"] != "in"]
@@ -47,7 +48,8 @@ class ContractResult:
 
 
 def contract_harness(spec, *, stop_at_invocation=False):
-    def run(**inputs):
+    def run(expect_errors=None, **inputs):
+        assert expect_errors is None or type(expect_errors) is bool
         parameters = [p for p in spec["parameters"] if p["direction"] != "out"]
         assert inputs.keys() == {p["name"] for p in parameters}, inputs
         for parameter in parameters:
@@ -82,7 +84,7 @@ class DispatchContractTest(unittest.TestCase):
     def test_all_pure_case_inputs_and_expected_output_types(self):
         excluded = (
             "registry_", "uninstall_registry_", "install_detail_", "eventlog_",
-            "move_", "uninstall_existing",
+            "move_", "uninstall_existing", "icacls_",
         )
         with patch.object(include_api_test.platform, "machine", return_value="AMD64"):
             for case, spec in SPECS.items():

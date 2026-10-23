@@ -21,6 +21,8 @@ _PAIRED = [
     ("registry_set_dword", "SetRegistrySubKeyDWORD", ["in:key", "in:subkey", "in:value:int"]),
     ("registry_get_dword", "GetRegistrySubKey", ["in:key", "in:subkey", "out:value:int"]),
     ("registry_set_binary", "HarnessSetRegistryBinary", ["in:key", "in:subkey"]),
+    ("registry_set_binary_register", "HarnessSetRegistryBinaryRegister", ["in:key", "in:subkey"]),
+    ("registry_set_binary_test_id", "HarnessSetRegistryBinary", ["in:key", "in:subkey"]),
     ("registry_remove", "RemoveRegistryKey", ["in:key"]),
     ("test_id", "GetTestId", ["out:value"]),
     ("shell_context_admin", "UpdateShellContextToAdmin", []),
@@ -122,6 +124,9 @@ _BRANCH_ADAPTERS = [
     ("trim_quotes_special", "HarnessTrimQuotesSpecial", [
         "out:quoted", "out:empty", "out:left",
     ], {}),
+    ("move_file_twice", "HarnessMoveFileTwice", [
+        "in:first_source", "in:first_destination", "in:second_source", "in:second_destination",
+    ], {}),
 ]
 
 _NO_UNINSTALLER_SYMBOL = [
@@ -153,6 +158,14 @@ _UNPREFIXED_UNINSTALLER_SYMBOL = [
     "log_warn",
     "log_error",
     "log",
+]
+
+# Cases whose harness runs under an active test id ("framework-test-id").
+_TEST_ID_CASES = [
+    "test_id",
+    "registry_set_binary_test_id",
+    "eventlog_add_source",
+    "eventlog_remove_source",
 ]
 
 _PRODUCT_CODES = {
@@ -201,7 +214,7 @@ def nsis_include_api_tests():
             defines = {}
             if test_name in _PRODUCT_CODES:
                 defines["TEST_PRODUCT_CODE"] = _PRODUCT_CODES[test_name]
-            if name == "test_id":
+            if name in _TEST_ID_CASES:
                 defines["TEST_INITIAL_ID"] = "framework-test-id"
             nsis_symbol(
                 name = test_name + "_symbol",

@@ -37,6 +37,34 @@ FunctionEnd
     !insertmacro un.SetRegistrySubKeyBin "${KEY}" "${SUBKEY}" 000102FF
 !macroend
 
+; KEY and SUBKEY arrive in registers the Bin macro itself uses as scratch space.
+!macro HarnessSetRegistryBinaryRegister KEY SUBKEY
+    Push $0
+    Push $1
+    StrCpy $0 "${KEY}"
+    StrCpy $1 "${SUBKEY}"
+    !insertmacro SetRegistrySubKeyBin "$0" "$1" 0A0B
+    Pop $1
+    Pop $0
+!macroend
+
+!macro un.HarnessSetRegistryBinaryRegister KEY SUBKEY
+    Push $0
+    Push $1
+    StrCpy $0 "${KEY}"
+    StrCpy $1 "${SUBKEY}"
+    !insertmacro un.SetRegistrySubKeyBin "$0" "$1" 0A0B
+    Pop $1
+    Pop $0
+!macroend
+
+; MoveFile derives its labels from the call site, so repeated expansions in one
+; function (including through a wrapper macro) must still compile and run.
+!macro HarnessMoveFileTwice FIRST_SOURCE FIRST_DESTINATION SECOND_SOURCE SECOND_DESTINATION
+    ${MoveFile} "${FIRST_SOURCE}" "${FIRST_DESTINATION}"
+    ${MoveFile} "${SECOND_SOURCE}" "${SECOND_DESTINATION}"
+!macroend
+
 ; Exercise the public output operand alias that previously lost the result.
 !macro HarnessGetUninstallRegistryRegister SUBKEY RESULT
     Push $0
