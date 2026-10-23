@@ -8,13 +8,16 @@ def move_file_folder_cases():
         ("move_file", "MoveFile", ["in:source", "in:destination"]),
         ("move_folder", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
     ]:
-        cases += include_api_case(
-            name = name,
-            api = "move_file_folder",
-            include = "MoveFileFolder.nsh",
-            symbol = symbol,
-            parameters = parameters,
-        )
+        # $switch_overwrite replaces existing destinations regardless of age.
+        for suffix, on_init in [("", []), ("_overwrite", ["StrCpy $switch_overwrite 1"])]:
+            cases += include_api_case(
+                name = name + suffix,
+                api = "move_file_folder",
+                include = "MoveFileFolder.nsh",
+                symbol = symbol,
+                parameters = parameters,
+                on_init = on_init,
+            )
 
     # MoveFile derives its labels from the call site, so repeated expansions in
     # one function must still compile and run.

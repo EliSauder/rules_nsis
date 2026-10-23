@@ -17,6 +17,9 @@ def run_case(case, harness, args):
         harness.run().assert_outputs(value="framework-test-id")
     elif base == "test_id_set":
         assert harness.run(id="updated-test-id").returncode == 0
+    elif base == "test_id_init":
+        for test_id in ("from-command-line", "with spaces", ""):
+            harness.run(testid=test_id, expect_errors=False).assert_outputs(value=test_id)
     elif base in _CONDITIONS:
         harness.run().assert_outputs(matched=_CONDITIONS[base])
     else:

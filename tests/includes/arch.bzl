@@ -8,7 +8,6 @@ def arch_cases():
     cases = []
     for name, symbol, parameters in [
         ("arch_get", "GetArch", ["out:arch"]),
-        ("arch_detect", "DetectArch", []),
         ("arch_is_64_bit", "Is64Bit", ["out:value:bool"]),
         ("arch_is_32_bit", "Is32Bit", ["out:value:bool"]),
         ("arch_validate", "ValidateArch", ["in:expected"]),
@@ -22,6 +21,14 @@ def arch_cases():
             symbol = symbol,
             parameters = parameters,
         )
+    cases += include_api_case(
+        name = "arch_detect",
+        api = "arch",
+        include = "Arch.nsh",
+        src = "arch_adapters.nsh",
+        symbol = "HarnessDetectArch",
+        parameters = ["out:arch", "out:is64:bool", "out:is32:bool"],
+    )
     cases += include_api_case(
         name = "arch_is_native_arm32",
         api = "arch",

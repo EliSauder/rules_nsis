@@ -449,14 +449,18 @@ independently and in parallel. Each include has its own files in
 - `<api>.bzl` declares its cases with `include_api_case` (from `defs.bzl`).
 - `<api>_test.py` holds the cases' assertions.
 - `<api>_adapters.nsh`, where needed, adds `Harness*` macros for cases a direct
-  symbol call cannot express: aliasing registers as operands, or expanding a
-  macro more than once in one function. Prefer a direct symbol (with `const:`
+  symbol call cannot express: aliasing registers as operands, expanding a
+  macro more than once in one function, reading state a call leaves in globals
+  (`DetectArch`), or observing a command-line option (`TestIdInit` reads the
+  harness's `testid` input). Prefer a direct symbol (with `const:`
   params, defines, or `on_init`) whenever possible.
 
 Every include also has compile-only tests, with and without
 `TESTABLE_INSTALLER`. `service_lifecycle` drives a real stub service
 (`service_stub.c`) through every `Sc.nsh` macro; it needs an elevated test run
-and skips otherwise.
+and skips otherwise. Registry view cases (`registry_view_*`,
+`registry_pinned_*`) use HKLM, because both views share `HKCU\Software`, so
+they also need an elevated run.
 
 ```sh
 bazel build //tests/includes:binaries     # cross-compile on any host

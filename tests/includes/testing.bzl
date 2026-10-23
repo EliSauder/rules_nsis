@@ -24,6 +24,16 @@ def testing_cases():
         un_symbol = "SetTestId",
         parameters = ["in:id"],
     )
+    cases += include_api_case(
+        name = "test_id_init",
+        api = "testing",
+        include = "Testing.nsh",
+        src = "testing_adapters.nsh",
+        symbol = "HarnessTestIdInit",
+        un_symbol = "HarnessTestIdInit",
+        parameters = ["in:testid", "out:value"],
+    )
+
     # The production build (no TESTABLE_INSTALLER) is never in a test.
     for name, symbol, on_init, testable in [
         ("if_test", "IfTest", _TEST_ID, True),

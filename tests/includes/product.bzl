@@ -58,7 +58,9 @@ def product_cases():
     for name, symbol, parameters, code in [
         ("set_product_code", "SetProductCode", ["in:guid"], None),
         ("product_code", "GetProductCode", ["out:value"], "aabbccdd-eeff-0011-2233-445566778899"),
+        ("product_code_unset", "GetProductCode", ["out:value"], None),
         ("uninstall_registry_update", "UpdateUninstallRegistry", ["in:subkey", "in:value"], "11111111-1111-4111-8111-111111111111"),
+        ("uninstall_registry_update_dword", "UpdateUninstallRegistryDWORD", ["in:subkey", "in:value:int"], "22222222-2222-4222-8222-222222222222"),
         ("uninstall_registry_get", "GetUninstallRegistry", ["in:subkey", "out:value"], "33333333-3333-4333-8333-333333333333"),
         ("uninstall_registry_remove", "RemoveUninstallRegistry", [], "55555555-5555-4555-8555-555555555555"),
         ("install_detail_update", "UpdateInstallDetail", [

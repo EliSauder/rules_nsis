@@ -13,6 +13,10 @@ def _uninstall_registry(base, harness, path):
             harness.run(subkey="DisplayName", value="include API test")
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as handle:
                 assert winreg.QueryValueEx(handle, "DisplayName") == ("include API test", winreg.REG_SZ)
+        elif base == "uninstall_registry_update_dword":
+            harness.run(subkey="EstimatedSize", value=1234)
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as handle:
+                assert winreg.QueryValueEx(handle, "EstimatedSize") == (1234, winreg.REG_DWORD)
         elif base in ("uninstall_registry_get", "uninstall_registry_get_register"):
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, path) as handle:
                 winreg.SetValueEx(handle, "DisplayName", 0, winreg.REG_SZ, "seeded")
@@ -54,11 +58,14 @@ def run_case(case, harness, args):
         harness.run().assert_outputs(value=expected)
     elif base == "set_product_code":
         assert harness.run(guid="aabbccdd-eeff-0011-2233-445566778899").returncode == 0
+        harness.run(guid="not-a-guid", expected_exitcode=5)
+    elif base == "product_code_unset":
+        harness.run(expected_exitcode=6)
     elif base == "product_code":
         (code,) = args
         harness.run().assert_outputs(value="{" + code.upper() + "}")
     elif base in (
-        "uninstall_registry_update", "uninstall_registry_get",
+        "uninstall_registry_update", "uninstall_registry_update_dword", "uninstall_registry_get",
         "uninstall_registry_get_register", "uninstall_registry_remove",
     ):
         (code,) = args
