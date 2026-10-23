@@ -124,6 +124,25 @@ SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 {{- end }}
 !include Options.nsh
 
+{{- /* BEGIN shortcuts: state */}}
+{{- if (ds "in").HasShortcuts }}
+!include Shortcut.nsh
+Var __shortcuts_done
+Var __shortcuts_any
+Var __shortcuts_has_sm
+Var __shortcuts_has_dt
+Var __shortcuts_do_sm
+Var __shortcuts_do_dt
+Var __shortcuts_do_path
+Var __shortcuts_comp
+; <product key>\Shortcuts\<component>: where the component's links are recorded.
+Var __shortcuts_key
+Var __shortcuts_link
+Var __shortcuts_n
+Var __shortcuts_d
+{{- end }}
+{{- /* END shortcuts: state */}}
+
 Name "${PRODUCT}"
 OutFile "${OUTFILE_NAME}"
 InstallDir "${INSTALL_ROOT}\${SUB_PATH}"
@@ -193,6 +212,7 @@ InstType "{{.}}"
 
 !insertmacro MUI_PAGE_INSTFILES
 {{ template "optionPagesAt" "after_instfiles" }}
+!insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_CONFIRM
 
@@ -1178,6 +1198,11 @@ Var SectionSelected_{{.Name}}
 !insertmacro PreUninstall_{{.Name}} "$INSTDIR\{{.Directory}}"
 {{ end }}
 
+{{- if .HasShortcuts }}
+Push "{{.Name}}"
+Call un.__Shortcuts_Remove
+{{- end }}
+
 !insertmacro LogInfo "Removing section {{.Name}}-{{.DisplayName}}"
 {{- if .Service }}
 !insertmacro Service_Stop "{{ .Name }}" $0
@@ -1978,6 +2003,286 @@ FunctionEnd
 ; END command line
 ; ----------------------------------------------------
 
+
+{{- /* BEGIN shortcuts: functions */}}
+{{- /* Escapes a string for use inside an NSIS `...` literal. */}}
+{{define "scq"}}{{ . | strings.ReplaceAll "$" "$$" | strings.ReplaceAll "`" "$\\`" | strings.ReplaceAll "\n" "$\\n" }}{{end}}
+
+{{define "shortcutCreate"}}
+            Call __Shortcuts_Prepare
+            ${Shortcut_Create} "$__shortcuts_link" `$INSTDIR\{{ template "scq" .TargetRelative }}` `{{ template "scq" .Arguments }}` `{{ if .IconRelative }}$INSTDIR\{{ template "scq" .IconRelative }}{{ end }}` {{ .IconIndex }} `{{ template "scq" .Description }}`
+            Call __Shortcuts_Record
+{{end}}
+
+{{- if (ds "in").HasShortcuts }}
+; ----------------------------------------------------
+; Shortcuts
+; ----------------------------------------------------
+
+; Sets $__shortcuts_any, _has_sm and _has_dt from the installed components.
+Function __Shortcuts_Scan
+    Push $0
+    StrCpy $__shortcuts_any 0
+    StrCpy $__shortcuts_has_sm 0
+    StrCpy $__shortcuts_has_dt 0
+    {{- range (ds "in").ShortcutComponents }}
+    SectionGetFlags {{printf "${%v}" .Name}} $0
+    IntOp $0 $0 & ${SF_SELECTED}
+    ${If} $0 <> 0
+        StrCpy $__shortcuts_any 1
+        {{- if .HasStartMenu }}
+        StrCpy $__shortcuts_has_sm 1
+        {{- end }}
+        {{- if .HasDesktop }}
+        StrCpy $__shortcuts_has_dt 1
+        {{- end }}
+    ${EndIf}
+    {{- end }}
+    Pop $0
+FunctionEnd
+
+; Stack: folder. Pushes 1 for a relative folder without empty, "." or ".." parts.
+Function __Shortcuts_FolderValid
+    Exch $0
+    Push $1
+    Push $2
+    Push $3
+    StrCpy $3 ""
+    StrCpy $1 0
+    ${Do}
+        StrCpy $2 $0 1 $1
+        ${If} $2 == ""
+        ${OrIf} $2 == "\"
+            ${If} $3 == ""
+            ${OrIf} $3 == "."
+            ${OrIf} $3 == ".."
+                StrCpy $0 0
+                ${Break}
+            ${EndIf}
+            StrCpy $3 ""
+            ${If} $2 == ""
+                StrCpy $0 1
+                ${Break}
+            ${EndIf}
+        ${ElseIf} $2 == ":"
+        ${OrIf} $2 == "/"
+        ${OrIf} $2 == "*"
+        ${OrIf} $2 == "?"
+        ${OrIf} $2 == "<"
+        ${OrIf} $2 == ">"
+        ${OrIf} $2 == "|"
+        ${OrIf} $2 == "$\""
+            StrCpy $0 0
+            ${Break}
+        ${Else}
+            StrCpy $3 "$3$2"
+        ${EndIf}
+        IntOp $1 $1 + 1
+    ${Loop}
+    Pop $3
+    Pop $2
+    Pop $1
+    Exch $0
+FunctionEnd
+
+; Leaves $__opt_chk_err empty when the chosen shortcuts can be created.
+Function __Shortcuts_Validate
+    Push $0
+    StrCpy $__opt_chk_err ""
+    ${If} shortcuts ${Option_IsSet} enabled
+    ${AndIf} shortcuts ${Option_IsSet} start_menu
+    ${AndIf} $__shortcuts_has_sm == 1
+        Push $__opt_shortcuts_start_menu_folder
+        Call __Shortcuts_FolderValid
+        Pop $0
+        ${If} $0 != 1
+            StrCpy $__opt_chk_err "must be a relative folder name without empty, . or .. parts"
+        ${EndIf}
+    ${EndIf}
+    Pop $0
+FunctionEnd
+
+Function __Shortcuts_PostCreate
+    Push $0
+    GetDlgItem $0 $HWNDPARENT 2
+    EnableWindow $0 0
+    ${If} $__shortcuts_has_sm != 1
+        ShowWindow $__hnd_shortcuts_start_menu 0
+        ShowWindow $__hnd_shortcuts_start_menu_folder 0
+        ShowWindow $__hnd_shortcuts_start_menu_folder_l 0
+    ${EndIf}
+    ${IfNot} ${FileExists} "$DESKTOP\*.*"
+        ${NSD_Uncheck} $__hnd_shortcuts_desktop
+        ShowWindow $__hnd_shortcuts_desktop 0
+    ${ElseIf} $__shortcuts_has_dt != 1
+        ShowWindow $__hnd_shortcuts_desktop 0
+    ${EndIf}
+    Pop $0
+FunctionEnd
+
+; Stack: the link's path in $__shortcuts_link. Records the folders that do not
+; exist yet and that creating the link will create.
+Function __Shortcuts_Prepare
+    Push $0
+    Push $1
+    Push $2
+    Push $__shortcuts_link
+    Call _Shortcut_ParentDir
+    Pop $1
+    StrCpy $0 $1
+    StrCpy $2 ""
+    ${DoWhile} $0 != ""
+        ${If} ${FileExists} "$0\*.*"
+            ${Break}
+        ${EndIf}
+        StrCpy $2 $0
+        Push $0
+        Call _Shortcut_ParentDir
+        Pop $0
+    ${Loop}
+    ${If} $2 != ""
+    ${AndIf} $0 != ""
+        !insertmacro SetRegistrySubKeyStr "$__shortcuts_key" "d$__shortcuts_d" "$1"
+        !insertmacro SetRegistrySubKeyStr "$__shortcuts_key" "s$__shortcuts_d" "$0"
+        IntOp $__shortcuts_d $__shortcuts_d + 1
+    ${EndIf}
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+
+Function __Shortcuts_Record
+    ${If} ${FileExists} "$__shortcuts_link"
+        !insertmacro SetRegistrySubKeyStr "$__shortcuts_key" "$__shortcuts_n" "$__shortcuts_link"
+        IntOp $__shortcuts_n $__shortcuts_n + 1
+        !insertmacro LogInfo "Created shortcut $__shortcuts_link"
+    ${Else}
+        !insertmacro LogWarn "Unable to create shortcut $__shortcuts_link"
+    ${EndIf}
+FunctionEnd
+
+Function __Shortcuts_CreateAll
+    ${If} $__shortcuts_done == "1"
+        Return
+    ${EndIf}
+    StrCpy $__shortcuts_done 1
+    Push $0
+    !insertmacro SetShellContext
+    !insertmacro DefineRegView
+    Call __Shortcuts_Scan
+    Call __Shortcuts_Validate
+    ${If} $__opt_chk_err != ""
+        ${Cli_Fail} "Invalid value for option shortcuts.start_menu_folder: $__opt_chk_err"
+    ${EndIf}
+
+    StrCpy $__shortcuts_do_sm 0
+    StrCpy $__shortcuts_do_dt 0
+    StrCpy $__shortcuts_do_path 0
+    ${If} shortcuts ${Option_IsSet} enabled
+        StrCpy $__shortcuts_do_path 1
+        ${If} shortcuts ${Option_IsSet} start_menu
+            StrCpy $__shortcuts_do_sm 1
+        ${EndIf}
+        ${If} shortcuts ${Option_IsSet} desktop
+            StrCpy $__shortcuts_do_dt 1
+        ${EndIf}
+    ${EndIf}
+    {{- /* Server Core, service accounts and the like have no desktop. */}}
+    ${If} $__shortcuts_do_dt == 1
+    ${AndIf} $__shortcuts_has_dt == 1
+    ${AndIfNot} ${FileExists} "$DESKTOP\*.*"
+        !insertmacro LogWarn "There is no desktop, so no desktop shortcuts are created."
+        StrCpy $__shortcuts_do_dt 0
+    ${EndIf}
+
+    {{- range (ds "in").ShortcutComponents }}
+    SectionGetFlags {{printf "${%v}" .Name}} $0
+    IntOp $0 $0 & ${SF_SELECTED}
+    ${If} $0 <> 0
+        StrCpy $__shortcuts_comp "{{.Name}}"
+        !insertmacro GetProductKey $__shortcuts_key
+        StrCpy $__shortcuts_key "$__shortcuts_key\Shortcuts\$__shortcuts_comp"
+        StrCpy $__shortcuts_n 0
+        StrCpy $__shortcuts_d 0
+        {{- range .Shortcuts }}
+        {{- if .StartMenu }}
+        ${If} $__shortcuts_do_sm == 1
+            StrCpy $__shortcuts_link `$SMPROGRAMS\$__opt_shortcuts_start_menu_folder{{ if .StartMenuSubfolder }}\{{ template "scq" .StartMenuSubfolder }}{{ end }}\{{ template "scq" .LinkName }}.lnk`
+            {{- template "shortcutCreate" . }}
+        ${EndIf}
+        {{- end }}
+        {{- if .Desktop }}
+        ${If} $__shortcuts_do_dt == 1
+            StrCpy $__shortcuts_link `$DESKTOP\{{ template "scq" .LinkName }}.lnk`
+            {{- template "shortcutCreate" . }}
+        ${EndIf}
+        {{- end }}
+        {{- if .Path }}
+        ${If} $__shortcuts_do_path == 1
+            StrCpy $__shortcuts_link `{{ .LocationPath }}\{{ template "scq" .LinkName }}.lnk`
+            {{- template "shortcutCreate" . }}
+        ${EndIf}
+        {{- end }}
+        {{- end }}
+    ${EndIf}
+    {{- end }}
+
+    !insertmacro _Option_PersistOne shortcuts enabled
+    !insertmacro _Option_PersistOne shortcuts start_menu
+    !insertmacro _Option_PersistOne shortcuts start_menu_folder
+    !insertmacro _Option_PersistOne shortcuts desktop
+    Pop $0
+FunctionEnd
+
+; Stack: component name. Removes the links recorded for the component that
+; still point into $INSTDIR, then the folders that creating them created.
+Function un.__Shortcuts_Remove
+    Exch $0
+    Push $1
+    Push $2
+    Push $3
+    Push $4
+    !insertmacro un.GetProductKey $4
+    StrCpy $4 "$4\Shortcuts\$0"
+    StrCpy $1 0
+    ${Do}
+        !insertmacro un.GetRegistrySubKey "$4" "$1" $2
+        ${If} $2 == ""
+            ${Break}
+        ${EndIf}
+        ${un.Shortcut_RemoveIfOwned} "$2" "$INSTDIR"
+        IntOp $1 $1 + 1
+    ${Loop}
+    StrCpy $1 0
+    ${Do}
+        !insertmacro un.GetRegistrySubKey "$4" "d$1" $2
+        ${If} $2 == ""
+            ${Break}
+        ${EndIf}
+        IntOp $1 $1 + 1
+    ${Loop}
+    ${While} $1 > 0
+        IntOp $1 $1 - 1
+        !insertmacro un.GetRegistrySubKey "$4" "d$1" $2
+        !insertmacro un.GetRegistrySubKey "$4" "s$1" $3
+        ${un.Shortcut_RemoveEmptyDirs} "$2" "$3"
+    ${EndWhile}
+    !insertmacro un.RemoveRegistryKey "$4"
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+
+; Silent installs never show the Shortcuts page.
+Function .onInstSuccess
+    ${If} ${Silent}
+        Call __Shortcuts_CreateAll
+    ${EndIf}
+FunctionEnd
+{{- end }}
+{{- /* END shortcuts: functions */}}
 
 Function .onInit
     {{- if (ds "in").TestableInstaller }}
