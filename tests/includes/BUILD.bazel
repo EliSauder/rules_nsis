@@ -14,6 +14,7 @@ load(":product.bzl", "product_cases")
 load(":registry.bzl", "registry_cases")
 load(":sc.bzl", "sc_cases")
 load(":shell_context.bzl", "shell_context_cases")
+load(":shortcut.bzl", "shortcut_cases")
 load(":testing.bzl", "testing_cases")
 load(":uninstall.bzl", "uninstall_cases")
 load(":utility.bzl", "utility_cases")
@@ -35,6 +36,7 @@ _INCLUDES = [
     "Registry.nsh",
     "Sc.nsh",
     "ShellContext.nsh",
+    "Shortcut.nsh",
     "Testing.nsh",
     "Uninstall.nsh",
     "Utility.nsh",
@@ -86,6 +88,7 @@ include_api_suite(
             registry_cases() +
             _SC.cases +
             shell_context_cases() +
+            shortcut_cases() +
             testing_cases() +
             uninstall_cases() +
             utility_cases() +
