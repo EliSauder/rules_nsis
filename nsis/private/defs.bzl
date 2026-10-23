@@ -602,7 +602,10 @@ Notes:
 - HasShortcuts is available as a bool field.
 - HasEventLog is available as a bool field.
 - EventLog is available as a nsis_eventlog_source rule (same CamelCaseName field access).
-```
+
+Option values from `nsis_options_page`s are available in all hooks through
+`${Option_Get} <page> <key> $var`, also in uninstall hooks (from the persisted copy). Values from
+pages attached to a component are only meaningful when that component is installed.
 """,
         ),
         "pre_install": attr.label(

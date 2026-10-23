@@ -455,6 +455,12 @@ independently and in parallel. Each include has its own files in
   harness's `testid` input). Prefer a direct symbol (with `const:`
   params, defines, or `on_init`) whenever possible.
 
+The command line and options pages rely on includes with their own suites:
+`Console.nsh`, the `Parse*` functions of `Formatting.nsh`, `Cli.nsh`,
+`Shortcut.nsh` and `Options.nsh`. The generated installers that use them
+(options pages, `/COMPONENTS`, `/HELP`, shortcuts) are covered by the
+`installer_with_*` end-to-end tests in `tests/BUILD.bazel`.
+
 Every include also has compile-only tests, with and without
 `TESTABLE_INSTALLER`. `service_lifecycle` drives a real stub service
 (`service_stub.c`) through every `Sc.nsh` macro; it needs an elevated test run
