@@ -3,7 +3,22 @@
 Write an include, describe one entry point with `nsis_symbol`, and build a
 standalone test executable. Bazel generates the JSON description automatically;
 no handwritten JSON is needed. These harnesses do not use the installer
-end-to-end test rule. Existing include tests are unchanged.
+end-to-end test rule. The include API unit tests use one generated harness per
+entry point, so they can run independently and in parallel.
+
+Run `bazel build //tests:include_api_test_binaries` to cross-compile the suite.
+On Windows, run `bazel test //tests:include_api_tests`. Installer end-to-end
+tests remain separate `nsis_installer_test` targets.
+On any host, `bazel test //tests:include_api_contract_test` validates dispatch
+input names/types against every generated symbol, typed assertion expectations,
+and the audited mutex/registry operand preservation paths without running Windows.
+The Windows suite additionally exercises uninstall subprocess success/failure
+and `$0` output aliases under the normal register guards.
+
+Numeric and boolean APIs use typed symbols. Service and ACL command results stay
+strings because `nsExec` can return `error` or `timeout`, not just decimal exit
+codes. Hex conversion emits four bits per hexadecimal digit (`f` becomes `1111`);
+invalid digits return an empty string.
 
 ```starlark
 load("@rules_nsis//nsis/testing:defs.bzl", "nsis_symbol", "nsis_test_harness")
@@ -118,6 +133,118 @@ with Harness(typed_binary_path, typed_description_path, directory=test_tmpdir) a
     assert type(result.outputs["number"]) is int
     assert type(result.outputs["enabled"]) is bool
 ```
+
+## Testing installer behavior with `py_test`
+
+An installer behavior test can use the same harness to exercise a macro that
+creates a file and writes a registry value. This example also demonstrates
+typed inout/output values. The fixture preserves its scratch register; the
+harness independently checks all 20 NSIS registers around the API invocation.
+
+`BUILD.bazel`:
+
+```starlark
+load("@rules_python//python:py_test.bzl", "py_test")
+load("@rules_nsis//nsis/testing:defs.bzl", "nsis_symbol", "nsis_test_harness")
+
+nsis_symbol(
+    name = "installer_behavior_symbol",
+    symbol = "CreateAndRegister",
+    kind = "macro",
+    parameters = [
+        "in:path",
+        "in:key",
+        "in:text",
+        "inout:count:int",
+        "inout:enabled:bool",
+        "out:result",
+    ],
+    testonly = True,
+)
+
+nsis_test_harness(
+    name = "installer_behavior_harness",
+    src = "installer_behavior.nsh",
+    description = ":installer_behavior_symbol",
+    testonly = True,
+)
+
+py_test(
+    name = "installer_behavior_test",
+    srcs = ["installer_behavior_test.py"],
+    main = "installer_behavior_test.py",
+    args = [
+        "$(rlocationpath :installer_behavior_harness)",
+        "$(rlocationpath :installer_behavior_symbol)",
+    ],
+    data = [":installer_behavior_harness", ":installer_behavior_symbol"],
+    deps = ["@rules_nsis//nsis/testing", "@rules_python//python/runfiles"],
+    target_compatible_with = ["@platforms//os:windows"],
+)
+```
+
+`installer_behavior.nsh`:
+
+```nsis
+!macro CreateAndRegister PATH KEY TEXT COUNT ENABLED RESULT
+    Push $0
+    FileOpen $0 "${PATH}" w
+    FileWrite $0 "${TEXT}"
+    FileClose $0
+    WriteRegStr HKCU "Software\RulesNsisExample\${KEY}" "Value" "${TEXT}"
+    IntOp ${COUNT} ${COUNT} + 1
+    IntOp ${ENABLED} ${ENABLED} ^ 1
+    StrCpy ${RESULT} "${PATH}"
+    Pop $0
+!macroend
+```
+
+`installer_behavior_test.py`:
+
+```python
+import os
+import sys
+import uuid
+
+import winreg
+from python.runfiles import Runfiles
+from nsis.testing import Harness
+
+binary, description = sys.argv[1:]
+runfiles = Runfiles.Create()
+key = uuid.uuid4().hex
+registry_path = "Software\\RulesNsisExample\\" + key
+with Harness(
+    runfiles.Rlocation(binary),
+    runfiles.Rlocation(description),
+    directory=os.environ["TEST_TMPDIR"],
+) as api:
+    output_path = api.directory / "installer output.txt"
+    try:
+        result = api.run(
+            path=str(output_path),
+            key=key,
+            text="installed by test",
+            count=41,
+            enabled=False,
+        )
+        result.assert_outputs(count=42, enabled=True, result=str(output_path))
+        assert type(result.outputs["count"]) is int
+        assert type(result.outputs["enabled"]) is bool
+        assert output_path.read_text(encoding="utf-8") == "installed by test"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, registry_path) as handle:
+            assert winreg.QueryValueEx(handle, "Value") == ("installed by test", winreg.REG_SZ)
+    finally:
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, registry_path)
+        except FileNotFoundError:
+            pass
+```
+
+Because this example writes to disk and the registry rather than stdout/stderr,
+it asserts those side effects directly. Tests for logging APIs can assert
+`result.stdout` and `result.stderr` when the API writes to the inherited process
+handles.
 
 `Result.outputs` is a dictionary of `str`, `int`, or `bool` values according to
 the declaration. `assert_outputs` checks both values and exact Python types;
