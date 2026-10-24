@@ -11,6 +11,7 @@ exports_files([
     "controls_post_install.nsh",
     "controls_pre_uninstall.nsh",
     "long_list_post_install.nsh",
+    "long_list_pre_uninstall.nsh",
     "options_post_install.nsh",
     "options_pre_uninstall.nsh",
     "test_icon.ico",

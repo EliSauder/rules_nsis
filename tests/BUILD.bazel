@@ -895,6 +895,7 @@ nsis_component(
     srcs = [":nsis_files"],
     selection_mode = "default",
     post_install = "//tests/testdata:long_list_post_install.nsh",
+    pre_uninstall = "//tests/testdata:long_list_pre_uninstall.nsh",
 )
 
 nsis_installer(
