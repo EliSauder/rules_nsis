@@ -358,9 +358,9 @@ def _get_installer_cmd(installer, install_root, config):
         str(installer),
         "/S",
         f"/TESTID={TEST_ID}",
-    ] + installer_args + [
-        f"/D={install_root}"
-    ]
+    ] + installer_args
+    if not config.get("reinstall_without_dir"):
+        cmd.append(f"/D={install_root}")
     return cmd
 
 def _validate_removed_files(testcase: unittest.TestCase, config: dict, install_root: str):
@@ -446,6 +446,15 @@ def _validate_services(testcase, config, install_root):
 
         testcase.assertEqual(val["description"], svc.description(), f"Description '{svc.description()}' not equal expected '{val['description']}'")
 
+def _validate_file_contents(testcase, expected: dict, root: str):
+    for path, content in expected.items():
+        if not os.path.isabs(path):
+            path = os.path.join(root, path)
+        testcase.assertTrue(os.path.isfile(path), f"Expected file missing: {path}")
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            actual = f.read().replace("\r\n", "\n")
+        testcase.assertEqual(content, actual, f"Unexpected content in {path}")
+
 def _validate_install(testcase, install_root, subpath, appkey, config, installer):
     installer_cmd = _get_installer_cmd(installer, install_root, config)
 
@@ -476,6 +485,8 @@ def _validate_install(testcase, install_root, subpath, appkey, config, installer
         _validate_files(testcase, config, install_root)
     with testcase.subTest(msg="Validate Installed Directories"):
         _validate_directories(testcase, config)
+    with testcase.subTest(msg="Validate Installed File Contents"):
+        _validate_file_contents(testcase, config.get("expected_file_contents", {}), install_root)
     with testcase.subTest(msg="Validate Installed Registry Keys"):
         _validate_reg(testcase, config, install_root, subpath, appkey)
     with testcase.subTest(msg="Validate Installed Services"):
@@ -504,6 +515,8 @@ def _validate_uninstall(testcase, install_root, subpath, appkey, config, runun=T
         log.debug("nsis uninstall stdout=%r", proc.stdout)
         log.debug("nsis uninstall stderr=%r", proc.stderr)
 
+    with testcase.subTest(msg="Validate Uninstall File Contents"):
+        _validate_file_contents(testcase, config.get("expected_uninstall_file_contents", {}), TEST_TMPDIR)
     with testcase.subTest(msg="Validate Removed Files"):
         _validate_removed_files(testcase, config, install_root)
     with testcase.subTest(msg="Validate Removed Directories"):
@@ -544,6 +557,11 @@ class NsisInstallerTest(unittest.TestCase):
 
         install_root = _get_install_root()
         subpath, appkey = _get_app_key_and_subpath(config)
+
+        if config.get("reinstall_without_dir"):
+            first = [str(installer), "/S", f"/TESTID={TEST_ID}", f"/D={install_root}"]
+            proc = subprocess.run(first, capture_output=True, text=True, timeout=120, check=False, env=env)
+            self.assertEqual(proc.returncode, 0, f"First install failed\ncmd: {first}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
         res = _validate_install(self, install_root, subpath, appkey, config, installer)
         if res:

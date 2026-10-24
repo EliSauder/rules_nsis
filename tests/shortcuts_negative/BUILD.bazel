@@ -1,0 +1,120 @@
+load("//tests:analysis_tests.bzl", "shortcut_failure_test")
+
+shortcut_failure_test(
+    name = "not_installed",
+    expected = "which component",
+    installed = False,
+    shortcut = {},
+)
+
+shortcut_failure_test(
+    name = "empty_locations",
+    expected = "locations must not be empty",
+    shortcut = {"locations": []},
+)
+
+shortcut_failure_test(
+    name = "unknown_location",
+    expected = "unknown location 'taskbar'",
+    shortcut = {"locations": ["taskbar"]},
+)
+
+shortcut_failure_test(
+    name = "duplicate_locations",
+    expected = "contains duplicates",
+    shortcut = {"locations": ["desktop", "desktop"]},
+)
+
+shortcut_failure_test(
+    name = "path_needs_location_path",
+    expected = "location_path is required",
+    shortcut = {"locations": ["path"]},
+)
+
+shortcut_failure_test(
+    name = "location_path_without_path",
+    expected = "location_path is only valid",
+    shortcut = {"location_path": "C:\\Links"},
+)
+
+shortcut_failure_test(
+    name = "relative_location_path",
+    expected = "must be a drive path",
+    shortcut = {
+        "locations": ["path"],
+        "location_path": "Links",
+    },
+)
+
+shortcut_failure_test(
+    name = "subfolder_without_start_menu",
+    expected = "start_menu_subfolder is only valid",
+    shortcut = {
+        "locations": ["desktop"],
+        "start_menu_subfolder": "Tools",
+    },
+)
+
+shortcut_failure_test(
+    name = "subfolder_dotdot",
+    expected = "must not contain '..' segments",
+    shortcut = {"start_menu_subfolder": "a\\..\\b"},
+)
+
+shortcut_failure_test(
+    name = "bad_display_name",
+    expected = "not valid in a file name",
+    shortcut = {"display_name": "a:b"},
+)
+
+shortcut_failure_test(
+    name = "subpath_on_file",
+    expected = "target_subpath is only valid when target is a directory",
+    shortcut = {"target_subpath": "README.md"},
+)
+
+shortcut_failure_test(
+    name = "subpath_missing_for_dir",
+    expected = "is a directory; target_subpath is required",
+    shortcut = {"target": ":subpath_missing_for_dir_tree"},
+    tree = True,
+)
+
+shortcut_failure_test(
+    name = "absolute_subpath",
+    expected = "must be relative",
+    shortcut = {
+        "target": ":absolute_subpath_tree",
+        "target_subpath": "\\README.md",
+    },
+    tree = True,
+)
+
+shortcut_failure_test(
+    name = "empty_segment_subpath",
+    expected = "must not have empty segments",
+    shortcut = {
+        "target": ":empty_segment_subpath_tree",
+        "target_subpath": "a\\\\README.md",
+    },
+    tree = True,
+)
+
+shortcut_failure_test(
+    name = "icon_subpath_without_icon",
+    expected = "icon_subpath requires icon",
+    shortcut = {"icon_subpath": "x.ico"},
+)
+
+shortcut_failure_test(
+    name = "negative_icon_index",
+    expected = "icon_index must not be negative",
+    shortcut = {"icon_index": -1},
+)
+
+shortcut_failure_test(
+    name = "duplicate_link_names",
+    expected = "both create ",
+    shortcut = {"display_name": "Same"},
+    shortcut2 = {"display_name": "same"},
+)

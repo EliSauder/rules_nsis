@@ -2,7 +2,7 @@
 !define __INCLUDE_TESTING
 
 !include LogicLib.nsh
-!include FileFunc.nsh
+!include Cli.nsh
 
 !ifdef TESTABLE_INSTALLER
 Var TestId
@@ -17,12 +17,12 @@ Var TestId
 
 !macro TestIdInit
 !ifdef TESTABLE_INSTALLER
-    Push $0
-    ${GetParameters} $0
+    !ifdef __UNINSTALL__
+        ${un.Cli_GetArgValue} "/TESTID" $TestId
+    !else
+        ${Cli_GetArgValue} "/TESTID" $TestId
+    !endif
     ClearErrors
-    ${GetOptions} $0 "/TESTID=" $TestId
-    ClearErrors
-    Pop $0
 !endif
 !macroend
 !define TestIdInit `!insertmacro TestIdInit`

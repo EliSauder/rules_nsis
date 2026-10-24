@@ -30,6 +30,31 @@ def _uninstall_registry(base, harness, path):
         common.delete_registry_tree(winreg, path)
 
 
+def _product_registry(base, harness, path):
+    import winreg
+
+    try:
+        if base == "product_registry_update":
+            harness.run(subkey="InstallDir", value="C:\\product")
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path) as handle:
+                assert winreg.QueryValueEx(handle, "InstallDir") == ("C:\\product", winreg.REG_SZ)
+        elif base == "product_registry_get":
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, path) as handle:
+                winreg.SetValueEx(handle, "InstallDir", 0, winreg.REG_SZ, "seeded")
+            harness.run(subkey="InstallDir").assert_outputs(value="seeded")
+            harness.run(subkey="Missing").assert_outputs(value="")
+        else:
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, path + "\\Options") as handle:
+                winreg.SetValueEx(handle, "page.key", 0, winreg.REG_SZ, "remove me")
+            assert harness.run(child="Options").returncode == 0
+            common.assert_key_missing(winreg, path + "\\Options")
+            winreg.OpenKey(winreg.HKEY_CURRENT_USER, path).Close()
+            assert harness.run(child="").returncode == 0
+            common.assert_key_missing(winreg, path)
+    finally:
+        common.delete_registry_tree(winreg, path)
+
+
 def _install_detail(base, harness):
     import winreg
 
@@ -59,6 +84,13 @@ def run_case(case, harness, args):
     elif base == "set_product_code":
         assert harness.run(guid="aabbccdd-eeff-0011-2233-445566778899").returncode == 0
         harness.run(guid="not-a-guid", expected_exitcode=5)
+    elif base == "set_product_key":
+        assert harness.run(path="Publisher\\Product").returncode == 0
+        harness.run(path="", expected_exitcode=5)
+    elif base == "product_key":
+        harness.run().assert_outputs(value="SOFTWARE\\Publisher\\Product")
+    elif base == "product_key_unset":
+        harness.run(expected_exitcode=6)
     elif base == "product_code_unset":
         harness.run(expected_exitcode=6)
     elif base == "product_code":
@@ -70,6 +102,9 @@ def run_case(case, harness, args):
     ):
         (code,) = args
         _uninstall_registry(base, harness, common.uninstall_key(code))
+    elif base in ("product_registry_update", "product_registry_get", "product_registry_remove"):
+        (path,) = args
+        _product_registry(base, harness, "Software\\" + path)
     elif base in ("install_detail_update", "install_detail_get"):
         _install_detail(base, harness)
     else:

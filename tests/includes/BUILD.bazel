@@ -1,6 +1,8 @@
 load("@rules_python//python:py_library.bzl", "py_library")
 load("//nsis/testing:defs.bzl", "nsis_compile_test")
 load(":arch.bzl", "arch_cases")
+load(":cli.bzl", "cli_cases")
+load(":console.bzl", "console_cases")
 load(":defs.bzl", "include_api_suite", "include_label")
 load(":event_log.bzl", "event_log_cases")
 load(":formatting.bzl", "formatting_cases")
@@ -9,10 +11,12 @@ load(":icacls.bzl", "icacls_cases")
 load(":logging.bzl", "logging_cases")
 load(":move_file_folder.bzl", "move_file_folder_cases")
 load(":mutex.bzl", "mutex_cases")
+load(":options.bzl", "options_cases")
 load(":product.bzl", "product_cases")
 load(":registry.bzl", "registry_cases")
 load(":sc.bzl", "sc_cases")
 load(":shell_context.bzl", "shell_context_cases")
+load(":shortcut.bzl", "shortcut_cases")
 load(":testing.bzl", "testing_cases")
 load(":uninstall.bzl", "uninstall_cases")
 load(":utility.bzl", "utility_cases")
@@ -22,6 +26,8 @@ package(default_visibility = ["//visibility:private"])
 
 _INCLUDES = [
     "Arch.nsh",
+    "Cli.nsh",
+    "Console.nsh",
     "EventLog.nsh",
     "Formatting.nsh",
     "Guid.nsh",
@@ -29,10 +35,12 @@ _INCLUDES = [
     "Logging.nsh",
     "MoveFileFolder.nsh",
     "Mutex.nsh",
+    "Options.nsh",
     "Product.nsh",
     "Registry.nsh",
     "Sc.nsh",
     "ShellContext.nsh",
+    "Shortcut.nsh",
     "Testing.nsh",
     "Uninstall.nsh",
     "Utility.nsh",
@@ -72,6 +80,8 @@ _SC = sc_cases()
 include_api_suite(
     name = "tests",
     cases = arch_cases() +
+            cli_cases() +
+            console_cases() +
             event_log_cases() +
             formatting_cases() +
             guid_cases() +
@@ -79,10 +89,12 @@ include_api_suite(
             logging_cases() +
             move_file_folder_cases() +
             mutex_cases() +
+            options_cases() +
             product_cases() +
             registry_cases() +
             _SC.cases +
             shell_context_cases() +
+            shortcut_cases() +
             testing_cases() +
             uninstall_cases() +
             utility_cases() +

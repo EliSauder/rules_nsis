@@ -7,7 +7,12 @@ load(
     "nsis_installer",
     "nsis_directory",
     "nsis_eventlog_source",
+    "nsis_option",
+    "nsis_option_group",
+    "nsis_options_page",
+    "nsis_shortcut",
 )
+load("//nsis/private:dirrule.bzl", "dirrule")
 load("//nsis/private:transitions.bzl", "windows_source")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 load("@rules_python//python:py_test.bzl", "py_test")
@@ -278,6 +283,41 @@ nsis_installer_test(
 )
 
 nsis_component(
+    name = "hook_group_component",
+    srcs = [":nsis_files"],
+    selection_mode = "default",
+    pre_install = "//tests/testdata:hook_pre_install.nsh",
+    post_install = "//tests/testdata:hook_post_install.nsh",
+    pre_uninstall = "//tests/testdata:hook_pre_uninstall.nsh",
+)
+
+nsis_component_group(
+    name = "hook_group",
+    components = [":hook_group_component"],
+)
+
+nsis_installer(
+    name = "installer_with_group_hooks",
+    testable = True,
+    id = "3c9d1f0e-6a52-4b1c-9f43-5a8e2d7b1c64",
+    components = [":hook_group"],
+    product = "Installer Group Hooks",
+    product_path = "Installer Group Hooks",
+)
+
+# The hooks write hook_pre.txt and hook_post.txt, so they are only present when
+# hooks of components nested in groups are rendered and included.
+nsis_installer_test(
+    name = "installer_with_group_hooks_test",
+    installer = ":installer_with_group_hooks",
+    must_have_files = [
+        "README.md",
+        "hook_pre.txt",
+        "hook_post.txt",
+    ],
+)
+
+nsis_component(
     name = "minimal_component_with_dir",
     directory = "Component",
     srcs = [":nsis_files"],
@@ -296,6 +336,14 @@ nsis_installer_test(
     name = "minimal_installer_with_dir_test",
     installer = ":minimal_installer_with_dir",
     must_have_files = ["Component/README.md"],
+)
+
+# A reinstall without /D= goes to the directory of the previous install.
+nsis_installer_test(
+    name = "minimal_installer_with_dir_reinstall_test",
+    installer = ":minimal_installer_with_dir",
+    must_have_files = ["Component/README.md"],
+    reinstall_without_dir = True,
 )
 
 nsis_component(
@@ -656,4 +704,478 @@ nsis_installer_test(
     name = "minimal_installer_user_test",
     installer = ":minimal_installer_user",
     must_have_files = ["README.md"],
+)
+
+
+_CONTROLS_DEFAULTS = "\n".join([
+    "release_date=2024-02-29",
+    "server_ip=10.0.0.1",
+    "gateway=10.0.0.2:8080",
+    "peer=::1",
+    "flavor=choc",
+    "toppings=sprinkles|nuts",
+    "extras=",
+    "note=first\\nsecond",
+    "note_text=first",
+    "second",
+    "config_file=",
+    "data_dir=",
+    "host_name=alpha",
+    "",
+])
+
+_CONTROLS_CLI = "\n".join([
+    "release_date=2030-12-31",
+    "server_ip=192.168.1.10",
+    "gateway=10.1.2.3:99",
+    "peer=2001:db8::1",
+    "flavor=mint",
+    "toppings=sprinkles|fudge",
+    "extras=a|c",
+    "note=x\\\\y\\nz",
+    "note_text=x\\y",
+    "z",
+    "config_file=C:\\Windows\\notepad.exe",
+    "data_dir=C:\\Windows",
+    "host_name=gamma",
+    "",
+])
+
+nsis_option(name = "enable_extras", key = "enable_extras", control = "checkbox", default = "1", label_text = "Install extras")
+
+nsis_option(name = "extras_name", control = "text", default = "extra", enabled_by = ":enable_extras", required = True, max_length = 20)
+
+nsis_option(name = "port", control = "number", min = "1", max = "65535", default = "8080")
+
+nsis_option(name = "mode", control = "droplist", choices = ["fast", "slow"])
+
+nsis_option(name = "level", control = "radio", choices = ["a", "b", "c"], default = "b", description = "The level of detail.")
+
+nsis_option(name = "token", control = "password", default = "secret")
+
+nsis_option_group(
+    name = "extras_group",
+    options = [":extras_name", ":port"],
+    enabled_by = ":enable_extras",
+)
+
+nsis_options_page(
+    name = "install_settings",
+    title = "Install Settings",
+    subtitle = "Choose the settings",
+    position = "after_directory",
+    options = [
+        ":enable_extras",
+        ":extras_group",
+        ":mode",
+    ],
+)
+
+nsis_options_page(
+    name = "advanced_settings",
+    position = "after_license",
+    options = [":level", ":token"],
+)
+
+nsis_option(name = "feature", control = "checkbox")
+
+nsis_option(name = "tag", control = "text", default = "comp")
+
+nsis_options_page(
+    name = "component_settings",
+    position = "after_components",
+    options = [":feature", ":tag"],
+)
+
+nsis_component(
+    name = "options_component",
+    srcs = [":nsis_files"],
+    selection_mode = "default",
+    options_pages = [":component_settings"],
+    post_install = "//tests/testdata:options_post_install.nsh",
+    pre_uninstall = "//tests/testdata:options_pre_uninstall.nsh",
+)
+
+nsis_installer(
+    name = "installer_with_options",
+    testable = True,
+    id = "9e1c4b52-7d3a-4f08-b6a1-2c5d8e0f3a77",
+    components = [":options_component"],
+    options_pages = [":install_settings", ":advanced_settings"],
+    product = "Installer With Options",
+    product_path = "Installer With Options",
+)
+
+nsis_installer_test(
+    name = "installer_with_options_test",
+    installer = ":installer_with_options",
+    must_have_files = ["README.md"],
+    expected_file_contents = {
+        "options_install.txt": "enable_extras=1\nextras_name=extra\nport=8080\nmode=fast\nlevel=b\ntoken=secret\nfeature=0\ntag=comp\n",
+    },
+    expected_uninstall_file_contents = {
+        "options_uninstall.txt": "enable_extras=1\nextras_name=extra\nport=8080\nmode=fast\nlevel=b\ntoken=secret\nfeature=0\ntag=comp\n",
+    },
+)
+
+nsis_installer_test(
+    name = "installer_with_options_cli_test",
+    installer = ":installer_with_options",
+    must_have_files = ["README.md"],
+    installer_args = [
+        "/O:install_settings.enable_extras=0",
+        "/O:install_settings.port=9090",
+        "/O:install_settings.mode=slow",
+        "/O:advanced_settings.token=abc",
+        "/O:component_settings.tag=zz",
+    ],
+    expected_file_contents = {
+        "options_install.txt": "enable_extras=0\nextras_name=extra\nport=9090\nmode=slow\nlevel=b\ntoken=abc\nfeature=0\ntag=zz\n",
+    },
+    expected_uninstall_file_contents = {
+        "options_uninstall.txt": "enable_extras=0\nextras_name=extra\nport=9090\nmode=slow\nlevel=b\ntoken=secret\nfeature=0\ntag=zz\n",
+    },
+)
+
+nsis_installer_test(
+    name = "installer_with_options_invalid_value_test",
+    installer = ":installer_with_options",
+    installer_args = ["/O:install_settings.port=99999"],
+    expected_installer_exitcode = 2,
+)
+
+nsis_installer_test(
+    name = "installer_with_options_unknown_option_test",
+    installer = ":installer_with_options",
+    installer_args = ["/O:install_settings.nope=1"],
+    expected_installer_exitcode = 2,
+)
+
+# One page per group of controls; together they cover every control kind.
+nsis_option(name = "note", control = "richedit", lines = 2, max_length = 60, default = "first\\nsecond")
+
+nsis_option(name = "config_file", control = "file_request", filter = "Executables|*.exe|All files|*.*", must_exist = True)
+
+nsis_option(name = "data_dir", control = "dir_request", must_exist = True)
+
+nsis_option(name = "host_name", control = "combobox", choices = ["alpha", "beta"], default = "alpha", max_length = 20)
+
+nsis_options_page(
+    name = "text_controls",
+    position = "after_directory",
+    options = [":note", ":config_file", ":data_dir", ":host_name"],
+)
+
+nsis_option(name = "flavor", control = "listbox", choices = ["vanilla", "choc", "mint"], default = "choc", lines = 2)
+
+nsis_option(name = "toppings", control = "sorted_listbox", multi_select = True, choices = ["sprinkles", "nuts", "fudge"], default = "nuts|sprinkles", lines = 3)
+
+nsis_option(name = "extras", control = "listbox", multi_select = True, choices = ["a", "b", "c"], lines = 2)
+
+nsis_options_page(
+    name = "list_controls",
+    position = "after_license",
+    options = [":flavor", ":toppings", ":extras"],
+)
+
+nsis_option(name = "release_date", control = "date", min = "2020-01-01", max = "2030-12-31", default = "2024-02-29")
+
+nsis_option(name = "server_ip", control = "ip_address", default = "10.0.0.1")
+
+nsis_option(name = "gateway", control = "net_address", address_types = ["ipv4", "with_port"], default = "10.0.0.2:8080")
+
+nsis_option(name = "peer", control = "net_address", address_types = ["ipv6"], default = "::1")
+
+nsis_options_page(
+    name = "value_controls",
+    position = "after_welcome",
+    options = [":release_date", ":server_ip", ":gateway", ":peer"],
+)
+
+nsis_component(
+    name = "controls_component",
+    srcs = [":nsis_files"],
+    selection_mode = "default",
+    post_install = "//tests/testdata:controls_post_install.nsh",
+    pre_uninstall = "//tests/testdata:controls_pre_uninstall.nsh",
+)
+
+nsis_installer(
+    name = "installer_with_controls",
+    testable = True,
+    id = "3f6a8c21-5b7e-4d90-a1c4-8e2b7d9f0a15",
+    components = [":controls_component"],
+    options_pages = [":text_controls", ":list_controls", ":value_controls"],
+    product = "Installer With Controls",
+    product_path = "Installer With Controls",
+)
+
+nsis_installer_test(
+    name = "installer_with_controls_test",
+    installer = ":installer_with_controls",
+    must_have_files = ["README.md"],
+    expected_file_contents = {
+        "controls_install.txt": _CONTROLS_DEFAULTS,
+    },
+    expected_uninstall_file_contents = {
+        "controls_uninstall.txt": _CONTROLS_DEFAULTS,
+    },
+)
+
+nsis_installer_test(
+    name = "installer_with_controls_cli_test",
+    installer = ":installer_with_controls",
+    must_have_files = ["README.md"],
+    installer_args = [
+        "/O:value_controls.release_date=2030-12-31",
+        "/O:value_controls.server_ip=192.168.001.010",
+        "/O:value_controls.gateway=10.1.2.3:99",
+        "/O:value_controls.peer=2001:db8::1",
+        "/O:list_controls.flavor=MINT",
+        "/O:list_controls.toppings=fudge|SPRINKLES",
+        "/O:list_controls.extras=c|a",
+        "/O:text_controls.note=x\\\\y\\nz",
+        "/O:text_controls.config_file=C:\\Windows\\notepad.exe",
+        "/O:text_controls.data_dir=C:\\Windows",
+        "/O:text_controls.host_name=gamma",
+    ],
+    expected_file_contents = {
+        "controls_install.txt": _CONTROLS_CLI,
+    },
+    expected_uninstall_file_contents = {
+        "controls_uninstall.txt": _CONTROLS_CLI,
+    },
+)
+
+[
+    nsis_installer_test(
+        # Short names: the Windows runfiles paths would exceed MAX_PATH.
+        name = "controls_invalid_{}_test".format(case),
+        installer = ":installer_with_controls",
+        installer_args = ["/O:{}".format(arg)],
+        expected_installer_exitcode = 2,
+    )
+    for case, arg in {
+        "date_after_max": "value_controls.release_date=2031-01-01",
+        "date_bad_day": "value_controls.release_date=2023-02-29",
+        "ip_incomplete": "value_controls.server_ip=1.2.3",
+        "list_unknown_item": "list_controls.toppings=fudge|nope",
+        "single_unknown_choice": "list_controls.flavor=nope",
+        "bad_escape": "text_controls.note=bad\\q",
+        "relative_dir": "text_controls.data_dir=relative\\dir",
+        "missing_dir": "text_controls.data_dir=C:\\definitely\\missing\\dir",
+    }.items()
+]
+
+# BEGIN command line (/COMPONENTS, /INSTTYPE, /HELP)
+nsis_component(
+    name = "cli_core",
+    srcs = [":nsis_files"],
+    selection_mode = "required",
+    post_install = "//tests/testdata:components_post_install.nsh",
+    pre_uninstall = "//tests/testdata:components_pre_uninstall.nsh",
+)
+
+nsis_component(
+    name = "cli_tools",
+    selection_mode = "default",
+    dependencies = [":cli_core"],
+    install_categories = ["Full", "Typical"],
+)
+
+nsis_component(
+    name = "cli_docs",
+    selection_mode = "optional",
+    dependencies = [":cli_tools"],
+    install_categories = ["Full"],
+)
+
+nsis_component(
+    name = "cli_samples",
+    selection_mode = "optional",
+    install_categories = ["Full"],
+)
+
+nsis_component_group(
+    name = "cli_extras",
+    components = [":cli_docs", ":cli_samples"],
+)
+
+nsis_installer(
+    name = "installer_with_cli",
+    testable = True,
+    id = "5b7e3a90-2c14-4d6f-8a51-9e0c7d3b4f12",
+    components = [":cli_core", ":cli_tools", ":cli_extras"],
+    options_pages = [":install_settings", ":advanced_settings"],
+    product = "Installer With Cli",
+    product_path = "Installer With Cli",
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_defaults_test",
+    installer = ":installer_with_cli",
+    expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=0\nsamples=0\n"},
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_absolute_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/COMPONENTS=cli_docs"],
+    expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=1\nsamples=0\n"},
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_relative_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/COMPONENTS=+cli_samples,-cli_tools"],
+    expected_file_contents = {"components.txt": "core=1\ntools=0\ndocs=0\nsamples=1\n"},
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_group_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/COMPONENTS=cli_extras"],
+    expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=1\nsamples=1\n"},
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_insttype_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/INSTTYPE=Full", "/COMPONENTS=-cli_samples"],
+    expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=1\nsamples=0\n"},
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_minimal_insttype_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/INSTTYPE=Minimal"],
+    expected_file_contents = {"components.txt": "core=1\ntools=0\ndocs=0\nsamples=0\n"},
+)
+
+[
+    nsis_installer_test(
+        name = "installer_with_cli_{}_test".format(name),
+        installer = ":installer_with_cli",
+        installer_args = args,
+        expected_installer_exitcode = 2,
+    )
+    for name, args in {
+        "unknown_component": ["/COMPONENTS=cli_nope"],
+        "mixed_modes": ["/COMPONENTS=cli_core,+cli_docs"],
+        "deselect_required": ["/COMPONENTS=-cli_core"],
+        "deselect_dependency": ["/COMPONENTS=+cli_docs,-cli_tools"],
+        "unknown_insttype": ["/INSTTYPE=Bogus"],
+        "insttype_absolute": ["/INSTTYPE=Full", "/COMPONENTS=cli_core"],
+    }.items()
+]
+
+py_test(
+    name = "nsis_cli_help_test",
+    srcs = [":nsis_cli_help_test.py", ":__init__.py"],
+    main = ":nsis_cli_help_test.py",
+    args = [
+        "$(rlocationpath :installer_with_cli)",
+        "$(rlocationpath :minimal_installer)",
+    ],
+    data = [":installer_with_cli", ":minimal_installer"],
+    target_compatible_with = ["@platforms//os:windows"],
+    timeout = "short",
+    deps = ["@rules_python//python/runfiles"],
+)
+# END command line
+
+
+nsis_shortcut(
+    name = "readme_shortcut",
+    target = "//tests/testdata:README.md",
+    display_name = "Readme",
+    description = "Opens the readme",
+    locations = ["start_menu", "desktop"],
+)
+
+nsis_shortcut(
+    name = "readme_tools_shortcut",
+    target = "//tests/testdata:README.md",
+    display_name = "Readme in Tools",
+    locations = ["start_menu"],
+    start_menu_subfolder = "Tools",
+)
+
+dirrule(
+    name = "shortcut_tree",
+    srcs = ["//tests/testdata:README.md"],
+)
+
+nsis_shortcut(
+    name = "tree_shortcut",
+    target = ":shortcut_tree",
+    target_subpath = "README.md",
+    icon = "//tests/testdata:test_icon.ico",
+    display_name = "Tree readme",
+    locations = ["desktop"],
+)
+
+nsis_component(
+    name = "shortcut_main_component",
+    srcs = [":nsis_files", "//tests/testdata:test_icon.ico"],
+    selection_mode = "default",
+    shortcuts = [":readme_shortcut", ":readme_tools_shortcut"],
+)
+
+nsis_component(
+    name = "shortcut_tree_component",
+    srcs = [":shortcut_tree", "//tests/testdata:test_icon.ico"],
+    directory = "tree",
+    selection_mode = "default",
+    shortcuts = [":tree_shortcut"],
+    pre_uninstall = "//tests/testdata:shortcuts_pre_uninstall.nsh",
+)
+
+nsis_component(
+    name = "shortcut_optional_component",
+    srcs = [":nsis_files"],
+    directory = "optional",
+    selection_mode = "optional",
+    shortcuts = [":optional_shortcut"],
+)
+
+nsis_shortcut(
+    name = "optional_shortcut",
+    target = "//tests/testdata:README.md",
+    display_name = "Optional readme",
+    locations = ["start_menu", "desktop"],
+)
+
+nsis_installer(
+    name = "installer_with_shortcuts",
+    testable = True,
+    id = "3f6a9c21-5b7d-4e08-a1c4-7d2e9b8f0a55",
+    components = [
+        ":shortcut_main_component",
+        ":shortcut_tree_component",
+        ":shortcut_optional_component",
+    ],
+    shortcuts_desktop_default = True,
+    product = "Installer With Shortcuts",
+    product_path = "Installer With Shortcuts",
+    vendor = "Rules NSIS",
+)
+
+nsis_installer_test(
+    name = "installer_with_shortcuts_test",
+    installer = ":installer_with_shortcuts",
+    must_have_files = ["README.md", "tree/README.md", "tree/test_icon.ico"],
+    # The test framework expects the files of every component.
+    installer_args = ["/COMPONENTS=+shortcut_optional_component"],
+)
+
+nsis_installer_test(
+    name = "installer_with_shortcuts_cli_test",
+    installer = ":installer_with_shortcuts",
+    must_have_files = ["README.md"],
+    installer_args = [
+        "/COMPONENTS=+shortcut_optional_component",
+        "/O:shortcuts.desktop=0",
+        "/O:shortcuts.start_menu_folder=Custom\\Folder",
+    ],
 )

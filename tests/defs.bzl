@@ -117,6 +117,8 @@ def _get_installer_test_details(ctx, inst, target):
     return {
         "installer_path": to_rlocation_path(ctx, instf),
         "installer_args": [],
+        "expected_file_contents": {},
+        "expected_uninstall_file_contents": {},
         "expected_files": files,
         "expected_dirs": ds,
         "expected_installer_name": outfile,
@@ -164,6 +166,10 @@ def _nsis_test_config_impl(ctx):
     det["install_first_and_remove"] = preinstall
 
     det["expected_installer_exitcode"] = int(ctx.attr.expected_installer_exitcode)
+    det["installer_args"] = ctx.attr.installer_args
+    det["reinstall_without_dir"] = ctx.attr.reinstall_without_dir
+    det["expected_file_contents"] = ctx.attr.expected_file_contents
+    det["expected_uninstall_file_contents"] = ctx.attr.expected_uninstall_file_contents
 
     outf = ctx.actions.declare_file(ctx.attr.name + ".json")
 
@@ -202,13 +208,17 @@ _nsis_test_config = rule(
         "expected_installer_exitcode": attr.int(
             default = 0,
         ),
+        "installer_args": attr.string_list(default = []),
+        "reinstall_without_dir": attr.bool(default = False),
+        "expected_file_contents": attr.string_dict(default = {}),
+        "expected_uninstall_file_contents": attr.string_dict(default = {}),
     },
     outputs = {
         "out": "%{name}.json"
     },
 )
 
-def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must_have_dirs, install_first_and_remove, expected_installer_exitcode, target_compatible_with, **kwargs):
+def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must_have_dirs, install_first_and_remove, expected_installer_exitcode, installer_args, reinstall_without_dir, expected_file_contents, expected_uninstall_file_contents, target_compatible_with, **kwargs):
     v = []
     if install_first_and_remove != None:
         v.append(install_first_and_remove)
@@ -221,6 +231,10 @@ def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must
         install_first_and_remove = v,
         visibility = ["//visibility:private"],
         expected_installer_exitcode = expected_installer_exitcode,
+        installer_args = installer_args,
+        reinstall_without_dir = reinstall_without_dir,
+        expected_file_contents = expected_file_contents,
+        expected_uninstall_file_contents = expected_uninstall_file_contents,
     )
 
     f = ":{}_config".format(name)
@@ -282,6 +296,27 @@ nsis_installer_test = macro(
         "expected_installer_exitcode": attr.int(
             mandatory = False,
             default = 0,
+        ),
+        "installer_args": attr.string_list(
+            mandatory = False,
+            default = [],
+            doc = "Extra installer arguments, e.g. /O:page.key=value.",
+        ),
+        "reinstall_without_dir": attr.bool(
+            mandatory = False,
+            default = False,
+            configurable = False,
+            doc = "Install into the install root first, then run the tested install without /D= so it must reuse the stored install directory.",
+        ),
+        "expected_file_contents": attr.string_dict(
+            mandatory = False,
+            default = {},
+            doc = "Install-root relative files and the content they must have after the install.",
+        ),
+        "expected_uninstall_file_contents": attr.string_dict(
+            mandatory = False,
+            default = {},
+            doc = "Files, relative to the test temp dir (the uninstaller's $EXEDIR), and the content they must have after the uninstall.",
         ),
         "target_compatible_with": attr.label_list(
             mandatory = False,

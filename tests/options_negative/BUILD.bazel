@@ -1,0 +1,188 @@
+load("//tests:analysis_tests.bzl", "options_failure_test")
+
+options_failure_test(
+    name = "bad_key",
+    expected = "must match [a-z][a-z0-9_]*",
+    options = [{"name": "o", "key": "Bad-Key"}],
+)
+
+options_failure_test(
+    name = "reserved_page",
+    expected = "page name 'shortcuts' is reserved",
+    options = [{"name": "o"}],
+    page = {"page_name": "shortcuts"},
+)
+
+options_failure_test(
+    name = "bad_page_name",
+    expected = "page name 'Bad' must match",
+    options = [{"name": "o"}],
+    page = {"page_name": "Bad"},
+)
+
+options_failure_test(
+    name = "duplicate_key",
+    expected = "duplicate option key 'same'",
+    options = [
+        {"name": "a", "key": "same"},
+        {"name": "b", "key": "same"},
+    ],
+)
+
+options_failure_test(
+    name = "duplicate_key_in_group",
+    expected = "duplicate option key 'same'",
+    options = [
+        {"name": "a", "key": "same"},
+        {"name": "b", "key": "same"},
+    ],
+    groups = [{"name": "g", "options": ["b"]}],
+)
+
+options_failure_test(
+    name = "enabled_by_not_checkbox",
+    expected = "which is a 'text'; it must be a checkbox",
+    options = [
+        {"name": "a", "control": "text"},
+        {"name": "b", "enabled_by": "a"},
+    ],
+)
+
+options_failure_test(
+    name = "enabled_by_other_page",
+    expected = "which is not on page",
+    options = [
+        {"name": "a", "control": "checkbox"},
+        {"name": "b", "enabled_by": "a"},
+    ],
+    items = ["b"],
+)
+
+options_failure_test(
+    name = "group_enabled_by_child",
+    expected = "which is inside the group",
+    options = [{"name": "a", "control": "checkbox"}],
+    groups = [{"name": "g", "options": ["a"], "enabled_by": "a"}],
+)
+
+options_failure_test(
+    name = "password_persist_yes",
+    expected = "never persisted",
+    options = [{"name": "a", "control": "password", "persist": "yes"}],
+)
+
+options_failure_test(
+    name = "component_page_position",
+    expected = "must use position = \"after_components\"",
+    options = [{"name": "a"}],
+    page = {"position": "after_welcome"},
+    component_page = True,
+)
+
+options_failure_test(
+    name = "wrong_control_attr",
+    expected = "attribute 'min' is not used by control 'text'",
+    options = [{"name": "a", "min": "1"}],
+)
+
+options_failure_test(
+    name = "bad_default",
+    expected = "is not one of choices",
+    options = [{"name": "a", "control": "radio", "choices": ["x", "y"], "default": "z"}],
+)
+
+options_failure_test(
+    name = "page_overflow",
+    expected = "split the options across several pages",
+    options = [{"name": "o%d" % i, "control": "text"} for i in range(8)],
+)
+
+options_failure_test(
+    name = "filter_on_text",
+    expected = "attribute 'filter' is not used by control 'text'",
+    options = [{"name": "a", "filter": "A|*.*"}],
+)
+
+options_failure_test(
+    name = "lines_on_text",
+    expected = "attribute 'lines' is not used by control 'text'",
+    options = [{"name": "a", "lines": 2}],
+)
+
+options_failure_test(
+    name = "address_types_on_text",
+    expected = "attribute 'address_types' is not used by control 'text'",
+    options = [{"name": "a", "address_types": ["ipv4"]}],
+)
+
+options_failure_test(
+    name = "must_exist_on_text",
+    expected = "attribute 'must_exist' is not used by control 'text'",
+    options = [{"name": "a", "must_exist": True}],
+)
+
+options_failure_test(
+    name = "multi_select_on_droplist",
+    expected = "attribute 'multi_select' is not used by control 'droplist'",
+    options = [{"name": "a", "control": "droplist", "choices": ["x"], "multi_select": True}],
+)
+
+options_failure_test(
+    name = "bad_date_default",
+    expected = "date",
+    options = [{"name": "a", "control": "date", "default": "2023-02-29"}],
+)
+
+options_failure_test(
+    name = "bad_ip_default",
+    expected = "ip",
+    options = [{"name": "a", "control": "ip_address", "default": "1.2.3"}],
+)
+
+options_failure_test(
+    name = "bad_list_default",
+    expected = "is not one of choices",
+    options = [{"name": "a", "control": "listbox", "multi_select": True, "choices": ["x", "y"], "default": "x|z"}],
+)
+
+options_failure_test(
+    name = "bad_richedit_escape",
+    expected = "escape",
+    options = [{"name": "a", "control": "richedit", "default": "bad\\q"}],
+)
+
+options_failure_test(
+    name = "relative_path_default",
+    expected = "absolute",
+    options = [{"name": "a", "control": "dir_request", "default": "rel\\dir"}],
+)
+
+options_failure_test(
+    name = "bad_filter",
+    expected = "filter",
+    options = [{"name": "a", "control": "file_request", "filter": "odd|pairs|x"}],
+)
+
+options_failure_test(
+    name = "bad_address_type",
+    expected = "address_types",
+    options = [{"name": "a", "control": "net_address", "address_types": ["bogus"]}],
+)
+
+options_failure_test(
+    name = "prefix_dns_only",
+    expected = "with_prefix",
+    options = [{"name": "a", "control": "net_address", "address_types": ["dns", "with_prefix"]}],
+)
+
+options_failure_test(
+    name = "required_single_listbox",
+    expected = "required",
+    options = [{"name": "a", "control": "listbox", "choices": ["x"], "required": True}],
+)
+
+options_failure_test(
+    name = "date_min_gt_max",
+    expected = "min",
+    options = [{"name": "a", "control": "date", "min": "2030-01-01", "max": "2020-01-01"}],
+)

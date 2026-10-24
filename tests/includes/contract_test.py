@@ -21,7 +21,8 @@ CASES = {}
 # first invocation is checked.
 _IMPURE = (
     "registry_set_", "registry_get_", "registry_remove", "registry_view_", "registry_pinned_", "uninstall_registry_",
-    "install_detail_", "eventlog_", "move_", "uninstall_existing", "icacls_", "mutex", "log",
+    "install_detail_", "eventlog_", "move_", "uninstall_existing", "icacls_", "mutex", "log", "console",
+    "shortcut_", "cli_fail", "option_persist", "option_load_", "product_registry_",
 )
 
 
@@ -52,7 +53,7 @@ class ContractResult:
 
 
 def contract_harness(spec, *, stop_at_invocation=False):
-    def run(expected_exitcode=0, expect_errors=None, **values):
+    def run(expected_exitcode=0, expect_errors=None, command_args=(), command_tail=(), **values):
         assert type(expected_exitcode) is int
         assert expect_errors is None or type(expect_errors) is bool
         parameters = inputs(spec)

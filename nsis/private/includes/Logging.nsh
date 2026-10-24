@@ -2,6 +2,7 @@
 !define __INCLUDE_LOGGING
 
 !include LogicLib.nsh
+!include Console.nsh
 
 ; Logging is opt-in: define LOGGING_ENABLE before including this file.
 ; The level is selected with one of LOGLEVEL_DEBUG, LOGLEVEL_INFO,
@@ -20,41 +21,12 @@
     !define _LOGLEVEL 1
 !endif
 
-!ifdef LOGGING_ENABLE
-Var StdOutHandle
-Var StdOutAttempted
-!endif
-
 !macro Log TEXT
 !ifdef LOGGING_ENABLE
     ${IfNot} ${Silent}
         DetailPrint `${TEXT}`
     ${EndIf}
-    ${If} $StdOutHandle == ""
-    ${AndIf} $StdOutAttempted == ""
-        StrCpy $StdOutAttempted "Y"
-        Push $0
-        Push $1
-        ; Prefer an inherited (redirected) stdout; otherwise attach to the
-        ; parent's console.
-        System::Call 'kernel32::GetStdHandle(i -11)p.r0'
-        ${If} $0 P<> 0
-        ${AndIf} $0 P<> -1
-            StrCpy $StdOutHandle $0
-        ${Else}
-            System::Call 'kernel32::AttachConsole(i -1)i.r1'
-            ${If} $1 != 0
-                System::Call 'kernel32::GetStdHandle(i -11)p.r0'
-                StrCpy $StdOutHandle $0
-            ${EndIf}
-        ${EndIf}
-        Pop $1
-        Pop $0
-    ${EndIf}
-
-    ${If} $StdOutHandle != ""
-        FileWrite $StdOutHandle `${TEXT}$\r$\n`
-    ${EndIf}
+    ${Console_WriteLine} `${TEXT}`
 !endif
 !macroend
 !define Log `!insertmacro Log`
