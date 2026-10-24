@@ -7,8 +7,10 @@
 2. [Options Pages](#Options-Pages)
 3. [Command Line](#Command-Line)
 4. [Shortcuts](#Shortcuts)
-5. [Generated Installer Details](#Generated-Installer-Details)
-6. [NSIS API Unit Testing](#nsis-api-unit-testing)
+5. [Plugins](#Plugins)
+    1. [Third-party plugins](#Third-party-plugins)
+6. [Generated Installer Details](#Generated-Installer-Details)
+7. [NSIS API Unit Testing](#nsis-api-unit-testing)
 
 ## Overview
 
@@ -336,6 +338,68 @@ stack is balanced, and can assert the NSIS error flag (`expect_errors`).
 See the [testing framework guide](nsis/testing/README.md) for Bazel definitions,
 typed Python assertions, installer/uninstaller support, and runnable examples.
 These unit harnesses are separate from the end-to-end installer tests.
+
+## Plugins
+
+Plugins beyond the ones in the NSIS distribution are declared with
+`nsis_plugin` and listed in the `plugins` attribute of `nsis_installer` (and of
+`nsis_test_harness`). Their DLLs and headers are added with `!addplugindir`
+and `!addincludedir` before any other script content, so scripts can call
+`plugin_name::Function` directly. Plugins are only embedded in an installer
+when its script calls them.
+
+```starlark
+load("@rules_nsis//nsis:defs.bzl", "nsis_plugin", "nsis_installer")
+
+nsis_plugin(
+    name = "inetc",
+    plugin_name = "inetc",              # defaults to `name`
+    x86_unicode = "Plugins/x86-unicode/inetc.dll",
+    amd64_unicode = "Plugins/amd64-unicode/inetc.dll",
+    includes = ["Include/inetc.nsh"],   # optional headers
+    license = "Docs/inetc/License.txt", # mandatory
+)
+
+nsis_installer(
+    name = "installer",
+    plugins = [":inetc"],
+    ...
+)
+```
+
+- Installers are Unicode, so only `x86_unicode` and `amd64_unicode` builds are
+  taken; at least one is required. Each DLL must be named `<plugin_name>.dll`
+  because makensis takes the command prefix from the file name.
+- If two plugins share a `plugin_name`, makensis fails when the script calls it.
+- The licenses of an installer's plugins are in its `plugin_licenses` output
+  group.
+
+`nsis_plugin_archive` fetches an archive with the usual layout
+(`Plugins/x86-unicode`, `Plugins/amd64-unicode` or `Plugins/x64-unicode`, and
+`Include/*.nsh`) and declares `@<name>//:plugin`:
+
+```starlark
+nsis_plugin_archive = use_repo_rule("@rules_nsis//nsis:repositories.bzl", "nsis_plugin_archive")
+
+nsis_plugin_archive(
+    name = "nsis_plugin_inetc",
+    plugin_name = "inetc",
+    urls = ["https://example.com/inetc.zip"],
+    sha256 = "...",
+    license = "Docs/inetc/License.txt",
+)
+```
+
+For other layouts, use `http_archive` with a `build_file_content` that calls
+`nsis_plugin`.
+
+### Third-party plugins
+
+Every installer can use [nsArray](https://nsis.sourceforge.io/Arrays_in_NSIS)
+1.1.1.7 by Stuart "Afrow UK" Welch (zlib-style license), which the bundled
+includes use. It is downloaded from the NSIS wiki, pinned by sha256. Keep its
+license notice, from the `plugin_licenses` output group, when you distribute
+an installer that embeds it.
 
 ## Generated Installer Details
 

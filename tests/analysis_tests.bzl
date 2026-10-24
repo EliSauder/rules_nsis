@@ -8,10 +8,10 @@ load(
     "nsis_option",
     "nsis_option_group",
     "nsis_options_page",
+    "nsis_plugin",
     "nsis_shortcut",
 )
 load("//nsis/private:dirrule.bzl", "dirrule")
-
 def _eventlog_requires_admin_test_impl(ctx):
     env = analysistest.begin(ctx)
     asserts.expect_failure(env, "requires execution_level = \"admin\"")
@@ -158,4 +158,85 @@ def shortcut_failure_test(
         name = name,
         target_under_test = ":" + name + "_installer",
         expected = expected,
+    )
+
+def _plugin_lines_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    contents = [
+        a.content
+        for a in analysistest.target_actions(env)
+        if a.mnemonic == "FileWrite" and a.outputs.to_list()[0].basename.endswith(".plugins.nsh")
+    ]
+    asserts.equals(env, 1, len(contents))
+    lines = contents[0].splitlines() if contents else []
+    for expected in ctx.attr.lines:
+        matches = [l for l in lines if l.startswith(expected.split(" ...")[0]) and l.endswith(expected.split("... ")[-1])]
+        asserts.equals(env, 1, len(matches), "{} not exactly once in {}".format(expected, lines))
+    if ctx.attr.license:
+        licenses = [f.short_path for f in analysistest.target_under_test(env)[OutputGroupInfo].plugin_licenses.to_list()]
+        asserts.true(env, any([l.endswith(ctx.attr.license) for l in licenses]), "{} not in {}".format(ctx.attr.license, licenses))
+    return analysistest.end(env)
+
+# Each entry of `lines` is "<start> ... <end>" and must match exactly one line.
+_plugin_lines_test = analysistest.make(
+    _plugin_lines_test_impl,
+    attrs = {
+        "lines": attr.string_list(),
+        "license": attr.string(),
+    },
+)
+
+def plugin_tests(name):
+    """Declares plugin analysis tests.
+
+    The tests share dummy DLLs; analysis never reads their content.
+    """
+    for dll in ["p/p.dll", "x64/p.dll", "wrong/other.dll"]:
+        native.genrule(
+            name = "{}_dll_{}".format(name, dll.replace("/", "_").replace(".", "_")),
+            outs = ["{}_dlls/{}".format(name, dll)],
+            cmd = "touch $@",
+            tags = ["manual"],
+        )
+
+    def dll(path):
+        return ":{}_dll_{}".format(name, path.replace("/", "_").replace(".", "_"))
+
+    nsis_plugin(name = name + "_wrong_name", plugin_name = "p", x86_unicode = dll("wrong/other.dll"), license = "//tests/testdata:README.md", tags = ["manual"])
+    nsis_plugin(name = name + "_p", plugin_name = "p", x86_unicode = dll("p/p.dll"), amd64_unicode = dll("x64/p.dll"), license = "//tests/testdata:README.md", tags = ["manual"])
+
+    nsis_component(name = name + "_component", srcs = ["//tests/testdata:README.md"], tags = ["manual"])
+
+    def installer(suffix, plugins):
+        nsis_installer(
+            name = name + "_" + suffix + "_installer",
+            id = "6b0c1d7a-0000-4000-8000-000000000003",
+            components = [":" + name + "_component"],
+            product = "Plugins " + suffix,
+            product_path = "Plugins " + suffix,
+            plugins = plugins,
+            tags = ["manual"],
+        )
+        return ":{}_{}_installer".format(name, suffix)
+
+    _expect_failure_test(
+        name = name + "_wrong_name_test",
+        target_under_test = installer("wrong_name", [":" + name + "_wrong_name"]),
+        expected = "must be named p.dll",
+    )
+    _plugin_lines_test(
+        name = name + "_same_label_test",
+        target_under_test = installer("same_label", ["@nsis_plugin_nsarray//:plugin"]),
+        lines = ['!addplugindir /x86-unicode ... nsis_plugin_nsarray/Plugins/x86-unicode"'],
+    )
+    _plugin_lines_test(
+        name = name + "_lines_test",
+        target_under_test = installer("lines", [":" + name + "_p"]),
+        lines = [
+            '!addplugindir /x86-unicode ... {}_dlls/p"'.format(name),
+            '!addplugindir /amd64-unicode ... {}_dlls/x64"'.format(name),
+            '!addplugindir /x86-unicode ... nsis_plugin_nsarray/Plugins/x86-unicode"',
+            '!addincludedir ... nsis_plugin_nsarray/Include"',
+        ],
+        license = "Docs/nsArray/Readme.txt",
     )

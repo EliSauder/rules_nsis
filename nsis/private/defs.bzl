@@ -1,5 +1,6 @@
 load("//nsis/private:transitions.bzl", "windows_source_transition")
 load(":options.bzl", "NsisOptionsPageInfo", "collect_options_pages")
+load(":plugins.bzl", "NsisPluginInfo")
 load(":cli.bzl", "cli_data", "options_doc_content")
 load(
     ":shortcuts.bzl",
@@ -815,7 +816,7 @@ def _make_nsis_args(ctx, toolchain, outfile):
 
     return args
 
-def _makensis(ctx, toolchain, script, inputs, user_scripts):
+def _makensis(ctx, toolchain, script, inputs, user_scripts, plugin_files):
     if not script:
         fail("script can not be None")
 
@@ -875,6 +876,7 @@ def _makensis(ctx, toolchain, script, inputs, user_scripts):
             user_scripts,
             makensis_dir,
             inputs,
+            plugin_files,
             makensis_files,
             sctx.inputs,
         ]
@@ -1554,24 +1556,49 @@ def _read_stamp_values(ctx, stamp):
     if not stamp:
         return None
 
-def _add_includes(ctx, toolchain, script):
+def _plugin_lines(plugins, make_path):
+    """!addplugindir and !addincludedir lines for the plugins' DLL and header folders.
+
+    makensis itself fails a call to a plugin name found in two folders.
+    """
+    lines = {}
+    for p in plugins:
+        for target, dll in sorted(p.dlls.items()):
+            lines['!addplugindir /{} "{}"'.format(target, make_path(dll.dirname))] = True
+        for f in p.includes:
+            lines['!addincludedir "{}"'.format(make_path(f.dirname))] = True
+    return lines.keys()
+
+def _add_includes(ctx, toolchain, script, plugins):
     outfile = _get_render_file(ctx, "nsis-with-include", script)
+
+    # The plugin lines come right after the include dir so that they apply
+    # before any user code, including !include lines that call plugins.
+    plugin_lines = ctx.actions.declare_file("{}.plugins.nsh".format(ctx.label.name))
+    ctx.actions.write(
+        output = plugin_lines,
+        content = "".join([
+            line + "\n"
+            for line in _plugin_lines(plugins, lambda p: _make_sys_path(toolchain, p))
+        ]),
+    )
     ctx.actions.run_shell(
         outputs = [outfile],
-        inputs = [script, ctx.file._includes],
+        inputs = [script, plugin_lines, ctx.file._includes],
         arguments = [
             script.path,
             outfile.path,
             ctx.file._includes.path,
+            plugin_lines.path,
         ],
         command = """
 infile="$1"
 outfile="$2"
 includes="$3"
+plugins="$4"
 
-touch "$outfile"
 echo "!addincludedir \\"$3\\"" > "$outfile"
-cat - "$1" >> "$outfile"
+cat "$plugins" "$1" >> "$outfile"
 """
     )
 
@@ -1594,12 +1621,14 @@ def _nsis_installer_impl(ctx):
     srcs = _all_files(ctx)
     script, user_scripts = _build_rendered_templates(ctx, toolchain)
 
-    script = _add_includes(ctx, toolchain, script)
+    plugins = [p[NsisPluginInfo] for p in ctx.attr._default_plugins + ctx.attr.plugins]
+    script = _add_includes(ctx, toolchain, script, plugins)
 
     validation = collect_shortcuts(ctx.label, _flatten_components(ctx)).validation
 
-    return _makensis(ctx, toolchain, script, srcs, user_scripts) + [
+    return _makensis(ctx, toolchain, script, srcs, user_scripts, depset([f for p in plugins for f in p.dlls.values() + p.includes])) + [
         OutputGroupInfo(
+            plugin_licenses = depset([p.license for p in plugins]),
             options_doc = _options_doc_outputs(ctx, toolchain),
             _validation = validation,
         ),
@@ -1929,6 +1958,14 @@ For more details see `post_init`.
         "_includes": attr.label(
             default = Label("//nsis/private/includes:includes_dir"),
             allow_single_file = True,
+        ),
+        "plugins": attr.label_list(
+            providers = [NsisPluginInfo],
+            doc = "Additional NSIS plugins (nsis_plugin targets) made available to the script.",
+        ),
+        "_default_plugins": attr.label_list(
+            default = [Label("@nsis_plugin_nsarray//:plugin")],
+            providers = [NsisPluginInfo],
         ),
     }, **dict(SIGNING_ATTRS, **STAMP_ATTRS)),
     toolchains = [
