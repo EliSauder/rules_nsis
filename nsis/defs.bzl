@@ -17,9 +17,7 @@ load(
 load(
     "//nsis/private:plugins.bzl",
     _NsisPluginInfo = "NsisPluginInfo",
-    _NsisPluginSetInfo = "NsisPluginSetInfo",
     _nsis_plugin = "nsis_plugin",
-    _nsis_plugin_set = "nsis_plugin_set",
 )
 load(
     "//nsis/private:shortcuts.bzl",
@@ -49,6 +47,4 @@ NsisOptionsPageInfo = _NsisOptionsPageInfo
 nsis_shortcut = _nsis_shortcut
 NsisShortcutInfo = _NsisShortcutInfo
 nsis_plugin = _nsis_plugin
-nsis_plugin_set = _nsis_plugin_set
 NsisPluginInfo = _NsisPluginInfo
-NsisPluginSetInfo = _NsisPluginSetInfo

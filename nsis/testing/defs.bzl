@@ -110,7 +110,7 @@ def _harness_impl(ctx):
     args.add("--include-dir", ctx.file._includes.path)
     for directory in depset([f.dirname for f in ctx.files.includes]).to_list():
         args.add("--include-dir", directory)
-    staged = stage_plugins(ctx, [ctx.attr._default_plugins] + ctx.attr.plugins)
+    staged = stage_plugins(ctx)
     for line in plugin_script_lines(staged, lambda p: p):
         args.add("--plugin-line=" + line)
     ctx.actions.run(

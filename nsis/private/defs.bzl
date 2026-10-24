@@ -1608,7 +1608,7 @@ def _nsis_installer_impl(ctx):
     srcs = _all_files(ctx)
     script, user_scripts = _build_rendered_templates(ctx, toolchain)
 
-    staged = stage_plugins(ctx, [ctx.attr._default_plugins] + ctx.attr.plugins)
+    staged = stage_plugins(ctx)
     script = _add_includes(ctx, toolchain, script, staged)
 
     validation = collect_shortcuts(ctx.label, _flatten_components(ctx)).validation
