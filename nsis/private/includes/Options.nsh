@@ -176,7 +176,7 @@ Function ${PREFIX}Option_ListCount
         StrCpy $2 1
     StrCpy $1 0
     StrCmp $0 "" done
-    ; ArraySplit, not nsArray::Split: Split crashes on strings over ~512 chars
+    ; ArraySplit, not nsArray::Split: Split overflows its buffer on strings over ~512 chars (see Utility.nsh)
     !insertmacro ${PREFIX}ArraySplit __opt_items $0 "|" 0
     ClearErrors
     nsArray::Length __opt_items
@@ -218,7 +218,7 @@ Function ${PREFIX}Option_ListHas
     StrCmp $__opt_lh_src $0 lookup
     build:
         nsArray::Clear __opt_set
-        ; ArraySplit, not nsArray::Split: Split crashes on strings over ~512 chars
+        ; ArraySplit, not nsArray::Split: Split overflows its buffer on strings over ~512 chars (see Utility.nsh)
         !insertmacro ${PREFIX}ArraySplit __opt_items $0 "|" 1
         nsArray::Iterate __opt_items /reset
         loop:

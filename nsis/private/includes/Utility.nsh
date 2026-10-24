@@ -39,11 +39,12 @@ FunctionEnd
 ; Splits STRING at every single-character DELIM into the nsArray ARRAY (which
 ; is cleared first). With NOEMPTY set to 1, empty items are skipped.
 ;
-; This replaces `nsArray::Split`: in the unicode build the plugin overflows a
-; buffer (it crashes) once the string it is given is longer than about 512
-; characters, while NSIS strings go up to NSIS_MAX_STRLEN. Items are added one
-; by one with /key=, which also keeps an item that looks like an nsArray switch
-; (/at=...) from being read as one.
+; This replaces `nsArray::Split`: the plugin allocates its string buffer as
+; `string_size + 1 * sizeof(TCHAR)` (missing parentheses), which is only
+; string_size + 2 bytes. In the unicode build the buffer holds about 512
+; characters, so a longer string overflows the heap, while NSIS strings go up
+; to NSIS_MAX_STRLEN. Items are added one by one with /key=, which also keeps
+; an item that looks like an nsArray switch (/at=...) from being read as one.
 !macro _ArraySplit PREFIX
 ; Stack: array name, string, delimiter, noempty (top).
 Function ${PREFIX}ArraySplit

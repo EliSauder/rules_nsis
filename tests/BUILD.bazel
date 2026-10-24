@@ -879,6 +879,41 @@ nsis_options_page(
     options = [":flavor", ":toppings", ":extras"],
 )
 
+_LONG_ITEMS = ["item_%d%d%d" % (i // 100, i // 10 % 10, i % 10) for i in range(90)]
+
+# 90 choices: the canonical value is longer than 512 characters.
+nsis_option(name = "many", control = "listbox", multi_select = True, choices = _LONG_ITEMS, lines = 3)
+
+nsis_options_page(
+    name = "long_list",
+    position = "after_license",
+    options = [":many"],
+)
+
+nsis_component(
+    name = "long_list_component",
+    srcs = [":nsis_files"],
+    selection_mode = "default",
+    post_install = "//tests/testdata:long_list_post_install.nsh",
+)
+
+nsis_installer(
+    name = "installer_with_long_list",
+    testable = True,
+    id = "9d1c7e52-3a64-4b08-8f2e-5c7a1b3d6e90",
+    components = [":long_list_component"],
+    options_pages = [":long_list"],
+    product = "Installer With Long List",
+    product_path = "Installer With Long List",
+)
+
+nsis_installer_test(
+    name = "installer_with_long_list_cli_test",
+    installer = ":installer_with_long_list",
+    installer_args = ["/O:long_list.many=" + "|".join(reversed(_LONG_ITEMS[30:]))],
+    expected_file_contents = {"long_list.txt": "many=" + "|".join(_LONG_ITEMS[30:]) + "\n"},
+)
+
 nsis_option(name = "release_date", control = "date", min = "2020-01-01", max = "2030-12-31", default = "2024-02-29")
 
 nsis_option(name = "server_ip", control = "ip_address", default = "10.0.0.1")
