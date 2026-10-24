@@ -390,6 +390,22 @@ nsis_plugin_archive(
 )
 ```
 
+To fix a plugin, build it from its sources instead: `patches` (with
+`patch_strip`, default 1) are applied to the extracted archive, and with
+`source_dir` the `.c` files in that folder are compiled into both Unicode DLLs
+with Zig. Like the plugins shipped with NSIS, they are linked without a C
+runtime (entry point `DllMain`, importing only kernel32 and user32). `copts`
+adds compiler flags.
+
+```starlark
+nsis_plugin_archive(
+    name = "nsis_plugin_inetc",
+    ...
+    patches = ["//third_party:inetc-fix.patch"],  # a git diff of the archive
+    source_dir = "Contrib/inetc",
+)
+```
+
 For other layouts, use `http_archive` with a `build_file_content` that calls
 `nsis_plugin`.
 
@@ -397,7 +413,9 @@ For other layouts, use `http_archive` with a `build_file_content` that calls
 
 Every installer can use [nsArray](https://nsis.sourceforge.io/Arrays_in_NSIS)
 1.1.1.7 by Stuart "Afrow UK" Welch (zlib-style license), which the bundled
-includes use. It is downloaded from the NSIS wiki, pinned by sha256. Keep its
+includes use. It is downloaded from the NSIS wiki, pinned by sha256, and built
+from source with a patch that fixes a heap overflow in `nsArray::Split`
+(`nsis/plugins/patches`). Keep its
 license notice, from the `plugin_licenses` output group, when you distribute
 an installer that embeds it.
 
