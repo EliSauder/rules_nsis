@@ -90,6 +90,19 @@ filegroup(
 """,
 )
 
+############################
+# DEFAULT NSIS PLUGINS
+############################
+# nsArray (zlib-style license) is used by the bundled includes.
+nsis_plugin_archive = use_repo_rule("//nsis:repositories.bzl", "nsis_plugin_archive")
+nsis_plugin_archive(
+    name = "nsis_plugin_nsarray",
+    plugin_name = "nsArray",
+    urls = ["https://nsis.sourceforge.io/mediawiki/images/9/97/NsArray.zip"],
+    sha256 = "56cef303f97de3a6e26ccfe9a8a860bbb539a08c520d312e7774cce310013723",
+    license = "Docs/nsArray/Readme.txt",
+)
+
 zlib_toolchain = use_extension("//nsis/private:zlib.bzl", "zlib_toolchain")
 use_repo(zlib_toolchain, zlib_zig = "zig_config")
 
