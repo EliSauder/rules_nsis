@@ -4,7 +4,6 @@ load(":cli.bzl", "cli_data", "options_doc_content")
 load(
     ":shortcuts.bzl",
     "NsisShortcutInfo",
-    "collect_shortcuts",
     "default_start_menu_folder",
     "resolve_component_shortcuts",
     "shortcut_ds",
@@ -1292,6 +1291,66 @@ def _vendor_path(ctx):
         return ctx.attr.vendor
     return ctx.attr.vendor_path
 
+def _collect_shortcuts(label, components):
+    """Checks the shortcuts of all components together and summarizes them.
+
+    Args:
+        label: The installer label, for error messages.
+        components: The unique NsisComponentInfo set of the installer.
+
+    Returns:
+        A struct of the `Has*` flags, `components` (the data source entries of
+        the components with shortcuts) and `validation` (a depset of files).
+    """
+    seen = {}
+    comps = []
+    validation = []
+    has_sm = False
+    has_dt = False
+    has_path = False
+    for cmp in components:
+        if not cmp.shortcuts:
+            continue
+        sm = False
+        dt = False
+        pa = False
+        for sc in cmp.shortcuts:
+            validation.append(sc.validation)
+            link = sc.link_name.lower()
+            keys = []
+            if sc.start_menu:
+                keys.append("Start Menu folder '{}'".format(sc.start_menu_subfolder.lower()))
+                sm = True
+            if sc.desktop:
+                keys.append("the Desktop")
+                dt = True
+            if sc.path:
+                keys.append("folder '{}'".format(sc.location_path.lower()))
+                pa = True
+            for k in keys:
+                ident = (k, link)
+                if ident in seen:
+                    fail("{}: shortcuts {} and {} both create '{}.lnk' in {}".format(label, seen[ident], sc.label, sc.link_name, k))
+                seen[ident] = sc.label
+        has_sm = has_sm or sm
+        has_dt = has_dt or dt
+        has_path = has_path or pa
+        comps.append({
+            "Name": cmp.name,
+            "HasStartMenu": sm,
+            "HasDesktop": dt,
+            "HasPath": pa,
+            "Shortcuts": [shortcut_ds(s) for s in cmp.shortcuts],
+        })
+    return struct(
+        has_shortcuts = len(comps) > 0,
+        has_start_menu = has_sm,
+        has_desktop = has_dt,
+        has_path = has_path,
+        components = comps,
+        validation = depset(transitive = validation),
+    )
+
 def _build_data_structure(ctx, toolchain):
 
     inst_data = _get_installer_ds(ctx, toolchain)
@@ -1317,7 +1376,7 @@ def _build_data_structure(ctx, toolchain):
     pages = opts.pages
     options = opts.options
 
-    shortcuts = collect_shortcuts(ctx.label, _flatten_components(ctx))
+    shortcuts = _collect_shortcuts(ctx.label, _flatten_components(ctx))
     inst_data["HasShortcuts"] = shortcuts.has_shortcuts
     inst_data["HasStartMenuShortcuts"] = shortcuts.has_start_menu
     inst_data["HasDesktopShortcuts"] = shortcuts.has_desktop
@@ -1596,7 +1655,7 @@ def _nsis_installer_impl(ctx):
 
     script = _add_includes(ctx, toolchain, script)
 
-    validation = collect_shortcuts(ctx.label, _flatten_components(ctx)).validation
+    validation = _collect_shortcuts(ctx.label, _flatten_components(ctx)).validation
 
     return _makensis(ctx, toolchain, script, srcs, user_scripts) + [
         OutputGroupInfo(

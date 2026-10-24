@@ -3,7 +3,7 @@
 A shortcut only names a file (and optionally an icon) that the owning
 component installs. The component resolves it to the path the installer will
 put the file at (`resolve_component_shortcuts`), the installer checks the whole
-set (`collect_shortcuts`) and adds the internal `shortcuts` options page
+set and adds the internal `shortcuts` options page
 (`shortcuts_page`). Creation and removal at run time live in the installer
 template.
 """
@@ -354,66 +354,6 @@ def shortcut_ds(sc):
         "StartMenuSubfolder": sc.start_menu_subfolder,
         "LocationPath": sc.location_path,
     }
-
-def collect_shortcuts(label, components):
-    """Checks the shortcuts of all components together and summarizes them.
-
-    Args:
-        label: The installer label, for error messages.
-        components: The unique NsisComponentInfo set of the installer.
-
-    Returns:
-        A struct of the `Has*` flags, `components` (the data source entries of
-        the components with shortcuts) and `validation` (a depset of files).
-    """
-    seen = {}
-    comps = []
-    validation = []
-    has_sm = False
-    has_dt = False
-    has_path = False
-    for cmp in components:
-        if not cmp.shortcuts:
-            continue
-        sm = False
-        dt = False
-        pa = False
-        for sc in cmp.shortcuts:
-            validation.append(sc.validation)
-            link = sc.link_name.lower()
-            keys = []
-            if sc.start_menu:
-                keys.append("Start Menu folder '{}'".format(sc.start_menu_subfolder.lower()))
-                sm = True
-            if sc.desktop:
-                keys.append("the Desktop")
-                dt = True
-            if sc.path:
-                keys.append("folder '{}'".format(sc.location_path.lower()))
-                pa = True
-            for k in keys:
-                ident = (k, link)
-                if ident in seen:
-                    _fail(label, "shortcuts {} and {} both create '{}.lnk' in {}".format(seen[ident], sc.label, sc.link_name, k))
-                seen[ident] = sc.label
-        has_sm = has_sm or sm
-        has_dt = has_dt or dt
-        has_path = has_path or pa
-        comps.append({
-            "Name": cmp.name,
-            "HasStartMenu": sm,
-            "HasDesktop": dt,
-            "HasPath": pa,
-            "Shortcuts": [shortcut_ds(s) for s in cmp.shortcuts],
-        })
-    return struct(
-        has_shortcuts = len(comps) > 0,
-        has_start_menu = has_sm,
-        has_desktop = has_dt,
-        has_path = has_path,
-        components = comps,
-        validation = depset(transitive = validation),
-    )
 
 def default_start_menu_folder(vendor, vendor_path, product_path):
     parts = [p for p in [vendor_path or vendor, product_path] if p]
