@@ -1,0 +1,34 @@
+diff --git a/Contrib/nsArray/Array.h b/Contrib/nsArray/Array.h
+index 496fb10..2681d02 100644
+--- a/Contrib/nsArray/Array.h
++++ b/Contrib/nsArray/Array.h
+@@ -119,8 +119,11 @@ struct ARRAY* CopyArrayKeys(struct ARRAY* pArraySrc, TCHAR* pNameDest);
+ 
+ #define ALLOC(T, V) T* V = (T*)GlobalAlloc(GMEM_FIXED, sizeof(T))
+ #define ALLOC_P(T, V) V = (T*)GlobalAlloc(GMEM_FIXED, sizeof(T))
+-#define ALLOC_C(T, V, C) T* V = (T*)GlobalAlloc(GMEM_FIXED, C * sizeof(T))
+-#define ALLOC_C_P(T, V, C) V = (T*)GlobalAlloc(GMEM_FIXED, C * sizeof(T))
++// ALTERED by rules_nsis: the count C is parenthesized. Without it,
++// ALLOC_C(TCHAR, p, string_size + 1) allocated string_size + sizeof(TCHAR)
++// bytes and nsArray::Split overflowed the heap on long strings.
++#define ALLOC_C(T, V, C) T* V = (T*)GlobalAlloc(GMEM_FIXED, (C) * sizeof(T))
++#define ALLOC_C_P(T, V, C) V = (T*)GlobalAlloc(GMEM_FIXED, (C) * sizeof(T))
+ #define ALLOC_STRCPY(V, S) V = (TCHAR*)GlobalAlloc(GMEM_FIXED, (lstrlen(S) + 1) * sizeof(TCHAR)); lstrcpy(V, S)
+ #define FREE(P) GlobalFree(P)
+ 
+diff --git a/Docs/nsArray/Readme.txt b/Docs/nsArray/Readme.txt
+index 19cdfee..a58f9f0 100644
+--- a/Docs/nsArray/Readme.txt
++++ b/Docs/nsArray/Readme.txt
+@@ -1,3 +1,11 @@
++*** ALTERED VERSION ***
++This is an altered version of nsArray 1.1.1.7, patched and built by rules_nsis
++(https://github.com/EliSauder/rules_nsis). It is not the original plug-in.
++Change: in Contrib/nsArray/Array.h the count argument of the ALLOC_C and
++ALLOC_C_P macros is parenthesized. nsArray::Split allocated
++string_size + sizeof(TCHAR) bytes instead of (string_size + 1) * sizeof(TCHAR)
++and overflowed the heap when splitting long strings.
++
+ nsArray NSIS plug-in
+ 
+ Author:   Stuart 'Afrow UK' Welch <afrowuk@afrowsoft.co.uk>

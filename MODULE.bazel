@@ -93,7 +93,8 @@ filegroup(
 ############################
 # DEFAULT NSIS PLUGINS
 ############################
-# nsArray (zlib-style license) is used by the bundled includes.
+# nsArray (zlib-style license) is used by the bundled includes. It is built
+# from source with a patch that fixes a heap overflow in nsArray::Split.
 nsis_plugin_archive = use_repo_rule("//nsis:repositories.bzl", "nsis_plugin_archive")
 nsis_plugin_archive(
     name = "nsis_plugin_nsarray",
@@ -101,6 +102,10 @@ nsis_plugin_archive(
     urls = ["https://nsis.sourceforge.io/mediawiki/images/9/97/NsArray.zip"],
     sha256 = "56cef303f97de3a6e26ccfe9a8a860bbb539a08c520d312e7774cce310013723",
     license = "Docs/nsArray/Readme.txt",
+    patches = ["//nsis/plugins:patches/nsarray-alloc-c.patch"],
+    source_dir = "Contrib/nsArray",
+    # g_arrays is a tentative definition in two files, which MSVC merges.
+    copts = ["-fcommon"],
 )
 
 zlib_toolchain = use_extension("//nsis/private:zlib.bzl", "zlib_toolchain")
