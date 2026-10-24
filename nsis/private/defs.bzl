@@ -1,6 +1,6 @@
 load("//nsis/private:transitions.bzl", "windows_source_transition")
 load(":options.bzl", "NsisOptionsPageInfo", "collect_options_pages")
-load(":plugins.bzl", "PLUGIN_ATTRS", "plugin_script_lines", "stage_plugins")
+load(":plugins.bzl", "NsisPluginInfo")
 load(":cli.bzl", "cli_data", "options_doc_content")
 load(
     ":shortcuts.bzl",
@@ -1556,7 +1556,20 @@ def _read_stamp_values(ctx, stamp):
     if not stamp:
         return None
 
-def _add_includes(ctx, toolchain, script, staged):
+def _plugin_lines(plugins, make_path):
+    """!addplugindir and !addincludedir lines for the plugins' DLL and header folders.
+
+    makensis itself fails a call to a plugin name found in two folders.
+    """
+    lines = {}
+    for p in plugins:
+        for target, dll in sorted(p.dlls.items()):
+            lines['!addplugindir /{} "{}"'.format(target, make_path(dll.dirname))] = True
+        for f in p.includes:
+            lines['!addincludedir "{}"'.format(make_path(f.dirname))] = True
+    return lines.keys()
+
+def _add_includes(ctx, toolchain, script, plugins):
     outfile = _get_render_file(ctx, "nsis-with-include", script)
 
     # The plugin lines come right after the include dir so that they apply
@@ -1566,7 +1579,7 @@ def _add_includes(ctx, toolchain, script, staged):
         output = plugin_lines,
         content = "".join([
             line + "\n"
-            for line in plugin_script_lines(staged, lambda p: _make_sys_path(toolchain, p))
+            for line in _plugin_lines(plugins, lambda p: _make_sys_path(toolchain, p))
         ]),
     )
     ctx.actions.run_shell(
@@ -1608,14 +1621,14 @@ def _nsis_installer_impl(ctx):
     srcs = _all_files(ctx)
     script, user_scripts = _build_rendered_templates(ctx, toolchain)
 
-    staged = stage_plugins(ctx)
-    script = _add_includes(ctx, toolchain, script, staged)
+    plugins = [p[NsisPluginInfo] for p in ctx.attr._default_plugins + ctx.attr.plugins]
+    script = _add_includes(ctx, toolchain, script, plugins)
 
     validation = collect_shortcuts(ctx.label, _flatten_components(ctx)).validation
 
-    return _makensis(ctx, toolchain, script, srcs, user_scripts, staged.files) + [
+    return _makensis(ctx, toolchain, script, srcs, user_scripts, depset([f for p in plugins for f in p.dlls.values() + p.includes])) + [
         OutputGroupInfo(
-            plugin_licenses = staged.licenses,
+            plugin_licenses = depset([p.license for p in plugins]),
             options_doc = _options_doc_outputs(ctx, toolchain),
             _validation = validation,
         ),
@@ -1946,7 +1959,15 @@ For more details see `post_init`.
             default = Label("//nsis/private/includes:includes_dir"),
             allow_single_file = True,
         ),
-    }, **dict(PLUGIN_ATTRS, **dict(SIGNING_ATTRS, **STAMP_ATTRS))),
+        "plugins": attr.label_list(
+            providers = [NsisPluginInfo],
+            doc = "Additional NSIS plugins (nsis_plugin targets) made available to the script.",
+        ),
+        "_default_plugins": attr.label_list(
+            default = [Label("@nsis_plugin_nsarray//:plugin")],
+            providers = [NsisPluginInfo],
+        ),
+    }, **dict(SIGNING_ATTRS, **STAMP_ATTRS)),
     toolchains = [
         _NSIS_TOOLCHAIN_TYPE,
     ] + _INSTALLER_SIGNING_TOOLCHAINS,

@@ -370,7 +370,7 @@ nsis_installer(
 - Installers are Unicode, so only `x86_unicode` and `amd64_unicode` builds are
   taken; at least one is required. Each DLL must be named `<plugin_name>.dll`
   because makensis takes the command prefix from the file name.
-- Two different targets with the same `plugin_name` fail the build.
+- If two plugins share a `plugin_name`, makensis fails when the script calls it.
 - The licenses of an installer's plugins are in its `plugin_licenses` output
   group.
 

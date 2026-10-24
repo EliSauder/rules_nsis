@@ -160,40 +160,27 @@ def shortcut_failure_test(
         expected = expected,
     )
 
-def _plugin_staging_test_impl(ctx):
+def _plugin_lines_test_impl(ctx):
     env = analysistest.begin(ctx)
-    outputs = [
-        o.short_path
-        for a in analysistest.target_actions(env)
-        if a.mnemonic == "Symlink"
-        for o in a.outputs.to_list()
-    ]
-    for expected in ctx.attr.staged:
-        asserts.true(
-            env,
-            any([o.endswith(expected) for o in outputs]),
-            "{} not staged, got {}".format(expected, outputs),
-        )
-
-    lines = [
+    contents = [
         a.content
         for a in analysistest.target_actions(env)
         if a.mnemonic == "FileWrite" and a.outputs.to_list()[0].basename.endswith(".plugins.nsh")
     ]
-    asserts.equals(env, 1, len(lines))
-    if lines:
-        for expected in ctx.attr.lines:
-            asserts.true(env, expected in lines[0], "{} not in {}".format(expected, lines[0]))
-
+    asserts.equals(env, 1, len(contents))
+    lines = contents[0].splitlines() if contents else []
+    for expected in ctx.attr.lines:
+        matches = [l for l in lines if l.startswith(expected.split(" ...")[0]) and l.endswith(expected.split("... ")[-1])]
+        asserts.equals(env, 1, len(matches), "{} not exactly once in {}".format(expected, lines))
     if ctx.attr.license:
         licenses = [f.short_path for f in analysistest.target_under_test(env)[OutputGroupInfo].plugin_licenses.to_list()]
         asserts.true(env, any([l.endswith(ctx.attr.license) for l in licenses]), "{} not in {}".format(ctx.attr.license, licenses))
     return analysistest.end(env)
 
-_plugin_staging_test = analysistest.make(
-    _plugin_staging_test_impl,
+# Each entry of `lines` is "<start> ... <end>" and must match exactly one line.
+_plugin_lines_test = analysistest.make(
+    _plugin_lines_test_impl,
     attrs = {
-        "staged": attr.string_list(),
         "lines": attr.string_list(),
         "license": attr.string(),
     },
@@ -204,7 +191,7 @@ def plugin_tests(name):
 
     The tests share dummy DLLs; analysis never reads their content.
     """
-    for dll in ["dup/dup.dll", "dup2/dup.dll", "p/p.dll", "x64/p.dll", "wrong/other.dll"]:
+    for dll in ["p/p.dll", "x64/p.dll", "wrong/other.dll"]:
         native.genrule(
             name = "{}_dll_{}".format(name, dll.replace("/", "_").replace(".", "_")),
             outs = ["{}_dlls/{}".format(name, dll)],
@@ -217,8 +204,6 @@ def plugin_tests(name):
 
     nsis_plugin(name = name + "_wrong_name", plugin_name = "p", x86_unicode = dll("wrong/other.dll"), license = "//tests/testdata:README.md", tags = ["manual"])
     nsis_plugin(name = name + "_p", plugin_name = "p", x86_unicode = dll("p/p.dll"), amd64_unicode = dll("x64/p.dll"), license = "//tests/testdata:README.md", tags = ["manual"])
-    nsis_plugin(name = name + "_dup_a", plugin_name = "dup", x86_unicode = dll("dup/dup.dll"), license = "//tests/testdata:README.md", tags = ["manual"])
-    nsis_plugin(name = name + "_dup_b", plugin_name = "dup", x86_unicode = dll("dup2/dup.dll"), license = "//tests/testdata:README.md", tags = ["manual"])
 
     nsis_component(name = name + "_component", srcs = ["//tests/testdata:README.md"], tags = ["manual"])
 
@@ -239,24 +224,19 @@ def plugin_tests(name):
         target_under_test = installer("wrong_name", [":" + name + "_wrong_name"]),
         expected = "must be named p.dll",
     )
-    _expect_failure_test(
-        name = name + "_name_clash_test",
-        target_under_test = installer("clash", [":" + name + "_dup_a", ":" + name + "_dup_b"]),
-        expected = "plugin name 'dup' is provided by both",
-    )
-    _plugin_staging_test(
+    _plugin_lines_test(
         name = name + "_same_label_test",
         target_under_test = installer("same_label", ["@nsis_plugin_nsarray//:plugin"]),
-        staged = ["same_label_installer.plugins/x86-unicode/nsArray.dll"],
+        lines = ['!addplugindir /x86-unicode ... nsis_plugin_nsarray/Plugins/x86-unicode"'],
     )
-    _plugin_staging_test(
-        name = name + "_staging_test",
-        target_under_test = installer("staging", [":" + name + "_p"]),
-        staged = [
-            "staging_installer.plugins/x86-unicode/p.dll",
-            "staging_installer.plugins/amd64-unicode/p.dll",
-            "staging_installer.plugins/x86-unicode/nsArray.dll",
+    _plugin_lines_test(
+        name = name + "_lines_test",
+        target_under_test = installer("lines", [":" + name + "_p"]),
+        lines = [
+            '!addplugindir /x86-unicode ... {}_dlls/p"'.format(name),
+            '!addplugindir /amd64-unicode ... {}_dlls/x64"'.format(name),
+            '!addplugindir /x86-unicode ... nsis_plugin_nsarray/Plugins/x86-unicode"',
+            '!addincludedir ... nsis_plugin_nsarray/Include"',
         ],
-        lines = ["!addplugindir /x86-unicode ", "!addplugindir /amd64-unicode "],
         license = "Docs/nsArray/Readme.txt",
     )
