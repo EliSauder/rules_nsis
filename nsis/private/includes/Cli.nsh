@@ -9,13 +9,14 @@
 
 ; Command line support for the installer and the uninstaller.
 ;
-; The command line is split into args, like argc/argv: whitespace separates
-; args outside double quotes, and quotes are removed wherever they appear, so
-; /name="a b" and "/name=a b" are both the arg /name=a b. NSIS consumes a /D=
-; arg and everything after it before the script runs, so parsing stops there
-; too. Names are matched case-insensitively, and a switch is either bare (/X)
-; or carries a value (/X=value). When a name is given more than once, the last
-; one wins.
+; The command line is split into args by Windows (CommandLineToArgvW), the
+; same way a C program gets argv: whitespace separates args outside double
+; quotes, quotes are removed wherever they appear, \" is a literal quote, and
+; backslashes are halved before a quote. So /name="a b" and "/name=a b" are both
+; the arg /name=a b. NSIS consumes a /D= arg and everything after it before the
+; script runs, so parsing stops there too. Names are matched case-insensitively,
+; and a switch is either bare (/X) or carries a value (/X=value). When a name is
+; given more than once, the last one wins.
 ;
 ; The args are kept in the nsArray array __cli_args (indexed, so an arg may
 ; contain any character, including LF) and counted in $__cli_argc, which also
@@ -24,10 +25,10 @@
 ; scan the args. Every macro parses the command line on first use, so
 ; ${Cli_Init} is optional.
 ;
-; The full command line is read from the process (GetCommandLineW) in chunks,
-; so its total length is not limited to NSIS_MAX_STRLEN. Each single arg is:
-; a longer one is truncated, a warning is logged and ${Cli_Init} sets the error
-; flag (the other macros report only their own result).
+; The whole command line is read, whatever its length. An arg longer than
+; NSIS_MAX_STRLEN - 1 characters is truncated, a warning is logged and
+; ${Cli_Init} sets the error flag (the other macros report only their own
+; result).
 ;
 ; Each macro except ${Cli_Fail} has an "un." variant. The macros that return a
 ; value set the error flag and return "" when there is none, and clear it
@@ -35,10 +36,7 @@
 
 Var /GLOBAL __cli_argc
 
-; Longest arg, and how many characters are read at a time. A chunk plus the
-; couple of characters carried over from the one before must fit in a string.
 !define /math _CLI_ARG_MAX ${NSIS_MAX_STRLEN} - 1
-!define /math _CLI_CHUNK ${NSIS_MAX_STRLEN} - 8
 
 ; Lower-cases the string in the register $REGISTER (a digit 0-9), in place. The
 ; one place that defines how names are compared.
@@ -52,127 +50,46 @@ Var /GLOBAL __cli_argc
 !macro _Cli_Init PREFIX
 Function ${PREFIX}Cli_Init
   StrCmp $__cli_argc "" 0 ${PREFIX}CliInitDone
-  Push $0 ; characters being tokenized
-  Push $1 ; index
-  Push $2 ; length
-  Push $3 ; current character
-  Push $4 ; current arg
-  Push $5 ; inside quotes
-  Push $6 ; arg in progress
-  Push $7 ; pointer to the unread command line
-  Push $8 ; unread characters
-  Push $9 ; chunk
-  Push $R0 ; characters to tokenize
-  Push $R1 ; an arg was too long
-  Push $R2 ; length of the current arg
-  Push $R3 ; scratch
+  Push $0 ; argc
+  Push $1 ; argv
+  Push $2 ; index
+  Push $3 ; pointer to argv[index], then to the arg
+  Push $4 ; arg
+  Push $5 ; an arg was too long
+  Push $6 ; scratch
 
   StrCpy $__cli_argc 0
   nsArray::Clear __cli_args
   nsArray::Clear __cli_named
-  ClearErrors
-
-  StrCpy $4 ""
   StrCpy $5 0
-  StrCpy $6 0
-  StrCpy $R1 0
-  StrCpy $R2 0
-  System::Call 'kernel32::GetCommandLineW() p .r7'
-  System::Call 'kernel32::lstrlenW(p r7) i .r8'
 
-  ; Skip the program name the way ${GetParameters} does: it ends at the
-  ; separator found from the third character on, a quote when the line starts
-  ; with one and a space otherwise. A name longer than a chunk leaves no args.
-  Call ${PREFIX}CliInitRead
-  StrCpy $3 $9 1
-  StrCmp $3 '"' +2
-    StrCpy $3 " "
-  StrCpy $1 2
-${PREFIX}CliInitName:
-  IntCmp $1 $R3 ${PREFIX}CliInitNoArgs 0 ${PREFIX}CliInitNoArgs
-  StrCpy $0 $9 1 $1
-  IntOp $1 $1 + 1
-  StrCmp $0 $3 0 ${PREFIX}CliInitName
-  StrCpy $0 $9 "" $1
-  Goto ${PREFIX}CliInitBuffer
-${PREFIX}CliInitNoArgs:
-  StrCpy $0 ""
-  StrCpy $8 0
-
-${PREFIX}CliInitBuffer:
-  StrLen $2 $0
-  StrCpy $1 0
-  StrCpy $R0 $2
-  ; Another chunk follows, so leave the last two characters for the next
-  ; round: the /D= check needs to see three.
-  ${If} $8 > 0
-    IntOp $R0 $2 - 2
-  ${EndIf}
-
+  System::Call 'kernel32::GetCommandLineW() p .r1'
+  System::Call 'shell32::CommandLineToArgvW(p r1, *i .r0) p .r1'
+  ; argv[0] is the program.
+  StrCpy $2 1
 ${PREFIX}CliInitNext:
-  IntCmp $1 $R0 ${PREFIX}CliInitChunkEnd 0 ${PREFIX}CliInitChunkEnd
-  StrCpy $3 $0 1 $1
-  ${If} $6 == 0
-  ${AndIf} $5 == 0
-    StrCpy $3 $0 3 $1
-    ${If} $3 == "/D="
-      StrCpy $8 0
-      Goto ${PREFIX}CliInitEnd
-    ${EndIf}
-    StrCpy $3 $0 1 $1
-  ${EndIf}
-  IntOp $1 $1 + 1
-  ${If} $3 == '"'
-    IntOp $5 1 - $5
-    StrCpy $6 1
-    Goto ${PREFIX}CliInitNext
-  ${EndIf}
-  ${If} $5 == 0
-    ${If} $3 == " "
-    ${OrIf} $3 == "$\t"
-      ${If} $6 == 1
-        Call ${PREFIX}CliInitAdd
-        StrCpy $6 0
-      ${EndIf}
-      Goto ${PREFIX}CliInitNext
-    ${EndIf}
-  ${EndIf}
-  StrCpy $6 1
-  ${If} $R2 >= ${_CLI_ARG_MAX}
-    StrCpy $R1 1
-  ${Else}
-    StrCpy $4 "$4$3"
-    IntOp $R2 $R2 + 1
-  ${EndIf}
+  IntCmp $2 $0 ${PREFIX}CliInitEnd 0 ${PREFIX}CliInitEnd
+  IntPtrOp $3 $2 * ${NSIS_PTR_SIZE}
+  IntPtrOp $3 $1 + $3
+  System::Call '*$3(p .r3)'
+  System::Call 'kernel32::lstrcpynW(w .r4, p r3, i ${NSIS_MAX_STRLEN})'
+  StrCpy $6 $4 3
+  StrCmp $6 "/D=" ${PREFIX}CliInitEnd
+  System::Call 'kernel32::lstrlenW(p r3) i .r3'
+  IntCmp $3 ${_CLI_ARG_MAX} +2 +2
+    StrCpy $5 1
+  Call ${PREFIX}CliInitAdd
+  IntOp $2 $2 + 1
   Goto ${PREFIX}CliInitNext
 
-${PREFIX}CliInitChunkEnd:
-  ${If} $8 > 0
-    StrCpy $0 $0 "" $1
-    Call ${PREFIX}CliInitRead
-    StrCpy $0 "$0$9"
-    Goto ${PREFIX}CliInitBuffer
-  ${EndIf}
-
 ${PREFIX}CliInitEnd:
-  ${If} $6 == 1
-    Call ${PREFIX}CliInitAdd
-  ${EndIf}
-  ${If} $R1 == 1
+  System::Call 'kernel32::LocalFree(p r1)'
+  ClearErrors
+  ${If} $5 == 1
     !insertmacro LogWarn "An argument of the command line is longer than ${_CLI_ARG_MAX} characters and was truncated."
-  ${EndIf}
-  ; Popping leaves the error flag alone.
-  ${If} $R1 == 1
     SetErrors
   ${EndIf}
 
-  Pop $R3
-  Pop $R2
-  Pop $R1
-  Pop $R0
-  Pop $9
-  Pop $8
-  Pop $7
   Pop $6
   Pop $5
   Pop $4
@@ -183,26 +100,7 @@ ${PREFIX}CliInitEnd:
 ${PREFIX}CliInitDone:
 FunctionEnd
 
-; Reads the next chunk of the command line into $9, and its length into $R3,
-; moving $7 and $8 past it. Called with Cli_Init's registers.
-Function ${PREFIX}CliInitRead
-  StrCpy $9 ""
-  StrCpy $R3 0
-  ${If} $8 > 0
-    StrCpy $R3 $8
-    ${If} $R3 > ${_CLI_CHUNK}
-      StrCpy $R3 ${_CLI_CHUNK}
-    ${EndIf}
-    System::Call '*$7(&w$R3 .r9)'
-    ; The pointer moves in bytes, and a character is two.
-    IntPtrOp $7 $7 + $R3
-    IntPtrOp $7 $7 + $R3
-    IntOp $8 $8 - $R3
-  ${EndIf}
-FunctionEnd
-
-; Adds $4 to the args and the named args, and clears it and the length in $R2.
-; Called with Cli_Init's registers. The name is what precedes the first =; a
+; Adds $4 to the args and the named args. Called with Cli_Init's registers. The name is what precedes the first =; a
 ; later arg with the same name replaces the earlier one.
 Function ${PREFIX}CliInitAdd
   nsArray::Set __cli_args /key=$__cli_argc $4
@@ -237,8 +135,6 @@ ${PREFIX}CliInitAddDone:
   Pop $2
   Pop $1
   Pop $0
-  StrCpy $4 ""
-  StrCpy $R2 0
 FunctionEnd
 !macroend
 
