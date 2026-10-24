@@ -4,6 +4,8 @@ def run_case(case, harness, args):
     base = common.base(case)
     if base == "cli_init":
         harness.run(expect_errors=False)
+        # A single arg past NSIS_MAX_STRLEN is truncated, and reported.
+        harness.run(command_tail=["/x=" + "x" * 20000], expect_errors=True)
     elif base == "cli_arg_count":
         count = harness.run().outputs["count"]
         # Quotes group an arg, so an empty or spaced arg still counts once.
@@ -11,6 +13,11 @@ def run_case(case, harness, args):
         harness.run(command_args=extra).assert_outputs(count=count + len(extra))
         # NSIS consumes /D= and everything after it before the script runs.
         harness.run(command_tail=["/D=C:\\Program Files\\x y"]).assert_outputs(count=count)
+        # The whole command line is read, not just the first NSIS_MAX_STRLEN
+        # characters. The harness's own args come first, so these go last.
+        many = [f"/arg{i:03}={'x' * 50}" for i in range(400)]
+        assert sum(len(a) + 1 for a in many) > 20000
+        harness.run(command_tail=many).assert_outputs(count=count + len(many))
     elif base == "cli_get_arg":
         extra = ["plain", '"two words"', 'a"b c"d', '""', "/n=1", "last"]
         expected = ["plain", "two words", "ab cd", "", "/n=1", "last"]
@@ -27,6 +34,21 @@ def run_case(case, harness, args):
         )
         harness.run(index=1000, expect_errors=True).assert_outputs(value="")
         harness.run(index=-1, expect_errors=True).assert_outputs(value="")
+        # The uninstaller harness adds one more arg, _?=, after /index.
+        fixed = 4 if case.startswith("un_") else 3
+        harness.run(index=after + fixed, command_args=extra, expect_errors=True).assert_outputs(value="")
+        # Args are not delimited by anything, so they may contain LF.
+        harness.run(index=0, command_args=['"a\nb"', "c"], expect_errors=False).assert_outputs(value="a\nb")
+        harness.run(index=1, command_args=['"a\nb"', "c"], expect_errors=False).assert_outputs(value="c")
+        # Over 20000 characters in 400 args: the last one is intact.
+        many = [f"/arg{i:03}={'x' * 50}" for i in range(400)]
+        harness.run(index=fixed - 1 + len(many), command_tail=many, expect_errors=False).assert_outputs(
+            value=many[-1]
+        )
+        harness.run(index=fixed + len(many), command_tail=many, expect_errors=True).assert_outputs(value="")
+        # An arg close to NSIS_MAX_STRLEN is stored and returned whole.
+        long_arg = "/long=" + "y" * 990
+        harness.run(index=fixed, command_tail=[long_arg], expect_errors=False).assert_outputs(value=long_arg)
     elif base == "cli_has_arg":
         for arguments, expected in [
             ([], False),
@@ -50,13 +72,22 @@ def run_case(case, harness, args):
             (['/x="with spaces"'], "with spaces"),
             (['"/x=with spaces"'], "with spaces"),
             (['/x=a"b c"d'], "ab cd"),
+            # Windows argv rules: \" is a literal quote, and backslashes
+            # before a quote are halved. The quotes stay balanced because the
+            # harness reads its own args with NSIS's parser.
+            (['/x=a\\"b\\"c'], 'a"b"c'),
+            (['"/x=c:\\\\"'], "c:\\"),
             (["/x=one", "/x=two", "/X=three"], "three"),
+            # Names match in any case, and the value keeps its own.
+            (["/X=MiXed"], "MiXed"),
+            (["/x=a", "/X=b", "/x=c"], "c"),
             (["/x=one", "/x"], ""),
             (["/x", "/x=two"], "two"),
         ]:
             # A bare /x leaves no value even when an earlier one had it.
             bare_last = arguments[-1] == "/x"
             harness.run(command_args=arguments, expect_errors=bare_last).assert_outputs(value=expected)
+        harness.run(command_tail=["/x=" + "v" * 990], expect_errors=False).assert_outputs(value="v" * 990)
         for arguments in ([], ["/x"], ["/xy=1"], ["/y=1"], ["x=1"]):
             harness.run(command_args=arguments, expect_errors=True).assert_outputs(value="")
     elif base == "cli_get_arg_bool":
