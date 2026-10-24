@@ -193,6 +193,27 @@ Function ${PREFIX}Option_ListCount
     Exch $0
 FunctionEnd
 
+; Builds a `|` separated list item by item: call Option_ListBegin, then
+; Option_ListAppend once per item (stack: item), then Option_ListEnd, which
+; pushes the list. Option_ListEnd sets the error flag when the list does not
+; fit in NSIS_MAX_STRLEN (the pushed list is then cut short) and clears it
+; otherwise; Option_ListBegin and Option_ListAppend leave it as it was.
+Function ${PREFIX}Option_ListBegin
+    nsArray::SetList __opt_list /end
+    nsArray::Clear __opt_list
+FunctionEnd
+
+Function ${PREFIX}Option_ListAppend
+    Exch $0
+    nsArray::SetList __opt_list $0 /end
+    Pop $0
+FunctionEnd
+
+Function ${PREFIX}Option_ListEnd
+    ClearErrors
+    nsArray::Join __opt_list "|"
+FunctionEnd
+
 ; Stack: list, value (top). Pushes 1 or 0. The items of the most recent list
 ; are kept in the set `__opt_set`, keyed by their lower-cased text with a "k"
 ; prefix (nsArray keys are case-sensitive, and a key such as /at=1 would be

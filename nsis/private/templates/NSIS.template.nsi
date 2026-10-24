@@ -648,7 +648,7 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
         Push $__opt_chk_val
         Call Option_ListCount
         Pop $1
-        nsArray::Clear __opt_canon
+        Call Option_ListBegin
         StrCpy $2 0
         {{- range .Choices }}
         Push $__opt_chk_val
@@ -657,14 +657,14 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
         Pop $3
         ${If} $3 == 1
             IntOp $2 $2 + 1
-            nsArray::Set __opt_canon "/key={{ template "nsq" . }}" "{{ template "nsq" . }}"
+            Push "{{ template "nsq" . }}"
+            Call Option_ListAppend
         ${EndIf}
         {{- end }}
         ${If} $1 <> $2
             StrCpy $__opt_chk_err "must be a '|' separated list of distinct values from: {{ range $i, $c := .Choices }}{{ if $i }}, {{ end }}{{ template "nsq" $c }}{{ end }}"
         ${Else}
-            ClearErrors
-            nsArray::Join __opt_canon "|"
+            Call Option_ListEnd
             Pop $0
             ${If} ${Errors}
                 StrCpy $__opt_chk_err "is too long"
