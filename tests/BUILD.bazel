@@ -1026,6 +1026,20 @@ nsis_installer_test(
 )
 
 nsis_installer_test(
+    name = "installer_with_cli_empty_entries_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/COMPONENTS=cli_docs,,cli_samples"],
+    expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=1\nsamples=1\n"},
+)
+
+nsis_installer_test(
+    name = "installer_with_cli_trailing_comma_test",
+    installer = ":installer_with_cli",
+    installer_args = ["/COMPONENTS=+cli_samples,,-cli_tools,"],
+    expected_file_contents = {"components.txt": "core=1\ntools=0\ndocs=0\nsamples=1\n"},
+)
+
+nsis_installer_test(
     name = "installer_with_cli_relative_test",
     installer = ":installer_with_cli",
     installer_args = ["/COMPONENTS=+cli_samples,-cli_tools"],

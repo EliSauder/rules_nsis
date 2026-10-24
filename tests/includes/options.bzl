@@ -37,6 +37,35 @@ def options_cases():
         parameters = ["in:list", "in:value", "out:found:bool"],
     )
     cases += include_api_case(
+        name = "option_list_count",
+        api = "options",
+        include = "Options.nsh",
+        src = "options_adapters.nsh",
+        symbol = "HarnessOptionListCount",
+        parameters = ["in:list", "out:count:int"],
+    )
+    cases += include_api_case(
+        name = "option_list_join",
+        api = "options",
+        include = "Options.nsh",
+        src = "options_adapters.nsh",
+        symbol = "HarnessOptionListJoin",
+        parameters = ["in:list", "out:joined"],
+    )
+    for name, symbol, parameters in [
+        ("option_list_contains_long", "HarnessOptionListContainsLong", ["in:count:int", "in:value", "out:found:bool"]),
+        ("option_list_count_long", "HarnessOptionListCountLong", ["in:count:int", "out:count_out:int"]),
+        ("option_list_join_long", "HarnessOptionListJoinLong", ["in:count:int", "out:joined"]),
+    ]:
+        cases += include_api_case(
+            name = name,
+            api = "options",
+            include = "Options.nsh",
+            src = "options_adapters.nsh",
+            symbol = symbol,
+            parameters = parameters,
+        )
+    cases += include_api_case(
         name = "option_persist",
         api = "options",
         include = "Options.nsh",
