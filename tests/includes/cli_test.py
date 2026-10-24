@@ -72,6 +72,10 @@ def run_case(case, harness, args):
             (['/x="with spaces"'], "with spaces"),
             (['"/x=with spaces"'], "with spaces"),
             (['/x=a"b c"d'], "ab cd"),
+            # Windows argv rules: \" is a literal quote, and backslashes
+            # before a quote are halved.
+            (['/x=a\\"b'], 'a"b'),
+            (['"/x=c:\\\\"'], "c:\\"),
             (["/x=one", "/x=two", "/X=three"], "three"),
             # Names match in any case, and the value keeps its own.
             (["/X=MiXed"], "MiXed"),
