@@ -648,7 +648,7 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
         Push $__opt_chk_val
         Call Option_ListCount
         Pop $1
-        StrCpy $0 ""
+        nsArray::Clear __opt_canon
         StrCpy $2 0
         {{- range .Choices }}
         Push $__opt_chk_val
@@ -657,17 +657,20 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
         Pop $3
         ${If} $3 == 1
             IntOp $2 $2 + 1
-            ${If} $0 == ""
-                StrCpy $0 "{{ template "nsq" . }}"
-            ${Else}
-                StrCpy $0 "$0|{{ template "nsq" . }}"
-            ${EndIf}
+            nsArray::Set __opt_canon "/key={{ template "nsq" . }}" "{{ template "nsq" . }}"
         ${EndIf}
         {{- end }}
         ${If} $1 <> $2
             StrCpy $__opt_chk_err "must be a '|' separated list of distinct values from: {{ range $i, $c := .Choices }}{{ if $i }}, {{ end }}{{ template "nsq" $c }}{{ end }}"
         ${Else}
-            StrCpy $__opt_chk_val $0
+            ClearErrors
+            nsArray::Join __opt_canon "|"
+            Pop $0
+            ${If} ${Errors}
+                StrCpy $__opt_chk_err "is too long"
+            ${Else}
+                StrCpy $__opt_chk_val $0
+            ${EndIf}
         ${EndIf}
     {{- if .Required }}
     ${ElseIf} $__opt_chk_enabled == "1"
@@ -1448,7 +1451,6 @@ FunctionEnd
 
 Var __cmp_name
 Var __cmp_val
-Var __cmp_rest
 Var __cmp_tok
 Var __cmp_more
 {{- range $cli.Components }}
@@ -1484,38 +1486,30 @@ Function __Components_Mark
     ${Cli_Fail} "Unknown component: $__cmp_name"
 FunctionEnd
 
-{{- /* Splits the next entry off $__cmp_rest into $__cmp_tok; $__cmp_more is 1 when more follow. */}}
+{{- /* Takes the next entry of the __components array into $__cmp_tok (spaces trimmed); $__cmp_more is 0 once the array is exhausted. */}}
 Function __Components_Next
     Push $0
     Push $1
-    StrCpy $0 0
-    ${Do}
-        StrCpy $1 $__cmp_rest 1 $0
-        ${If} $1 == ""
-        ${OrIf} $1 == ","
-            ${Break}
-        ${EndIf}
-        IntOp $0 $0 + 1
-    ${Loop}
-    StrCpy $__cmp_tok $__cmp_rest $0
-    ${If} $1 == ","
-        IntOp $0 $0 + 1
-        StrCpy $__cmp_rest $__cmp_rest "" $0
-        StrCpy $__cmp_more 1
-    ${Else}
-        StrCpy $__cmp_rest ""
+    ClearErrors
+    nsArray::Iterate __components
+    ${If} ${Errors}
+        StrCpy $__cmp_tok ""
         StrCpy $__cmp_more 0
-    ${EndIf}
-    StrCpy $1 $__cmp_tok 1
-    ${While} $1 == " "
-        StrCpy $__cmp_tok $__cmp_tok "" 1
+    ${Else}
+        Pop $0
+        Pop $__cmp_tok
+        StrCpy $__cmp_more 1
         StrCpy $1 $__cmp_tok 1
-    ${EndWhile}
-    StrCpy $1 $__cmp_tok 1 -1
-    ${While} $1 == " "
-        StrCpy $__cmp_tok $__cmp_tok -1
+        ${While} $1 == " "
+            StrCpy $__cmp_tok $__cmp_tok "" 1
+            StrCpy $1 $__cmp_tok 1
+        ${EndWhile}
         StrCpy $1 $__cmp_tok 1 -1
-    ${EndWhile}
+        ${While} $1 == " "
+            StrCpy $__cmp_tok $__cmp_tok -1
+            StrCpy $1 $__cmp_tok 1 -1
+        ${EndWhile}
+    ${EndIf}
     Pop $1
     Pop $0
 FunctionEnd
@@ -1577,9 +1571,13 @@ Function __Components_ApplyCli
 
     StrCpy $5 0
     StrCpy $6 0
-    StrCpy $__cmp_rest $0
+    ${ArraySplit} __components "$0" "," 1
+    nsArray::Iterate __components /reset
     ${Do}
         Call __Components_Next
+        ${If} $__cmp_more = 0
+            ${Break}
+        ${EndIf}
         ${If} $__cmp_tok != ""
             StrCpy $2 $__cmp_tok 1
             ${If} $2 == "+"
@@ -1588,9 +1586,6 @@ Function __Components_ApplyCli
             ${Else}
                 IntOp $6 $6 + 1
             ${EndIf}
-        ${EndIf}
-        ${If} $__cmp_more = 0
-            ${Break}
         ${EndIf}
     ${Loop}
     ${If} $5 > 0
@@ -1634,9 +1629,12 @@ Function __Components_ApplyCli
     ${EndIf}
 {{- end }}
 
-    StrCpy $__cmp_rest $0
+    nsArray::Iterate __components /reset
     ${Do}
         Call __Components_Next
+        ${If} $__cmp_more = 0
+            ${Break}
+        ${EndIf}
         ${If} $__cmp_tok != ""
             StrCpy $__cmp_val 1
             ${If} $3 = 0
@@ -1648,9 +1646,6 @@ Function __Components_ApplyCli
             ${EndIf}
             StrCpy $__cmp_name $__cmp_tok
             Call __Components_Mark
-        ${EndIf}
-        ${If} $__cmp_more = 0
-            ${Break}
         ${EndIf}
     ${Loop}
 

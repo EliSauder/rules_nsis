@@ -26,11 +26,16 @@
 !include Registry.nsh
 !include ShellContext.nsh
 !include Testing.nsh
+!include Utility.nsh
 !include WinMessages.nsh
 !ifndef DTM_SETRANGE
   !define /math DTM_SETRANGE ${DTM_FIRST} + 4
 !endif
 
+
+; Cache of Option_ListHas: the list `__opt_set` was built from.
+Var __opt_lh_src
+Var __opt_lh_ok
 
 !ifmacrondef __Options_ForEachPersisted
 !macro __Options_ForEachPersisted CALLBACK
@@ -160,67 +165,88 @@ Function ${PREFIX}Option_Escape
 FunctionEnd
 
 ; Stack: list. Pushes the number of `|` separated items (0 for an empty list).
+; Empty items count. The error flag is left as it was.
 Function ${PREFIX}Option_ListCount
     Exch $0 ; list
     Push $1 ; count
-    Push $2 ; position
-    Push $3
+    Push $2 ; saved error flag
 
+    StrCpy $2 0
+    IfErrors 0 +2
+        StrCpy $2 1
     StrCpy $1 0
     StrCmp $0 "" done
-    StrCpy $1 1
-    StrCpy $2 0
-    loop:
-        StrCpy $3 $0 1 $2
-        StrCmp $3 "" done
-        StrCmp $3 "|" 0 +2
-            IntOp $1 $1 + 1
-        IntOp $2 $2 + 1
-        Goto loop
+    ; ArraySplit, not nsArray::Split: Split crashes on strings over ~512 chars
+    !insertmacro ${PREFIX}ArraySplit __opt_items $0 "|" 0
+    ClearErrors
+    nsArray::Length __opt_items
+    Pop $1
     done:
-    StrCpy $0 $1
+    StrCmp $2 1 0 +3
+        SetErrors
+        Goto +2
+    ClearErrors
 
-    Pop $3
+    StrCpy $0 $1
     Pop $2
     Pop $1
     Exch $0
 FunctionEnd
 
-; Stack: list, value (top). Pushes 1 or 0.
+; Stack: list, value (top). Pushes 1 or 0. The items of the most recent list
+; are kept in the set `__opt_set`, keyed by their lower-cased text with a "k"
+; prefix (nsArray keys are case-sensitive, and a key such as /at=1 would be
+; read as a position), so repeated lookups in one list don't rescan it. The
+; error flag is left as it was.
 Function ${PREFIX}Option_ListHas
     Exch $1 ; value
     Exch
     Exch $0 ; list
-    Push $2
+    Push $2 ; result
     Push $3
     Push $4
-    Push $5
-    Push $6
+    Push $5 ; saved error flag
 
     StrCpy $5 0
+    IfErrors 0 +2
+        StrCpy $5 1
+    StrCpy $2 0
     StrCmp $1 "" done
-    StrCpy $2 0 ; token start
-    StrCpy $3 0 ; scan position
-    loop:
-        StrCpy $4 $0 1 $3
-        StrCmp $4 "|" token
-        StrCmp $4 "" token
-        IntOp $3 $3 + 1
-        Goto loop
-    token:
-        IntOp $6 $3 - $2
-        StrCpy $6 $0 $6 $2
-        StrCmp $6 $1 0 +3
-            StrCpy $5 1
-            Goto done
-        StrCmp $4 "" done
-        IntOp $3 $3 + 1
-        StrCpy $2 $3
-        Goto loop
+    StrCmp $0 "" done
+    ; The set only depends on the list up to case, so a plain compare is enough.
+    StrCmp $__opt_lh_ok 1 0 build
+    StrCmp $__opt_lh_src $0 lookup
+    build:
+        nsArray::Clear __opt_set
+        ; ArraySplit, not nsArray::Split: Split crashes on strings over ~512 chars
+        !insertmacro ${PREFIX}ArraySplit __opt_items $0 "|" 1
+        nsArray::Iterate __opt_items /reset
+        loop:
+            ClearErrors
+            nsArray::Iterate __opt_items
+            IfErrors loopdone
+            Pop $3 ; key
+            Pop $4 ; item
+            System::Call 'user32::CharLowerBuffW(t r4r4, i ${NSIS_MAX_STRLEN})'
+            nsArray::Set __opt_set /key=k$4 1
+            Goto loop
+        loopdone:
+        StrCpy $__opt_lh_src $0
+        StrCpy $__opt_lh_ok 1
+    lookup:
+    System::Call 'user32::CharLowerBuffW(t r1r1, i ${NSIS_MAX_STRLEN})'
+    ClearErrors
+    nsArray::Get __opt_set k$1
+    IfErrors done
+    Pop $3
+    StrCpy $2 1
     done:
-    StrCpy $1 $5
+    StrCmp $5 1 0 +3
+        SetErrors
+        Goto +2
+    ClearErrors
 
-    Pop $6
+    StrCpy $1 $2
     Pop $5
     Pop $4
     Pop $3
