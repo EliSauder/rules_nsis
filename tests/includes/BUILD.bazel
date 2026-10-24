@@ -75,6 +75,12 @@ py_library(
     ]
 ]
 
+# nsArray must be usable from every harness without being declared.
+nsis_compile_test(
+    name = "plugins_smoke_compile_test",
+    src = "plugins_smoke.nsh",
+)
+
 _SC = sc_cases()
 
 include_api_suite(
