@@ -12,6 +12,7 @@ load(
     "nsis_shortcut",
 )
 load("//nsis/private:dirrule.bzl", "dirrule")
+load("//nsis/private:plugins.bzl", "NsisPluginInfo", "nsis_plugin_dll")
 def _eventlog_requires_admin_test_impl(ctx):
     env = analysistest.begin(ctx)
     asserts.expect_failure(env, "requires execution_level = \"admin\"")
@@ -186,6 +187,34 @@ _plugin_lines_test = analysistest.make(
     },
 )
 
+def _plugin_dll_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    actions = analysistest.target_actions(env)
+    compiles = [a.argv for a in actions if a.mnemonic == "NsisPluginCompile"]
+    links = [a.argv for a in actions if a.mnemonic == "NsisPluginDll"]
+    asserts.equals(env, 1, len(compiles))
+    asserts.equals(env, 1, len(links))
+    for argv in compiles + links:
+        asserts.equals(env, ctx.attr.zig_target, argv[argv.index("-target") + 1])
+    for flag in ["-c", "-DUNICODE", "-D_UNICODE", "-fcommon"]:
+        asserts.true(env, flag in compiles[0], "{} not in {}".format(flag, compiles[0]))
+    for flag in ["-shared", "-nostdlib", "-Wl,--entry=DllMain"]:
+        asserts.true(env, flag in links[0], "{} not in {}".format(flag, links[0]))
+    asserts.true(env, links[0][links[0].index("-o") + 1].endswith("/dummy.dll"), links[0])
+    return analysistest.end(env)
+
+_plugin_dll_test = analysistest.make(_plugin_dll_test_impl, attrs = {"zig_target": attr.string()})
+
+def _source_plugin_test_impl(ctx):
+    env = analysistest.begin(ctx)
+    dlls = analysistest.target_under_test(env)[NsisPluginInfo].dlls
+    asserts.equals(env, ["amd64-unicode", "x86-unicode"], sorted(dlls))
+    for target, dll in dlls.items():
+        asserts.true(env, dll.short_path.endswith("/" + target.replace("-", "_") + "/nsArray.dll"), dll.short_path)
+    return analysistest.end(env)
+
+_source_plugin_test = analysistest.make(_source_plugin_test_impl)
+
 def plugin_tests(name):
     """Declares plugin analysis tests.
 
@@ -227,7 +256,7 @@ def plugin_tests(name):
     _plugin_lines_test(
         name = name + "_same_label_test",
         target_under_test = installer("same_label", ["@nsis_plugin_nsarray//:plugin"]),
-        lines = ['!addplugindir /x86-unicode ... nsis_plugin_nsarray/Plugins/x86-unicode"'],
+        lines = ['!addplugindir /x86-unicode ... nsis_plugin_nsarray/x86_unicode"'],
     )
     _plugin_lines_test(
         name = name + "_lines_test",
@@ -235,8 +264,28 @@ def plugin_tests(name):
         lines = [
             '!addplugindir /x86-unicode ... {}_dlls/p"'.format(name),
             '!addplugindir /amd64-unicode ... {}_dlls/x64"'.format(name),
-            '!addplugindir /x86-unicode ... nsis_plugin_nsarray/Plugins/x86-unicode"',
+            '!addplugindir /x86-unicode ... nsis_plugin_nsarray/x86_unicode"',
             '!addincludedir ... nsis_plugin_nsarray/Include"',
         ],
         license = "Docs/nsArray/Readme.txt",
+    )
+    for target, zig_target in [("x86-unicode", "x86-windows-gnu"), ("amd64-unicode", "x86_64-windows-gnu")]:
+        nsis_plugin_dll(
+            name = "{}_dll_{}".format(name, target),
+            plugin_name = "dummy",
+            target = target,
+            srcs = ["dummy_plugin.c"],
+            copts = ["-fcommon"],
+            tags = ["manual"],
+        )
+        _plugin_dll_test(
+            name = "{}_dll_{}_test".format(name, target),
+            target_under_test = ":{}_dll_{}".format(name, target),
+            zig_target = zig_target,
+        )
+
+    # The default nsArray is the patched source build, not the DLLs in the zip.
+    _source_plugin_test(
+        name = name + "_nsarray_source_test",
+        target_under_test = "@nsis_plugin_nsarray//:plugin",
     )
