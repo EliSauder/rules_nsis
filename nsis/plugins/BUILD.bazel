@@ -1,0 +1,8 @@
+load("//nsis/private:plugins.bzl", "nsis_plugin_set")
+
+# Plugins every installer and include test can rely on.
+nsis_plugin_set(
+    name = "defaults",
+    plugins = [],
+    visibility = ["//visibility:public"],
+)

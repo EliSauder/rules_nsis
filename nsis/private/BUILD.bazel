@@ -4,6 +4,7 @@ exports_files([
     "options.bzl",
     "cli.bzl",
     "shortcuts.bzl",
+    "plugins.bzl",
 ], ["//visibility:public"])
 
 exports_files([

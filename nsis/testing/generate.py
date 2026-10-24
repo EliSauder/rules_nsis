@@ -164,7 +164,7 @@ def _on_init(context, on_init):
     return [f"Function {name}", *on_init, "FunctionEnd"]
 
 
-def generate(spec, source, include_dirs=(), defines=None, on_init=()):
+def generate(spec, source, include_dirs=(), defines=None, on_init=(), plugin_lines=()):
     """Generates a harness script; spec=None only checks that source compiles."""
     defines = dict(defines or {})
     if spec is not None:
@@ -187,6 +187,7 @@ def generate(spec, source, include_dirs=(), defines=None, on_init=()):
     ]
     for directory in include_dirs:
         lines.append(f"!addincludedir {literal(str(directory))}")
+    lines += plugin_lines
     lines += _defines(defines)
     # Include by basename: makensis also searches relative to the current script.
     lines += [
@@ -355,6 +356,7 @@ def main():
     parser.add_argument("--source", required=True)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--include-dir", action="append", default=[])
+    parser.add_argument("--plugin-line", action="append", default=[], help="NSIS line")
     parser.add_argument("--define", action="append", default=[], help="NAME=VALUE")
     parser.add_argument("--on-init", action="append", default=[], help="NSIS line")
     args = parser.parse_args()
@@ -364,7 +366,7 @@ def main():
         defines[name] = value
     spec = json.loads(args.spec.read_text(encoding="utf-8")) if args.spec else None
     args.output.write_text(
-        generate(spec, args.source, args.include_dir, defines, args.on_init),
+        generate(spec, args.source, args.include_dir, defines, args.on_init, args.plugin_line),
         encoding="utf-8",
     )
 

@@ -1,6 +1,7 @@
 """Describe NSIS symbols and build standalone API test harnesses."""
 
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
+load("//nsis/private:plugins.bzl", "PLUGIN_ATTRS", "plugin_script_lines", "stage_plugins")
 load("//nsis/private:transitions.bzl", "windows_source_transition")
 
 NsisSymbolInfo = provider(
@@ -109,6 +110,9 @@ def _harness_impl(ctx):
     args.add("--include-dir", ctx.file._includes.path)
     for directory in depset([f.dirname for f in ctx.files.includes]).to_list():
         args.add("--include-dir", directory)
+    staged = stage_plugins(ctx, [ctx.attr._default_plugins] + ctx.attr.plugins)
+    for line in plugin_script_lines(staged, lambda p: p):
+        args.add("--plugin-line=" + line)
     ctx.actions.run(
         executable = ctx.executable._generator,
         arguments = [args],
@@ -133,7 +137,7 @@ def _harness_impl(ctx):
         arguments = [flags],
         inputs = depset(
             [script, ctx.file.src, ctx.file._includes] + ctx.files.includes,
-            transitive = [toolchain.nsis_dir.files, toolchain.nsis_files],
+            transitive = [toolchain.nsis_dir.files, toolchain.nsis_files, staged.files],
         ),
         tools = [toolchain.makensis],
         outputs = [binary],
@@ -155,7 +159,7 @@ Without a description the harness only checks that src compiles on its own.
     executable = True,
     cfg = windows_source_transition,
     toolchains = ["//nsis/toolchain:toolchain_type"],
-    attrs = {
+    attrs = dict(PLUGIN_ATTRS, **{
         "src": attr.label(mandatory = True, allow_single_file = [".nsh"]),
         "description": attr.label(
             allow_single_file = [".json"],
@@ -181,7 +185,7 @@ Without a description the harness only checks that src compiles on its own.
         "_allowlist_function_transition": attr.label(
             default = Label("@bazel_tools//tools/allowlists/function_transition_allowlist"),
         ),
-    },
+    }),
 )
 
 def nsis_compile_test(name, src, includes = [], defines = {}, **kwargs):
