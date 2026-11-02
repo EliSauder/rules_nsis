@@ -69,7 +69,8 @@ Var __opt_test_c
     ${Option_Get} test a ${OUT}
 !macroend
 
-; Persists a list and multiline text, clobbers them and loads them back.
+; Persists a list and multiline text, clobbers them and loads them back. The
+; stored values are left for the test to inspect and delete.
 !macro HarnessOptionPersistKinds LIST TEXT LIST_OUT TEXT_OUT
     !insertmacro _HarnessOptionClear ""
     ${Option_Set} test b `${LIST}`
@@ -80,7 +81,6 @@ Var __opt_test_c
     ${Option_LoadPersisted}
     ${Option_Get} test b ${LIST_OUT}
     ${Option_Get} test c ${TEXT_OUT}
-    !insertmacro _HarnessOptionClear ""
 !macroend
 
 ; Loads the values the test stored, without clearing them.
