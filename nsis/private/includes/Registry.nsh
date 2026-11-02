@@ -2,6 +2,7 @@
 !define __INCLUDE_REGISTRY
 
 !include LogicLib.nsh
+!include Array.nsh
 !include Formatting.nsh
 !include ShellContext.nsh
 !include Testing.nsh
@@ -450,11 +451,7 @@ Function ${PREFIX}SetRegistrySubKeyMultiStrInView
     !insertmacro _ApplyRegTestId $0 $4
     !insertmacro _RegMultiSzAccess "${PREFIX}" $3 6 $4 $5
 
-    nsArray::Length $1
-    Pop $6
-    IfErrors 0 +2
-        StrCpy $6 0
-    ClearErrors
+    ${Array_Length} $1 $6
 
     ; Room for every character, a terminator per string and the final
     ; terminator. System::Alloc zeroes the memory.

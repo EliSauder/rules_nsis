@@ -26,6 +26,7 @@ load(":version.bzl", "version_cases")
 package(default_visibility = ["//visibility:private"])
 
 _INCLUDES = [
+    "Array.nsh",
     "Arch.nsh",
     "Cli.nsh",
     "Console.nsh",

@@ -523,8 +523,7 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
     ${If} $0 <> -1
         SendMessage {{$h}} ${LB_GETSEL} $0 0 $1
         ${If} $1 > 0
-            nsArray::Length __opt_chk
-            Pop $1
+            ${Array_Length} __opt_chk $1
             nsArray::Set __opt_chk /key=$1 "{{ template "nsq" . }}"
         ${EndIf}
     ${EndIf}
@@ -1119,8 +1118,7 @@ Function __Options_ApplyCli
             ${If} $4 == "{{.Id}}"
 {{- if .MultiSelect }}
                 {{- /* The option may be repeated: every value is one item. */}}
-                nsArray::Length __optcli_{{.Var}}
-                Pop $5
+                ${Array_Length} __optcli_{{.Var}} $5
                 nsArray::Set __optcli_{{.Var}} /key=$5 "$3"
 {{- else }}
                 StrCpy $__opt_chk_val $3
@@ -1136,8 +1134,7 @@ Function __Options_ApplyCli
     ${EndWhile}
     {{- range (ds "in").Options }}
     {{- if .MultiSelect }}
-    nsArray::Length __optcli_{{.Var}}
-    Pop $0
+    ${Array_Length} __optcli_{{.Var}} $0
     ${If} $0 > 0
         Push "__optcli_{{.Var}}"
         Push "__opt_chk"
@@ -1795,8 +1792,13 @@ Function __Help_TextOptions
     !insertmacro __HelpW "<secret>"
 {{- else if .MultiSelect }}
     Push $0
+    {{- /* Join pushes nothing for an array that does not exist. */}}
+    ClearErrors
     nsArray::Join "${{.Var}}" ","
+    IfErrors +3
     Pop $0
+    Goto +2
+    StrCpy $0 ""
     !insertmacro __HelpW "$0"
     Pop $0
 {{- else }}

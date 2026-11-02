@@ -14,6 +14,7 @@
 !define INI_NSH
 
 !include "LogicLib.nsh"
+!include "Array.nsh"
 
 ; Stack: pointer to a double-NUL terminated list of strings (top), array. Puts
 ; the strings in the array.
@@ -93,8 +94,7 @@ Function Ini_ReadList
     Call Ini_Lines
     nsArray::Set $R0 /key=0 ""
     nsArray::Clear $R0
-    nsArray::Length __ini_lines
-    Pop $3
+    ${Array_Length} __ini_lines $3
     StrCpy $4 0 ; line
     StrCpy $5 0 ; found
     ${While} $4 < $3
@@ -190,11 +190,7 @@ Function Ini_FormatList
     Push $5
 
     StrCpy $5 ""
-    nsArray::Length $0
-    Pop $2
-    IfErrors 0 +2
-        StrCpy $2 0
-    ClearErrors
+    ${Array_Length} $0 $2
     ${If} $2 = 0
         StrCpy $5 "$1=$\r$\n"
     ${EndIf}

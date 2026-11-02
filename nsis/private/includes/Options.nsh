@@ -32,6 +32,7 @@
 !include LogicLib.nsh
 !include Logging.nsh
 !include Product.nsh
+!include Array.nsh
 !include Registry.nsh
 !include ShellContext.nsh
 !include Testing.nsh
@@ -192,11 +193,7 @@ FunctionEnd
 ; when the array does not exist).
 Function ${PREFIX}Option_ListCount
     Exch $0 ; array
-    nsArray::Length $0
-    Pop $0
-    ClearErrors
-    StrCmp $0 "" 0 +2
-        StrCpy $0 0
+    ${Array_Length} $0 $0
     Exch $0
 FunctionEnd
 
@@ -207,9 +204,7 @@ Function ${PREFIX}Option_ListGet
     Exch $0 ; array
     Push $2
 
-    nsArray::Length $0
-    Pop $2
-    IfErrors none
+    ${Array_Length} $0 $2
     IntCmp $1 $2 none read none
     read:
     nsArray::Get $0 /at=$1
@@ -239,9 +234,7 @@ Function ${PREFIX}Option_ListHas
     Push $5
 
     StrCpy $5 0
-    nsArray::Length $0
-    Pop $2
-    IfErrors done
+    ${Array_Length} $0 $2
     StrCpy $3 0
     loop:
         IntCmp $3 $2 done 0 done
@@ -277,10 +270,7 @@ Function ${PREFIX}Option_ArrayCopy
 
     nsArray::Set $1 /key=0 ""
     nsArray::Clear $1
-    ClearErrors
-    nsArray::Length $0
-    Pop $2
-    IfErrors done
+    ${Array_Length} $0 $2
     StrCpy $3 0
     loop:
         IntCmp $3 $2 done 0 done
@@ -368,8 +358,7 @@ Function ${PREFIX}Option_FromArray
     Push $2
 
     StrCpy $0 ""
-    nsArray::Length __options_reg
-    Pop $2
+    ${Array_Length} __options_reg $2
     StrCmp $2 "0" done
         nsArray::Get __options_reg /at=0
         Pop $2 ; key
