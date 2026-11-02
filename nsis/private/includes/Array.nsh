@@ -67,6 +67,7 @@
     nsArray::Get "${ARRAY}" "/at=${INDEX}"
     ${If} ${Errors}
         StrCpy ${OUT} ""
+        SetErrors
     ${Else}
         Pop ${OUT} ; the key
         Pop ${OUT}
@@ -79,6 +80,7 @@
     nsArray::Get "${ARRAY}" "${KEY}"
     ${If} ${Errors}
         StrCpy ${OUT} ""
+        SetErrors
     ${Else}
         Pop ${OUT}
     ${EndIf}
