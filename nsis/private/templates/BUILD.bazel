@@ -1,15 +1,3 @@
 exports_files([
     "NSIS.template.nsi",
 ])
-
-# {{define}} blocks, loaded by gomplate via --template.
-filegroup(
-    name = "parts",
-    srcs = [
-        "options.template.nsi",
-        "quoting.template.nsi",
-        "sections.template.nsi",
-        "shortcuts.template.nsi",
-    ],
-    visibility = ["//nsis:__subpackages__"],
-)
