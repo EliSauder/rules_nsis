@@ -42,7 +42,7 @@ register_toolchains(
 ############################
 # SETUP PYTHON
 ############################
-bazel_dep(name = "rules_python", version = "2.4.3")
+bazel_dep(name = "rules_python", version = "2.4.5")
 
 rules_python_config = use_extension("@rules_python//python/extensions:config.bzl", "config")
 rules_python_config.explicit_init_py(default = True)
