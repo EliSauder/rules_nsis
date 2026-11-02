@@ -12,11 +12,17 @@
 ;
 ; The generated code also defines `__Options_ForEachPersisted CALLBACK`, which
 ; invokes `!insertmacro ${CALLBACK} "<page>" "<key>"` for every persisted
-; option. It is what Option_Persist and Option_LoadPersisted iterate. It
-; defaults to nothing so this file compiles on its own.
+; option, where KIND is the option type (`list`, `multiline` or any other).
+; It is what Option_Persist and Option_LoadPersisted iterate. It defaults to
+; nothing so this file compiles on its own.
 ;
-; Persisted values are stored as REG_SZ values named `<page>.<key>` under
+; Persisted values are stored as REG_MULTI_SZ values named `<page>.<key>` under
 ; `<product key>\Options`, in the view and shell context the installer uses.
+; A `list` option has one string per item and any other option a single
+; string; a `multiline` option's string keeps its line breaks. The strings are
+; exchanged with Registry.nsh through an nsArray array. Values written as REG_SZ by older
+; versions are still read and are rewritten as REG_MULTI_SZ when loaded by the
+; installer.
 ; The product key must be set with ${SetProductKey} (Product.nsh) before
 ; persisting or loading values.
 
@@ -229,29 +235,111 @@ Function ${PREFIX}Option_ListHas
     Exch $1
 FunctionEnd
 
-; Stack: default, name (top). Pushes the stored value, or the default when
-; no value is stored.
+; Stack: option kind, default, name (top). Pushes the stored value, or the
+; default when no value is stored.
 Function ${PREFIX}Option_ReadReg
     Exch $0 ; name
     Exch
     Exch $1 ; default
+    Exch 2
+    Exch $4 ; kind
     Push $2
     Push $3
 
-    !insertmacro ${PREFIX}SetShellContext
     !insertmacro ${PREFIX}GetProductKey $2
     StrCpy $2 "$2\Options"
-    !insertmacro _ApplyRegTestId $2 $3
-    !insertmacro ${PREFIX}DefineRegView
     ClearErrors
-    ReadRegStr $3 SHCTX "$2" "$0"
-    IfErrors +2 0
+    nsArray::Clear __options_reg
+    ClearErrors
+    !insertmacro ${PREFIX}GetRegistrySubKeyMultiStr "$2" "$0" __options_reg
+    IfErrors legacy
+        Push $4
+        Call ${PREFIX}Option_FromArray
+        Pop $1
+        Goto done
+    legacy:
+    ; Not a REG_MULTI_SZ value: missing, or a REG_SZ one stored by an older
+    ; version in the single-line form the options use.
+    ClearErrors
+    !insertmacro ${PREFIX}GetRegistrySubKey "$2" "$0" $3
+    IfErrors done
         StrCpy $1 $3
+!if "${PREFIX}" == ""
+        Push $4
+        Push $3
+        Push $0
+        Call Option_WriteReg
+!endif
+    done:
 
     Pop $3
     Pop $2
+    Pop $4
     Pop $0
     Exch $1
+FunctionEnd
+
+; Stack: option kind (top). Pushes the option value held by the
+; `__options_reg` array: `|` separated for a list, escaped on one line for
+; multiline, the first string otherwise.
+Function ${PREFIX}Option_FromArray
+    Exch $1 ; kind
+    Push $0
+    Push $2
+
+    StrCmp $1 "list" 0 single
+        nsArray::Join __options_reg "|"
+        Pop $0
+        Goto done
+    single:
+    StrCpy $0 ""
+    nsArray::Length __options_reg
+    Pop $2
+    StrCmp $2 "0" done
+        nsArray::Get __options_reg /at=0
+        Pop $2 ; key
+        Pop $0
+        StrCmp $1 "multiline" 0 done
+            Push $0
+            Call ${PREFIX}Option_Escape
+            Pop $0
+    done:
+    ClearErrors
+
+    Pop $2
+    Exch $0
+    Exch
+    Pop $1
+FunctionEnd
+
+; Stack: option kind (top), option value. Fills the `__options_reg` array with
+; the strings to store: one per list item, otherwise a single one (the text of
+; a multiline option with its own line breaks).
+Function ${PREFIX}Option_ToArray
+    Exch $1 ; kind
+    Exch
+    Exch $0 ; value
+    Push $2
+
+    nsArray::Clear __options_reg
+    ClearErrors
+    StrCmp $1 "list" 0 single
+        StrCmp $0 "" done
+        nsArray::Split __options_reg "$0" "|"
+        Goto done
+    single:
+    StrCmp $1 "multiline" 0 set
+        Push $0
+        Call ${PREFIX}Option_Unescape
+        Pop $0
+    set:
+    nsArray::Set __options_reg /key=0 "$0"
+    done:
+    ClearErrors
+
+    Pop $2
+    Pop $1
+    Pop $0
 FunctionEnd
 
 !macroend
@@ -483,41 +571,47 @@ Function Option_UiGetIp
     Exch $0
 FunctionEnd
 
-; Stack: value, name (top).
+; Stack: option kind, value, name (top). Stores the value as REG_MULTI_SZ.
 Function Option_WriteReg
     Exch $0 ; name
     Exch
     Exch $1 ; value
+    Exch 2
+    Exch $4 ; kind
     Push $2
     Push $3
 
-    !insertmacro SetShellContext
+    Push $1
+    Push $4
+    Call Option_ToArray
     !insertmacro GetProductKey $2
     StrCpy $2 "$2\Options"
-    !insertmacro _ApplyRegTestId $2 $3
-    !insertmacro DefineRegView
-    WriteRegStr SHCTX "$2" "$0" "$1"
+    !insertmacro SetRegistrySubKeyMultiStr "$2" "$0" __options_reg
 
     Pop $3
     Pop $2
+    Pop $4
     Pop $0
     Pop $1
 FunctionEnd
 
-!macro _Option_PersistOne PAGE KEY
+!macro _Option_PersistOne PAGE KEY KIND
+    Push "${KIND}"
     Push `$__opt_${PAGE}_${KEY}`
     Push "${PAGE}.${KEY}"
     Call Option_WriteReg
 !macroend
 
-!macro _Option_LoadOne PAGE KEY
+!macro _Option_LoadOne PAGE KEY KIND
+    Push "${KIND}"
     Push `$__opt_${PAGE}_${KEY}`
     Push "${PAGE}.${KEY}"
     Call Option_ReadReg
     Pop $__opt_${PAGE}_${KEY}
 !macroend
 
-!macro _un.Option_LoadOne PAGE KEY
+!macro _un.Option_LoadOne PAGE KEY KIND
+    Push "${KIND}"
     Push `$__opt_${PAGE}_${KEY}`
     Push "${PAGE}.${KEY}"
     Call un.Option_ReadReg

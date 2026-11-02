@@ -1,5 +1,7 @@
 from tests.includes import common
 
+_OPTIONS_KEY = "SOFTWARE\\rules_nsis_tests\\Options\\framework-test-id"
+
 
 def run_case(case, harness, args):
     base = common.base(case)
@@ -24,6 +26,31 @@ def run_case(case, harness, args):
     elif base == "option_persist":
         for value in ["plain", "", "with|pipe$and\\slash", "C:\\Temp\\x"]:
             harness.run(value=value).assert_outputs(result=value)
+    elif base == "option_persist_kinds":
+        import winreg
+
+        try:
+            harness.run(list="a|b", text="l1\\n\\\\x\\n").assert_outputs(list_out="a|b", text_out="l1\\n\\\\x\\n")
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _OPTIONS_KEY) as handle:
+                assert winreg.QueryValueEx(handle, "test.b") == (["a", "b"], winreg.REG_MULTI_SZ)
+                assert winreg.QueryValueEx(handle, "test.c") == (["l1\r\n\\x\r\n"], winreg.REG_MULTI_SZ)
+        finally:
+            common.delete_registry_tree(winreg, _OPTIONS_KEY)
+    elif base == "option_load_stored":
+        import winreg
+
+        try:
+            # Values stored as REG_SZ by older versions are read, then promoted.
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _OPTIONS_KEY) as handle:
+                winreg.SetValueEx(handle, "test.b", 0, winreg.REG_SZ, "x|y")
+                winreg.SetValueEx(handle, "test.c", 0, winreg.REG_SZ, "m1\\nm2")
+            harness.run().assert_outputs(list="x|y", text="m1\\nm2")
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _OPTIONS_KEY) as handle:
+                assert winreg.QueryValueEx(handle, "test.b") == (["x", "y"], winreg.REG_MULTI_SZ)
+                assert winreg.QueryValueEx(handle, "test.c") == (["m1\r\nm2"], winreg.REG_MULTI_SZ)
+            harness.run().assert_outputs(list="x|y", text="m1\\nm2")
+        finally:
+            common.delete_registry_tree(winreg, _OPTIONS_KEY)
     elif base == "option_load_missing":
         harness.run(default="kept").assert_outputs(result="kept")
     else:
