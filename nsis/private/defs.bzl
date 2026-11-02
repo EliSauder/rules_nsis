@@ -1480,10 +1480,15 @@ def _render_file(ctx, infile, datafiles, outfile = None):
         args.add("{}={}".format(k, str(v.path)))
         dfs.append(v)
 
+    parts = ctx.files._template_parts
+    for part in parts:
+        args.add("--template")
+        args.add("{}={}".format(part.basename, part.path))
+
     args.add("--out")
     args.add(str(outfile.path))
 
-    inputs = depset(direct = dfs + [infile])
+    inputs = depset(direct = dfs + parts + [infile])
 
     ctx.actions.run(
         mnemonic = "RenderTemplate",
@@ -2007,6 +2012,10 @@ For more details see `post_init`.
         "_template": attr.label(
             default = Label("//nsis/private/templates:NSIS.template.nsi"),
             allow_single_file = True,
+        ),
+        "_template_parts": attr.label(
+            default = Label("//nsis/private/templates:parts"),
+            allow_files = True,
         ),
         "_gomplate": attr.label(
             default = "@gomplate//:gomplate",

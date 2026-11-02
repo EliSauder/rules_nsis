@@ -20,6 +20,8 @@
 !ifndef ARRAY_NSH
 !define ARRAY_NSH
 
+!include LogicLib.nsh
+
 !macro Array_Reset ARRAY
     nsArray::Set "${ARRAY}" /key=0 ""
     nsArray::Clear "${ARRAY}"
@@ -36,11 +38,12 @@
 !macro Array_Length ARRAY OUT
     ClearErrors
     nsArray::Length "${ARRAY}"
-    IfErrors +3
-    Pop ${OUT}
-    Goto +2
-    StrCpy ${OUT} 0
-    ClearErrors
+    ${If} ${Errors}
+        StrCpy ${OUT} 0
+        ClearErrors
+    ${Else}
+        Pop ${OUT}
+    ${EndIf}
 !macroend
 !define Array_Length `!insertmacro Array_Length`
 
@@ -62,32 +65,35 @@
 !macro Array_GetAt ARRAY INDEX OUT
     ClearErrors
     nsArray::Get "${ARRAY}" "/at=${INDEX}"
-    IfErrors +4
-    Pop ${OUT} ; the key
-    Pop ${OUT}
-    Goto +2
-    StrCpy ${OUT} ""
+    ${If} ${Errors}
+        StrCpy ${OUT} ""
+    ${Else}
+        Pop ${OUT} ; the key
+        Pop ${OUT}
+    ${EndIf}
 !macroend
 !define Array_GetAt `!insertmacro Array_GetAt`
 
 !macro Array_GetKey ARRAY KEY OUT
     ClearErrors
     nsArray::Get "${ARRAY}" "${KEY}"
-    IfErrors +3
-    Pop ${OUT}
-    Goto +2
-    StrCpy ${OUT} ""
+    ${If} ${Errors}
+        StrCpy ${OUT} ""
+    ${Else}
+        Pop ${OUT}
+    ${EndIf}
 !macroend
 !define Array_GetKey `!insertmacro Array_GetKey`
 
 !macro Array_Join ARRAY SEPARATOR OUT
     ClearErrors
     nsArray::Join "${ARRAY}" "${SEPARATOR}"
-    IfErrors +3
-    Pop ${OUT}
-    Goto +2
-    StrCpy ${OUT} ""
-    ClearErrors
+    ${If} ${Errors}
+        StrCpy ${OUT} ""
+        ClearErrors
+    ${Else}
+        Pop ${OUT}
+    ${EndIf}
 !macroend
 !define Array_Join `!insertmacro Array_Join`
 
