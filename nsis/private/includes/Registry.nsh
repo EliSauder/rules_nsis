@@ -459,9 +459,7 @@ Function ${PREFIX}SetRegistrySubKeyMultiStrInView
     StrCpy $9 0
     sizeloop:
         IntCmp $9 $6 sizedone 0 sizedone
-        nsArray::Get $1 /at=$9
-        Pop $R0
-        Pop $R1
+        ${Array_GetAt} $1 $9 $R1
         StrLen $R2 $R1
         IntOp $R2 $R2 + 1
         IntOp $R3 $R3 + $R2
@@ -475,9 +473,7 @@ Function ${PREFIX}SetRegistrySubKeyMultiStrInView
     StrCpy $9 0
     copyloop:
         IntCmp $9 $6 write 0 write
-        nsArray::Get $1 /at=$9
-        Pop $R0
-        Pop $R1
+        ${Array_GetAt} $1 $9 $R1
         System::Call 'kernel32::lstrcpyW(p r8, w r11)'
         StrLen $R2 $R1
         IntOp $R2 $R2 + 1
@@ -547,7 +543,7 @@ Function ${PREFIX}GetRegistrySubKeyMultiStrInView
     Push $R2
     Push $R3
 
-    nsArray::Clear $2
+    ${Array_Clear} $2
     ClearErrors
     !insertmacro _ApplyRegTestId $0 $4
     !insertmacro _RegMultiSzAccess "${PREFIX}" $3 1 $4 $5
@@ -575,7 +571,7 @@ Function ${PREFIX}GetRegistrySubKeyMultiStrInView
         IntPtrCmp $R1 $R2 done 0 done
         System::Call 'kernel32::lstrcpyW(w .r4, p r11)'
         System::Call 'kernel32::lstrlenW(p r11) i .r7'
-        nsArray::Set $2 /key=$R3 "$4"
+        ${Array_Set} $2 $R3 "$4"
         IntOp $R3 $R3 + 1
         IntOp $7 $7 + 1
         IntOp $7 $7 * 2
@@ -706,9 +702,7 @@ Function ${PREFIX}GetRegistrySubKeyInView
     Push $2
     Call ${PREFIX}GetRegistrySubKeyMultiStrInView
     IfErrors legacy
-        nsArray::Join "__registry_multisz" "$\n"
-        Pop $3
-        ClearErrors
+        ${Array_Join} "__registry_multisz" "$\n" $3
         Goto found
     legacy:
     !insertmacro _ApplyRegTestId $0 $3

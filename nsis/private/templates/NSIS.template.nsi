@@ -340,10 +340,9 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
 {{- if .Opt.MultiSelect }}
     {{- /* A list option's variable holds the name of the array with its items. */}}
     StrCpy ${{.Opt.Var}} "{{.Opt.Var}}"
-    nsArray::Set {{.Opt.Var}} /key=0 ""
-    nsArray::Clear {{.Opt.Var}}
+    ${Array_Reset} {{.Opt.Var}}
     {{- range $i, $d := .Opt.Default }}
-    nsArray::Set {{$.Opt.Var}} /key={{$i}} "{{ template "nsq" $d }}"
+    ${Array_Set} {{$.Opt.Var}} {{$i}} "{{ template "nsq" $d }}"
     {{- end }}
 {{- else if and (eq .Opt.Control "date") (eq .Opt.Default "") }}
     Push "{{.Opt.Min}}"
@@ -516,15 +515,14 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
 {{- else if or (eq .Control "listbox") (eq .Control "sorted_listbox") }}
     {{- if .MultiSelect }}
     {{- /* The selected choices go to the array __opt_chk. */}}
-    nsArray::Set __opt_chk /key=0 ""
-    nsArray::Clear __opt_chk
+    ${Array_Reset} __opt_chk
     {{- range .Choices }}
     ${NSD_LB_FindStringExact} {{$h}} "{{ template "nsq" . }}" $0
     ${If} $0 <> -1
         SendMessage {{$h}} ${LB_GETSEL} $0 0 $1
         ${If} $1 > 0
             ${Array_Length} __opt_chk $1
-            nsArray::Set __opt_chk /key=$1 "{{ template "nsq" . }}"
+            ${Array_Set} __opt_chk $1 "{{ template "nsq" . }}"
         ${EndIf}
     ${EndIf}
     {{- end }}
@@ -653,8 +651,7 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
 {{- else if or (eq .Control "listbox") (eq .Control "sorted_listbox") }}
     {{- if .MultiSelect }}
     {{- /* The items are in the array __opt_chk; the valid ones, in the order of the choices, replace them. */}}
-    nsArray::Set __opt_chk_out /key=0 ""
-    nsArray::Clear __opt_chk_out
+    ${Array_Reset} __opt_chk_out
     Push "__opt_chk"
     Call Option_ListCount
     Pop $1
@@ -664,7 +661,7 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
         Call Option_ListGet
         Pop $0
         ${If} $0 == ""
-            nsArray::Clear __opt_chk
+            ${Array_Clear} __opt_chk
             StrCpy $1 0
         ${EndIf}
     ${EndIf}
@@ -676,7 +673,7 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
         Call Option_ListHas
         Pop $3
         ${If} $3 == 1
-            nsArray::Set __opt_chk_out /key=$2 "{{ template "nsq" . }}"
+            ${Array_Set} __opt_chk_out $2 "{{ template "nsq" . }}"
             IntOp $2 $2 + 1
         ${EndIf}
         {{- end }}
@@ -1014,13 +1011,10 @@ Function __Options_ApplyIni
     Push $5
     Push $6
     ${Ini_Sections} $0 __opt_ini_sections
-    nsArray::Length __opt_ini_sections
-    Pop $1
+    ${Array_Length} __opt_ini_sections $1
     StrCpy $2 0
     ${While} $2 < $1
-        nsArray::Get __opt_ini_sections /at=$2
-        Pop $3
-        Pop $3
+        ${Array_GetAt} __opt_ini_sections $2 $3
         StrCpy $__opt_chk_what $3
         StrCpy $__opt_chk_val ""
         Call __Opt_IniIsKnown
@@ -1028,13 +1022,10 @@ Function __Options_ApplyIni
             ${Cli_Fail} "Unknown section [$3] in the options file."
         ${EndIf}
         ${Ini_Keys} $0 $3 __opt_ini_keys
-        nsArray::Length __opt_ini_keys
-        Pop $4
+        ${Array_Length} __opt_ini_keys $4
         StrCpy $5 0
         ${While} $5 < $4
-            nsArray::Get __opt_ini_keys /at=$5
-            Pop $6
-            Pop $6
+            ${Array_GetAt} __opt_ini_keys $5 $6
             StrCpy $__opt_chk_what $3
             StrCpy $__opt_chk_val $6
             Call __Opt_IniIsKnown
@@ -1080,8 +1071,7 @@ Function __Options_ApplyCli
     {{- /* The values of /O: arguments for list options are collected in arrays first. */}}
     {{- range (ds "in").Options }}
     {{- if .MultiSelect }}
-    nsArray::Set __optcli_{{.Var}} /key=0 ""
-    nsArray::Clear __optcli_{{.Var}}
+    ${Array_Reset} __optcli_{{.Var}}
     {{- end }}
     {{- end }}
     ClearErrors
@@ -1119,7 +1109,7 @@ Function __Options_ApplyCli
 {{- if .MultiSelect }}
                 {{- /* The option may be repeated: every value is one item. */}}
                 ${Array_Length} __optcli_{{.Var}} $5
-                nsArray::Set __optcli_{{.Var}} /key=$5 "$3"
+                ${Array_Set} __optcli_{{.Var}} $5 "$3"
 {{- else }}
                 StrCpy $__opt_chk_val $3
 {{- template "optApplyOne" . }}
@@ -1792,13 +1782,7 @@ Function __Help_TextOptions
     !insertmacro __HelpW "<secret>"
 {{- else if .MultiSelect }}
     Push $0
-    {{- /* Join pushes nothing for an array that does not exist. */}}
-    ClearErrors
-    nsArray::Join "${{.Var}}" ","
-    IfErrors +3
-    Pop $0
-    Goto +2
-    StrCpy $0 ""
+    ${Array_Join} "${{.Var}}" "," $0
     !insertmacro __HelpW "$0"
     Pop $0
 {{- else }}

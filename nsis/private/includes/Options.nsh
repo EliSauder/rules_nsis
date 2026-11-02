@@ -207,9 +207,7 @@ Function ${PREFIX}Option_ListGet
     ${Array_Length} $0 $2
     IntCmp $1 $2 none read none
     read:
-    nsArray::Get $0 /at=$1
-    Pop $2 ; key
-    Pop $0
+    ${Array_GetAt} $0 $1 $0
     Goto done
     none:
     StrCpy $0 ""
@@ -238,9 +236,7 @@ Function ${PREFIX}Option_ListHas
     StrCpy $3 0
     loop:
         IntCmp $3 $2 done 0 done
-        nsArray::Get $0 /at=$3
-        Pop $4 ; key
-        Pop $4
+        ${Array_GetAt} $0 $3 $4
         StrCmp $4 $1 0 +3
             StrCpy $5 1
             Goto done
@@ -268,16 +264,13 @@ Function ${PREFIX}Option_ArrayCopy
     Push $3
     Push $4
 
-    nsArray::Set $1 /key=0 ""
-    nsArray::Clear $1
+    ${Array_Reset} $1
     ${Array_Length} $0 $2
     StrCpy $3 0
     loop:
         IntCmp $3 $2 done 0 done
-        nsArray::Get $0 /at=$3
-        Pop $4 ; key
-        Pop $4
-        nsArray::Set $1 /key=$3 "$4"
+        ${Array_GetAt} $0 $3 $4
+        ${Array_Set} $1 $3 "$4"
         IntOp $3 $3 + 1
         Goto loop
     done:
@@ -304,7 +297,7 @@ Function ${PREFIX}Option_ReadReg
 
     !insertmacro ${PREFIX}GetProductKey $2
     StrCpy $2 "$2\Options"
-    nsArray::Clear __options_reg
+    ${Array_Clear} __options_reg
     ClearErrors
     !insertmacro ${PREFIX}GetRegistrySubKeyMultiStr "$2" "$0" __options_reg
     IfErrors legacy
@@ -326,10 +319,9 @@ Function ${PREFIX}Option_ReadReg
     !insertmacro ${PREFIX}GetRegistrySubKey "$2" "$0" $3
     IfErrors done
         StrCmp $4 "list" 0 legacysingle
-            nsArray::Clear $1
-            ClearErrors
+            ${Array_Reset} $1
             StrCmp $3 "" promote
-                nsArray::Split $1 "$3" "|"
+                ${Array_Split} $1 "$3" "|"
                 Goto promote
         legacysingle:
         StrCpy $1 $3
@@ -360,9 +352,7 @@ Function ${PREFIX}Option_FromArray
     StrCpy $0 ""
     ${Array_Length} __options_reg $2
     StrCmp $2 "0" done
-        nsArray::Get __options_reg /at=0
-        Pop $2 ; key
-        Pop $0
+        ${Array_GetAt} __options_reg 0 $0
         StrCmp $1 "multiline" 0 done
             Push $0
             Call ${PREFIX}Option_Escape
@@ -384,14 +374,14 @@ Function ${PREFIX}Option_ToArray
     Exch
     Exch $0 ; value
 
-    nsArray::Clear __options_reg
+    ${Array_Clear} __options_reg
     ClearErrors
     StrCmp $1 "multiline" 0 set
         Push $0
         Call ${PREFIX}Option_Unescape
         Pop $0
     set:
-    nsArray::Set __options_reg /key=0 "$0"
+    ${Array_Set} __options_reg 0 "$0"
     ClearErrors
 
     Pop $0

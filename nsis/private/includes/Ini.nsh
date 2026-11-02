@@ -26,8 +26,7 @@ Function Ini_PtrListToArray
     Push $3
     Push $4
 
-    nsArray::Set $1 /key=0 ""
-    nsArray::Clear $1
+    ${Array_Reset} $1
     StrCpy $2 0
     ${Do}
         System::Call 'kernel32::lstrlenW(p r0) i .r3'
@@ -35,7 +34,7 @@ Function Ini_PtrListToArray
             ${Break}
         ${EndIf}
         System::Call 'kernel32::lstrcpyW(w .r4, p r0)'
-        nsArray::Set $1 /key=$2 "$4"
+        ${Array_Set} $1 $2 "$4"
         IntOp $2 $2 + 1
         IntOp $3 $3 + 1
         IntOp $3 $3 * 2
@@ -92,15 +91,12 @@ Function Ini_ReadList
     Push $0
     Push $1
     Call Ini_Lines
-    nsArray::Set $R0 /key=0 ""
-    nsArray::Clear $R0
+    ${Array_Reset} $R0
     ${Array_Length} __ini_lines $3
     StrCpy $4 0 ; line
     StrCpy $5 0 ; found
     ${While} $4 < $3
-        nsArray::Get __ini_lines /at=$4
-        Pop $6
-        Pop $6
+        ${Array_GetAt} __ini_lines $4 $6
         StrCpy $7 0
         ${Do}
             StrCpy $1 $6 1 $7
@@ -115,7 +111,7 @@ Function Ini_ReadList
         ${AndIf} $1 == $2
             IntOp $7 $7 + 1
             StrCpy $1 $6 "" $7
-            nsArray::Set $R0 /key=$5 "$1"
+            ${Array_Set} $R0 $5 "$1"
             IntOp $5 $5 + 1
         ${EndIf}
         IntOp $4 $4 + 1
@@ -196,9 +192,7 @@ Function Ini_FormatList
     ${EndIf}
     StrCpy $3 0
     ${While} $3 < $2
-        nsArray::Get $0 /at=$3
-        Pop $4
-        Pop $4
+        ${Array_GetAt} $0 $3 $4
         StrCpy $5 "$5$1=$4$\r$\n"
         IntOp $3 $3 + 1
     ${EndWhile}

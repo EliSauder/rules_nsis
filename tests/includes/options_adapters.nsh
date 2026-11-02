@@ -35,18 +35,12 @@ Var __opt_test_c
 ; that are not empty.
 !macro _HarnessListReset
     ${Option_Set} test b "__opt_test_b"
-    nsArray::Set __opt_test_b /key=0 ""
-    nsArray::Clear __opt_test_b
-    ClearErrors
+    ${Array_Reset} __opt_test_b
 !macroend
 
 !macro _HarnessListAdd ITEM
     ${If} `${ITEM}` != ""
-        Push $R9
-        nsArray::Length __opt_test_b
-        Pop $R9
-        nsArray::Set __opt_test_b /key=$R9 `${ITEM}`
-        Pop $R9
+        ${Array_Append} __opt_test_b `${ITEM}`
     ${EndIf}
 !macroend
 

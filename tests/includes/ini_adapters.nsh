@@ -9,19 +9,14 @@
     ${Else}
         StrCpy ${MISSING} 0
     ${EndIf}
-    nsArray::Length harness_list
-    Pop ${COUNT}
+    ${Array_Length} harness_list ${COUNT}
     StrCpy ${FIRST} ""
     StrCpy ${SECOND} ""
     ${If} ${COUNT} > 0
-        nsArray::Get harness_list /at=0
-        Pop ${FIRST}
-        Pop ${FIRST}
+        ${Array_GetAt} harness_list 0 ${FIRST}
     ${EndIf}
     ${If} ${COUNT} > 1
-        nsArray::Get harness_list /at=1
-        Pop ${SECOND}
-        Pop ${SECOND}
+        ${Array_GetAt} harness_list 1 ${SECOND}
     ${EndIf}
 !macroend
 
@@ -37,11 +32,9 @@
 ; Reports the section names, and the key names of SECTION, joined with commas.
 !macro HarnessIniNames FILE SECTION SECTIONS KEYS
     ${Ini_Sections} `${FILE}` harness_sections
-    nsArray::Join harness_sections ","
-    Pop ${SECTIONS}
+    ${Array_Join} harness_sections "," ${SECTIONS}
     ${Ini_Keys} `${FILE}` `${SECTION}` harness_keys
-    nsArray::Join harness_keys ","
-    Pop ${KEYS}
+    ${Array_Join} harness_keys "," ${KEYS}
 !macroend
 
 ; Formats the items that are not empty and writes the text to OUT_FILE, since
@@ -49,15 +42,12 @@
 !macro HarnessIniFormatList A B KEY OUT_FILE
     Push $R8
     Push $R9
-    nsArray::Set harness_items /key=0 ""
-    nsArray::Clear harness_items
+    ${Array_Reset} harness_items
     ${If} `${A}` != ""
-        nsArray::Set harness_items /key=0 `${A}`
+        ${Array_Append} harness_items `${A}`
     ${EndIf}
     ${If} `${B}` != ""
-        nsArray::Length harness_items
-        Pop $R9
-        nsArray::Set harness_items /key=$R9 `${B}`
+        ${Array_Append} harness_items `${B}`
     ${EndIf}
     ${Ini_FormatList} harness_items `${KEY}` $R9
     FileOpen $R8 `${OUT_FILE}` w
