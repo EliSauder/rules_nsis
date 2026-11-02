@@ -168,7 +168,8 @@ def _plugin_lines_test_impl(ctx):
         if a.mnemonic == "FileWrite" and a.outputs.to_list()[0].basename.endswith(".plugins.nsh")
     ]
     asserts.equals(env, 1, len(contents))
-    lines = contents[0].splitlines() if contents else []
+    # Paths use \ on Windows.
+    lines = contents[0].replace("\\", "/").splitlines() if contents else []
     for expected in ctx.attr.lines:
         matches = [l for l in lines if l.startswith(expected.split(" ...")[0]) and l.endswith(expected.split("... ")[-1])]
         asserts.equals(env, 1, len(matches), "{} not exactly once in {}".format(expected, lines))
