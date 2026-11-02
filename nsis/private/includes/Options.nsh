@@ -222,8 +222,9 @@ Function ${PREFIX}Option_ListGet
     ClearErrors
 
     Pop $2
-    Pop $1
     Exch $0
+    Exch
+    Pop $1
 FunctionEnd
 
 ; Stack: array name, value (top). Pushes 1 when the array holds the value
@@ -295,8 +296,8 @@ Function ${PREFIX}Option_ArrayCopy
     Pop $4
     Pop $3
     Pop $2
-    Pop $1
     Pop $0
+    Pop $1
 FunctionEnd
 
 ; Stack: option kind, default, name (top). Pushes the stored value, or the

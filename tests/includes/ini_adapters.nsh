@@ -47,6 +47,8 @@
 ; Formats the items that are not empty and writes the text to OUT_FILE, since
 ; harness outputs cannot hold line breaks.
 !macro HarnessIniFormatList A B KEY OUT_FILE
+    Push $R8
+    Push $R9
     nsArray::Set harness_items /key=0 ""
     nsArray::Clear harness_items
     ${If} `${A}` != ""
@@ -61,4 +63,6 @@
     FileOpen $R8 `${OUT_FILE}` w
     FileWrite $R8 $R9
     FileClose $R8
+    Pop $R9
+    Pop $R8
 !macroend
