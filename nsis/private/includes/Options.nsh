@@ -338,8 +338,8 @@ Function ${PREFIX}Option_ToArray
     ClearErrors
 
     Pop $2
-    Pop $1
     Pop $0
+    Pop $1
 FunctionEnd
 
 !macroend
