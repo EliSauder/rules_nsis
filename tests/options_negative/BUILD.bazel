@@ -142,7 +142,13 @@ options_failure_test(
 options_failure_test(
     name = "bad_list_default",
     expected = "is not one of choices",
-    options = [{"name": "a", "control": "listbox", "multi_select": True, "choices": ["x", "y"], "default": "x|z"}],
+    options = [{"name": "a", "control": "listbox", "multi_select": True, "choices": ["x", "y"], "defaults": ["x", "z"]}],
+)
+
+options_failure_test(
+    name = "list_default_string",
+    expected = "multi_select options take 'defaults'",
+    options = [{"name": "a", "control": "listbox", "multi_select": True, "choices": ["x", "y"], "default": "x"}],
 )
 
 options_failure_test(

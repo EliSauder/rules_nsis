@@ -20,9 +20,12 @@
 ; `<product key>\Options`, in the view and shell context the installer uses.
 ; A `list` option has one string per item and any other option a single
 ; string; a `multiline` option's string keeps its line breaks. The strings are
-; exchanged with Registry.nsh through an nsArray array. Values written as REG_SZ by older
-; versions are still read and are rewritten as REG_MULTI_SZ when loaded by the
-; installer.
+; exchanged with Registry.nsh through nsArray arrays. Values written as REG_SZ
+; by older versions are still read (a list was its items joined with `|`) and
+; are rewritten as REG_MULTI_SZ when loaded by the installer.
+;
+; The variable of a `list` option (multi_select) holds the name of an nsArray
+; array with its items instead of a value; see Option_ListContains.
 ; The product key must be set with ${SetProductKey} (Product.nsh) before
 ; persisting or loading values.
 
@@ -59,8 +62,10 @@
 !macroend
 !define Option_IsSet `Option_IsSet`
 
-; Sets OUT to 1 when VALUE is one of the `|` separated values of the option,
-; and to 0 otherwise. Values are compared case-insensitively.
+; A `list` option (a listbox with multi_select) holds the name of an nsArray
+; array with one string per selected choice; Option_Get returns that name.
+; Sets OUT to 1 when VALUE is one of the items of the option, and to 0
+; otherwise. Values are compared case-insensitively.
 !macro Option_ListContains PAGE KEY VALUE OUT
     Push `$__opt_${PAGE}_${KEY}`
     Push `${VALUE}`
@@ -68,6 +73,24 @@
     Pop ${OUT}
 !macroend
 !define Option_ListContains `!insertmacro Option_ListContains`
+
+; Sets OUT to the number of items of a list option.
+!macro Option_ListCount PAGE KEY OUT
+    Push `$__opt_${PAGE}_${KEY}`
+    Call Option_ListCount
+    Pop ${OUT}
+!macroend
+!define Option_ListCount `!insertmacro Option_ListCount`
+
+; Sets OUT to the item of a list option at INDEX (from 0, in the order of the
+; choices), or to an empty string when there is none.
+!macro Option_ListGet PAGE KEY INDEX OUT
+    Push `$__opt_${PAGE}_${KEY}`
+    Push `${INDEX}`
+    Call Option_ListGet
+    Pop ${OUT}
+!macroend
+!define Option_ListGet `!insertmacro Option_ListGet`
 
 ; Multi-line (richedit) values are stored on one line with `\n` for a line
 ; break and `\\` for a backslash. This returns the real text, with line breaks
@@ -165,68 +188,74 @@ Function ${PREFIX}Option_Escape
     Exch $0
 FunctionEnd
 
-; Stack: list. Pushes the number of `|` separated items (0 for an empty list).
+; Stack: array name. Pushes the number of items in a list option's array (0
+; when the array does not exist).
 Function ${PREFIX}Option_ListCount
-    Exch $0 ; list
-    Push $1 ; count
-    Push $2 ; position
-    Push $3
+    Exch $0 ; array
+    nsArray::Length $0
+    Pop $0
+    ClearErrors
+    StrCmp $0 "" 0 +2
+        StrCpy $0 0
+    Exch $0
+FunctionEnd
 
-    StrCpy $1 0
-    StrCmp $0 "" done
-    StrCpy $1 1
-    StrCpy $2 0
-    loop:
-        StrCpy $3 $0 1 $2
-        StrCmp $3 "" done
-        StrCmp $3 "|" 0 +2
-            IntOp $1 $1 + 1
-        IntOp $2 $2 + 1
-        Goto loop
+; Stack: array name, index (top). Pushes the item, or "" past the end.
+Function ${PREFIX}Option_ListGet
+    Exch $1 ; index
+    Exch
+    Exch $0 ; array
+    Push $2
+
+    nsArray::Length $0
+    Pop $2
+    IfErrors none
+    IntCmp $1 $2 none read none
+    read:
+    nsArray::Get $0 /at=$1
+    Pop $2 ; key
+    Pop $0
+    Goto done
+    none:
+    StrCpy $0 ""
     done:
-    StrCpy $0 $1
+    ClearErrors
 
-    Pop $3
     Pop $2
     Pop $1
     Exch $0
 FunctionEnd
 
-; Stack: list, value (top). Pushes 1 or 0.
+; Stack: array name, value (top). Pushes 1 when the array holds the value
+; (compared case-insensitively), otherwise 0.
 Function ${PREFIX}Option_ListHas
     Exch $1 ; value
     Exch
-    Exch $0 ; list
+    Exch $0 ; array
     Push $2
     Push $3
     Push $4
     Push $5
-    Push $6
 
     StrCpy $5 0
-    StrCmp $1 "" done
-    StrCpy $2 0 ; token start
-    StrCpy $3 0 ; scan position
+    nsArray::Length $0
+    Pop $2
+    IfErrors done
+    StrCpy $3 0
     loop:
-        StrCpy $4 $0 1 $3
-        StrCmp $4 "|" token
-        StrCmp $4 "" token
-        IntOp $3 $3 + 1
-        Goto loop
-    token:
-        IntOp $6 $3 - $2
-        StrCpy $6 $0 $6 $2
-        StrCmp $6 $1 0 +3
+        IntCmp $3 $2 done 0 done
+        nsArray::Get $0 /at=$3
+        Pop $4 ; key
+        Pop $4
+        StrCmp $4 $1 0 +3
             StrCpy $5 1
             Goto done
-        StrCmp $4 "" done
         IntOp $3 $3 + 1
-        StrCpy $2 $3
         Goto loop
     done:
+    ClearErrors
     StrCpy $1 $5
 
-    Pop $6
     Pop $5
     Pop $4
     Pop $3
@@ -235,8 +264,44 @@ Function ${PREFIX}Option_ListHas
     Exch $1
 FunctionEnd
 
+; Stack: source array name, destination array name (top). Replaces the
+; destination's items with the source's.
+Function ${PREFIX}Option_ArrayCopy
+    Exch $1 ; destination
+    Exch
+    Exch $0 ; source
+    Push $2
+    Push $3
+    Push $4
+
+    nsArray::Set $1 /key=0 ""
+    nsArray::Clear $1
+    ClearErrors
+    nsArray::Length $0
+    Pop $2
+    IfErrors done
+    StrCpy $3 0
+    loop:
+        IntCmp $3 $2 done 0 done
+        nsArray::Get $0 /at=$3
+        Pop $4 ; key
+        Pop $4
+        nsArray::Set $1 /key=$3 "$4"
+        IntOp $3 $3 + 1
+        Goto loop
+    done:
+    ClearErrors
+
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+
 ; Stack: option kind, default, name (top). Pushes the stored value, or the
-; default when no value is stored.
+; default when no value is stored. The value and the default of a `list`
+; option are the name of its array, which is filled with the stored items.
 Function ${PREFIX}Option_ReadReg
     Exch $0 ; name
     Exch
@@ -248,29 +313,44 @@ Function ${PREFIX}Option_ReadReg
 
     !insertmacro ${PREFIX}GetProductKey $2
     StrCpy $2 "$2\Options"
-    ClearErrors
     nsArray::Clear __options_reg
     ClearErrors
     !insertmacro ${PREFIX}GetRegistrySubKeyMultiStr "$2" "$0" __options_reg
     IfErrors legacy
+        StrCmp $4 "list" 0 single
+            Push "__options_reg"
+            Push $1
+            Call ${PREFIX}Option_ArrayCopy
+            Goto done
+        single:
         Push $4
         Call ${PREFIX}Option_FromArray
         Pop $1
         Goto done
     legacy:
     ; Not a REG_MULTI_SZ value: missing, or a REG_SZ one stored by an older
-    ; version in the single-line form the options use.
+    ; version in the single-line form the options used. That form is only read
+    ; here: a list was its items joined with `|`.
     ClearErrors
     !insertmacro ${PREFIX}GetRegistrySubKey "$2" "$0" $3
     IfErrors done
+        StrCmp $4 "list" 0 legacysingle
+            nsArray::Clear $1
+            ClearErrors
+            StrCmp $3 "" promote
+                nsArray::Split $1 "$3" "|"
+                Goto promote
+        legacysingle:
         StrCpy $1 $3
+        promote:
 !if "${PREFIX}" == ""
         Push $4
-        Push $3
+        Push $1
         Push $0
         Call Option_WriteReg
 !endif
     done:
+    ClearErrors
 
     Pop $3
     Pop $2
@@ -279,19 +359,13 @@ Function ${PREFIX}Option_ReadReg
     Exch $1
 FunctionEnd
 
-; Stack: option kind (top). Pushes the option value held by the
-; `__options_reg` array: `|` separated for a list, escaped on one line for
-; multiline, the first string otherwise.
+; Stack: option kind (top). Pushes the value of a non-list option held by the
+; `__options_reg` array: its first string, escaped on one line for multiline.
 Function ${PREFIX}Option_FromArray
     Exch $1 ; kind
     Push $0
     Push $2
 
-    StrCmp $1 "list" 0 single
-        nsArray::Join __options_reg "|"
-        Pop $0
-        Goto done
-    single:
     StrCpy $0 ""
     nsArray::Length __options_reg
     Pop $2
@@ -313,31 +387,23 @@ Function ${PREFIX}Option_FromArray
 FunctionEnd
 
 ; Stack: option kind (top), option value. Fills the `__options_reg` array with
-; the strings to store: one per list item, otherwise a single one (the text of
-; a multiline option with its own line breaks).
+; the single string to store for a non-list option (the text of a multiline
+; option with its own line breaks).
 Function ${PREFIX}Option_ToArray
     Exch $1 ; kind
     Exch
     Exch $0 ; value
-    Push $2
 
     nsArray::Clear __options_reg
     ClearErrors
-    StrCmp $1 "list" 0 single
-        StrCmp $0 "" done
-        nsArray::Split __options_reg "$0" "|"
-        Goto done
-    single:
     StrCmp $1 "multiline" 0 set
         Push $0
         Call ${PREFIX}Option_Unescape
         Pop $0
     set:
     nsArray::Set __options_reg /key=0 "$0"
-    done:
     ClearErrors
 
-    Pop $2
     Pop $0
     Pop $1
 FunctionEnd
@@ -571,7 +637,8 @@ Function Option_UiGetIp
     Exch $0
 FunctionEnd
 
-; Stack: option kind, value, name (top). Stores the value as REG_MULTI_SZ.
+; Stack: option kind, value, name (top). Stores the value as REG_MULTI_SZ. The
+; value of a `list` option is the name of its array.
 Function Option_WriteReg
     Exch $0 ; name
     Exch
@@ -581,12 +648,16 @@ Function Option_WriteReg
     Push $2
     Push $3
 
-    Push $1
-    Push $4
-    Call Option_ToArray
+    StrCpy $3 $1
+    StrCmp $4 "list" write
+        Push $1
+        Push $4
+        Call Option_ToArray
+        StrCpy $3 "__options_reg"
+    write:
     !insertmacro GetProductKey $2
     StrCpy $2 "$2\Options"
-    !insertmacro SetRegistrySubKeyMultiStr "$2" "$0" __options_reg
+    !insertmacro SetRegistrySubKeyMultiStr "$2" "$0" "$3"
 
     Pop $3
     Pop $2
@@ -643,5 +714,20 @@ FunctionEnd
     Pop ${OUT}
 !macroend
 !define un.Option_ListContains `!insertmacro un.Option_ListContains`
+
+!macro un.Option_ListCount PAGE KEY OUT
+    Push `$__opt_${PAGE}_${KEY}`
+    Call un.Option_ListCount
+    Pop ${OUT}
+!macroend
+!define un.Option_ListCount `!insertmacro un.Option_ListCount`
+
+!macro un.Option_ListGet PAGE KEY INDEX OUT
+    Push `$__opt_${PAGE}_${KEY}`
+    Push `${INDEX}`
+    Call un.Option_ListGet
+    Pop ${OUT}
+!macroend
+!define un.Option_ListGet `!insertmacro un.Option_ListGet`
 
 !endif

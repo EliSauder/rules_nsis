@@ -31,14 +31,39 @@ Var __opt_test_c
     ${EndIf}
 !macroend
 
-!macro HarnessOptionListContains LIST VALUE OUT
-    ${Option_Set} test a `${LIST}`
-    ${Option_ListContains} test a `${VALUE}` ${OUT}
+; Makes the list option `test b` hold an empty array, then adds the items
+; that are not empty.
+!macro _HarnessListReset
+    ${Option_Set} test b "__opt_test_b"
+    nsArray::Set __opt_test_b /key=0 ""
+    nsArray::Clear __opt_test_b
+    ClearErrors
 !macroend
 
-!macro un.HarnessOptionListContains LIST VALUE OUT
-    ${Option_Set} test a `${LIST}`
-    ${un.Option_ListContains} test a `${VALUE}` ${OUT}
+!macro _HarnessListAdd ITEM
+    ${If} `${ITEM}` != ""
+        Push $R9
+        nsArray::Length __opt_test_b
+        Pop $R9
+        nsArray::Set __opt_test_b /key=$R9 `${ITEM}`
+        Pop $R9
+    ${EndIf}
+!macroend
+
+!macro HarnessOptionListContains A B C VALUE OUT
+    !insertmacro _HarnessListReset
+    !insertmacro _HarnessListAdd `${A}`
+    !insertmacro _HarnessListAdd `${B}`
+    !insertmacro _HarnessListAdd `${C}`
+    ${Option_ListContains} test b `${VALUE}` ${OUT}
+!macroend
+
+!macro un.HarnessOptionListContains A B C VALUE OUT
+    !insertmacro _HarnessListReset
+    !insertmacro _HarnessListAdd `${A}`
+    !insertmacro _HarnessListAdd `${B}`
+    !insertmacro _HarnessListAdd `${C}`
+    ${un.Option_ListContains} test b `${VALUE}` ${OUT}
 !macroend
 
 ; Persists VALUE, clobbers the option and loads it back. Another option that
@@ -69,23 +94,34 @@ Var __opt_test_c
     ${Option_Get} test a ${OUT}
 !macroend
 
-; Persists a list and multiline text, clobbers them and loads them back. The
-; stored values are left for the test to inspect and delete.
-!macro HarnessOptionPersistKinds LIST TEXT LIST_OUT TEXT_OUT
+!macro _HarnessListOut COUNT FIRST SECOND
+    ${Option_ListCount} test b ${COUNT}
+    ${Option_ListGet} test b 0 ${FIRST}
+    ${Option_ListGet} test b 1 ${SECOND}
+!macroend
+
+; Persists a list of up to two items and multiline text, clobbers them and
+; loads them back. The stored values are left for the test to inspect and
+; delete.
+!macro HarnessOptionPersistKinds A B TEXT COUNT FIRST SECOND TEXT_OUT
     !insertmacro _HarnessOptionClear ""
-    ${Option_Set} test b `${LIST}`
+    !insertmacro _HarnessListReset
+    !insertmacro _HarnessListAdd `${A}`
+    !insertmacro _HarnessListAdd `${B}`
     ${Option_Set} test c `${TEXT}`
     ${Option_Persist}
-    ${Option_Set} test b "clobbered"
+    !insertmacro _HarnessListReset
+    !insertmacro _HarnessListAdd "clobbered"
     ${Option_Set} test c "clobbered"
     ${Option_LoadPersisted}
-    ${Option_Get} test b ${LIST_OUT}
+    !insertmacro _HarnessListOut ${COUNT} ${FIRST} ${SECOND}
     ${Option_Get} test c ${TEXT_OUT}
 !macroend
 
 ; Loads the values the test stored, without clearing them.
-!macro HarnessOptionLoad LIST TEXT
+!macro HarnessOptionLoad COUNT FIRST SECOND TEXT
+    !insertmacro _HarnessListReset
     ${Option_LoadPersisted}
-    ${Option_Get} test b ${LIST}
+    !insertmacro _HarnessListOut ${COUNT} ${FIRST} ${SECOND}
     ${Option_Get} test c ${TEXT}
 !macroend

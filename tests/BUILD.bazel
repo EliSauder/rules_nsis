@@ -714,8 +714,8 @@ _CONTROLS_DEFAULTS = "\n".join([
     "gateway=10.0.0.2:8080",
     "peer=::1",
     "flavor=choc",
-    "toppings=sprinkles|nuts",
-    "extras=",
+    "toppings[0]=sprinkles",
+    "toppings[1]=nuts",
     "note=first\\nsecond",
     "note_text=first",
     "second",
@@ -731,8 +731,10 @@ _CONTROLS_CLI = "\n".join([
     "gateway=10.1.2.3:99",
     "peer=2001:db8::1",
     "flavor=mint",
-    "toppings=sprinkles|fudge",
-    "extras=a|c",
+    "toppings[0]=sprinkles",
+    "toppings[1]=fudge",
+    "extras[0]=a",
+    "extras[1]=c",
     "note=x\\\\y\\nz",
     "note_text=x\\y",
     "z",
@@ -869,7 +871,7 @@ nsis_options_page(
 
 nsis_option(name = "flavor", control = "listbox", choices = ["vanilla", "choc", "mint"], default = "choc", lines = 2)
 
-nsis_option(name = "toppings", control = "sorted_listbox", multi_select = True, choices = ["sprinkles", "nuts", "fudge"], default = "nuts|sprinkles", lines = 3)
+nsis_option(name = "toppings", control = "sorted_listbox", multi_select = True, choices = ["sprinkles", "nuts", "fudge"], defaults = ["nuts", "sprinkles"], lines = 3)
 
 nsis_option(name = "extras", control = "listbox", multi_select = True, choices = ["a", "b", "c"], lines = 2)
 
@@ -933,8 +935,10 @@ nsis_installer_test(
         "/O:value_controls.gateway=10.1.2.3:99",
         "/O:value_controls.peer=2001:db8::1",
         "/O:list_controls.flavor=MINT",
-        "/O:list_controls.toppings=fudge|SPRINKLES",
-        "/O:list_controls.extras=c|a",
+        "/O:list_controls.toppings=fudge",
+        "/O:list_controls.toppings=SPRINKLES",
+        "/O:list_controls.extras=c",
+        "/O:list_controls.extras=a",
         "/O:text_controls.note=x\\\\y\\nz",
         "/O:text_controls.config_file=C:\\Windows\\notepad.exe",
         "/O:text_controls.data_dir=C:\\Windows",
@@ -960,7 +964,7 @@ nsis_installer_test(
         "date_after_max": "value_controls.release_date=2031-01-01",
         "date_bad_day": "value_controls.release_date=2023-02-29",
         "ip_incomplete": "value_controls.server_ip=1.2.3",
-        "list_unknown_item": "list_controls.toppings=fudge|nope",
+        "list_unknown_item": "list_controls.toppings=nope",
         "single_unknown_choice": "list_controls.flavor=nope",
         "bad_escape": "text_controls.note=bad\\q",
         "relative_dir": "text_controls.data_dir=relative\\dir",

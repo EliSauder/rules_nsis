@@ -336,7 +336,15 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
 {{end}}
 
 {{define "optDefault"}}
-{{- if and (eq .Opt.Control "date") (eq .Opt.Default "") }}
+{{- if .Opt.MultiSelect }}
+    {{- /* A list option's variable holds the name of the array with its items. */}}
+    StrCpy ${{.Opt.Var}} "{{.Opt.Var}}"
+    nsArray::Set {{.Opt.Var}} /key=0 ""
+    nsArray::Clear {{.Opt.Var}}
+    {{- range $i, $d := .Opt.Default }}
+    nsArray::Set {{$.Opt.Var}} /key={{$i}} "{{ template "nsq" $d }}"
+    {{- end }}
+{{- else if and (eq .Opt.Control "date") (eq .Opt.Default "") }}
     Push "{{.Opt.Min}}"
     Push "{{.Opt.Max}}"
     Call {{.Prefix}}Option_Today
@@ -506,17 +514,17 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
     Pop $__opt_chk_val
 {{- else if or (eq .Control "listbox") (eq .Control "sorted_listbox") }}
     {{- if .MultiSelect }}
-    StrCpy $__opt_chk_val ""
+    {{- /* The selected choices go to the array __opt_chk. */}}
+    nsArray::Set __opt_chk /key=0 ""
+    nsArray::Clear __opt_chk
     {{- range .Choices }}
     ${NSD_LB_FindStringExact} {{$h}} "{{ template "nsq" . }}" $0
     ${If} $0 <> -1
         SendMessage {{$h}} ${LB_GETSEL} $0 0 $1
         ${If} $1 > 0
-            ${If} $__opt_chk_val == ""
-                StrCpy $__opt_chk_val "{{ template "nsq" . }}"
-            ${Else}
-                StrCpy $__opt_chk_val "$__opt_chk_val|{{ template "nsq" . }}"
-            ${EndIf}
+            nsArray::Length __opt_chk
+            Pop $1
+            nsArray::Set __opt_chk /key=$1 "{{ template "nsq" . }}"
         ${EndIf}
     ${EndIf}
     {{- end }}
@@ -644,30 +652,40 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
     ${EndIf}
 {{- else if or (eq .Control "listbox") (eq .Control "sorted_listbox") }}
     {{- if .MultiSelect }}
-    ${If} $__opt_chk_val != ""
-        Push $__opt_chk_val
-        Call Option_ListCount
-        Pop $1
-        StrCpy $0 ""
+    {{- /* The items are in the array __opt_chk; the valid ones, in the order of the choices, replace them. */}}
+    nsArray::Set __opt_chk_out /key=0 ""
+    nsArray::Clear __opt_chk_out
+    Push "__opt_chk"
+    Call Option_ListCount
+    Pop $1
+    ${If} $1 = 1
+        Push "__opt_chk"
+        Push 0
+        Call Option_ListGet
+        Pop $0
+        ${If} $0 == ""
+            nsArray::Clear __opt_chk
+            StrCpy $1 0
+        ${EndIf}
+    ${EndIf}
+    ${If} $1 > 0
         StrCpy $2 0
         {{- range .Choices }}
-        Push $__opt_chk_val
+        Push "__opt_chk"
         Push "{{ template "nsq" . }}"
         Call Option_ListHas
         Pop $3
         ${If} $3 == 1
+            nsArray::Set __opt_chk_out /key=$2 "{{ template "nsq" . }}"
             IntOp $2 $2 + 1
-            ${If} $0 == ""
-                StrCpy $0 "{{ template "nsq" . }}"
-            ${Else}
-                StrCpy $0 "$0|{{ template "nsq" . }}"
-            ${EndIf}
         ${EndIf}
         {{- end }}
         ${If} $1 <> $2
-            StrCpy $__opt_chk_err "must be a '|' separated list of distinct values from: {{ range $i, $c := .Choices }}{{ if $i }}, {{ end }}{{ template "nsq" $c }}{{ end }}"
+            StrCpy $__opt_chk_err "must be distinct values from: {{ range $i, $c := .Choices }}{{ if $i }}, {{ end }}{{ template "nsq" $c }}{{ end }}"
         ${Else}
-            StrCpy $__opt_chk_val $0
+            Push "__opt_chk_out"
+            Push "__opt_chk"
+            Call Option_ArrayCopy
         ${EndIf}
     {{- if .Required }}
     ${ElseIf} $__opt_chk_enabled == "1"
@@ -936,6 +954,17 @@ Function __Page_{{.Name}}_Leave
 FunctionEnd
 {{end}}
 
+{{- /* Stores the checked value: a list option's items are copied into its array. */}}
+{{define "optCommit"}}
+{{- if .MultiSelect }}
+    Push "__opt_chk"
+    Push "{{.Var}}"
+    Call Option_ArrayCopy
+{{- else }}
+    StrCpy ${{.Var}} $__opt_chk_val
+{{- end }}
+{{end}}
+
 {{define "optApplyOne"}}
     StrCpy $__opt_chk_what "{{.Id}}"
     StrCpy $__opt_chk_enabled 1
@@ -943,7 +972,7 @@ FunctionEnd
     ${If} $__opt_chk_err != ""
         ${Cli_Fail} "Invalid value for option {{.Id}}: $__opt_chk_err"
     ${EndIf}
-    StrCpy ${{.Var}} $__opt_chk_val
+{{- template "optCommit" . }}
 {{end}}
 
 {{define "optCli"}}
@@ -971,6 +1000,77 @@ Function __Opt_IniIsKnown
         ${EndIf}
     {{- end }}
     ${EndIf}
+    Pop $1
+    Pop $0
+FunctionEnd
+
+; Stack: ini file, section, key (top). Puts every value the key has in the
+; section (a list option repeats its key) into the array __opt_chk. The error
+; flag is set when there is none.
+Function __Opt_IniReadList
+    Exch $2 ; key
+    Exch
+    Exch $1 ; section
+    Exch 2
+    Exch $0 ; ini file
+    Push $3
+    Push $4
+    Push $5
+    Push $6
+    Push $7
+    Push $8
+    Push $9
+
+    nsArray::Set __opt_chk /key=0 ""
+    nsArray::Clear __opt_chk
+    StrCpy $7 0
+    System::Alloc 131072
+    Pop $3
+    System::Call 'kernel32::GetPrivateProfileSectionW(w r1, p r3, i 65535, w r0)'
+    StrCpy $4 $3
+    ${Do}
+        System::Call 'kernel32::lstrlenW(p r4) i .r6'
+        ${If} $6 = 0
+            ${Break}
+        ${EndIf}
+        System::Call 'kernel32::lstrcpyW(w .r5, p r4)'
+        StrCpy $8 0
+        ${Do}
+            StrCpy $9 $5 1 $8
+            ${If} $9 == ""
+            ${OrIf} $9 == "="
+                ${Break}
+            ${EndIf}
+            IntOp $8 $8 + 1
+        ${Loop}
+        ${If} $8 > 0
+        ${AndIf} $8 < $6
+            StrCpy $9 $5 $8
+            ${If} $9 == $2
+                IntOp $8 $8 + 1
+                StrCpy $9 $5 "" $8
+                nsArray::Set __opt_chk /key=$7 "$9"
+                IntOp $7 $7 + 1
+            ${EndIf}
+        ${EndIf}
+        IntOp $6 $6 + 1
+        IntOp $6 $6 * 2
+        IntPtrOp $4 $4 + $6
+    ${Loop}
+    System::Free $3
+    ClearErrors
+    ${If} $7 = 0
+        SetErrors
+    ${EndIf}
+
+    Pop $9
+    Pop $8
+    Pop $7
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
     Pop $1
     Pop $0
 FunctionEnd
@@ -1030,7 +1130,14 @@ Function __Options_ApplyIni
     System::Free $2
     {{- range (ds "in").Options }}
     ClearErrors
+{{- if .MultiSelect }}
+    Push $0
+    Push "{{.Page}}"
+    Push "{{.Key}}"
+    Call __Opt_IniReadList
+{{- else }}
     ReadINIStr $__opt_chk_val $0 "{{.Page}}" "{{.Key}}"
+{{- end }}
     ${IfNot} ${Errors}
 {{- if .Secret }}
     {{- /* An answer file written by /HELP leaves secrets empty. */}}
@@ -1057,6 +1164,13 @@ Function __Options_ApplyCli
     Push $3
     Push $4
     Push $5
+    {{- /* The values of /O: arguments for list options are collected in arrays first. */}}
+    {{- range (ds "in").Options }}
+    {{- if .MultiSelect }}
+    nsArray::Set __optcli_{{.Var}} /key=0 ""
+    nsArray::Clear __optcli_{{.Var}}
+    {{- end }}
+    {{- end }}
     ClearErrors
     ${Cli_GetArgValue} "/OPTIONS" $0
     ${IfNot} ${Errors}
@@ -1089,8 +1203,15 @@ Function __Options_ApplyCli
             StrCpy $3 $3 "" $5
             {{- range (ds "in").Options }}
             ${If} $4 == "{{.Id}}"
+{{- if .MultiSelect }}
+                {{- /* The option may be repeated: every value is one item. */}}
+                nsArray::Length __optcli_{{.Var}}
+                Pop $5
+                nsArray::Set __optcli_{{.Var}} /key=$5 "$3"
+{{- else }}
                 StrCpy $__opt_chk_val $3
 {{- template "optApplyOne" . }}
+{{- end }}
                 Goto __cli_next
             ${EndIf}
             {{- end }}
@@ -1099,6 +1220,18 @@ Function __Options_ApplyCli
         __cli_next:
         IntOp $2 $2 + 1
     ${EndWhile}
+    {{- range (ds "in").Options }}
+    {{- if .MultiSelect }}
+    nsArray::Length __optcli_{{.Var}}
+    Pop $0
+    ${If} $0 > 0
+        Push "__optcli_{{.Var}}"
+        Push "__opt_chk"
+        Call Option_ArrayCopy
+{{- template "optApplyOne" . }}
+    ${EndIf}
+    {{- end }}
+    {{- end }}
     Pop $5
     Pop $4
     Pop $3
@@ -1124,7 +1257,7 @@ FunctionEnd
     Call __Opt_Check_{{.Page}}_{{.Key}}
     StrCmp $__opt_chk_err "" +2 0
         Goto __fail
-    StrCpy ${{.Var}} $__opt_chk_val
+{{- template "optCommit" . }}
 {{- if .EnabledChain }}
     {{$n}}:
 {{- end }}
@@ -1738,6 +1871,69 @@ Function __Help_TextUsage
     !insertmacro __HelpNL
 FunctionEnd
 
+{{- /* Stack: list array name. Writes the items separated by commas. */}}
+Function __Help_ListText
+    Exch $0
+    Push $1
+    Push $2
+    Push $3
+
+    Push $0
+    Call Option_ListCount
+    Pop $1
+    StrCpy $2 0
+    ${While} $2 < $1
+        Push $0
+        Push $2
+        Call Option_ListGet
+        Pop $3
+        ${If} $2 > 0
+            !insertmacro __HelpW ","
+        ${EndIf}
+        !insertmacro __HelpW "$3"
+        IntOp $2 $2 + 1
+    ${EndWhile}
+
+    Pop $3
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+
+{{- /* Stack: list array name, key (top). Writes one `key=item` line per item, or `key=` for none. */}}
+Function __Help_ListIni
+    Exch $1 ; key
+    Exch
+    Exch $0 ; array
+    Push $2
+    Push $3
+    Push $4
+
+    Push $0
+    Call Option_ListCount
+    Pop $2
+    ${If} $2 = 0
+        !insertmacro __HelpW "$1="
+        !insertmacro __HelpNL
+    ${EndIf}
+    StrCpy $3 0
+    ${While} $3 < $2
+        Push $0
+        Push $3
+        Call Option_ListGet
+        Pop $4
+        !insertmacro __HelpW "$1=$4"
+        !insertmacro __HelpNL
+        IntOp $3 $3 + 1
+    ${EndWhile}
+
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+
 Function __Help_TextOptions
     !insertmacro __HelpW "Options:"
     !insertmacro __HelpNL
@@ -1746,6 +1942,9 @@ Function __Help_TextOptions
     !insertmacro __HelpW "{{ template "nsq" .TextPrefix }}"
 {{- if .Secret }}
     !insertmacro __HelpW "<secret>"
+{{- else if .MultiSelect }}
+    Push "${{.Var}}"
+    Call __Help_ListText
 {{- else }}
     !insertmacro __HelpW "${{.Var}}"
 {{- end }}
@@ -1812,11 +2011,17 @@ Function __Help_IniOptions
 {{- range .Options }}
     !insertmacro __HelpW "{{ template "nsq" .IniComment }}"
     !insertmacro __HelpNL
+{{- if .MultiSelect }}
+    Push "${{.Var}}"
+    Push "{{.Key}}"
+    Call __Help_ListIni
+{{- else }}
     !insertmacro __HelpW "{{.Key}}="
 {{- if not .Secret }}
     !insertmacro __HelpW "${{.Var}}"
 {{- end }}
     !insertmacro __HelpNL
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
