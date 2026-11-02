@@ -12,6 +12,7 @@ bzl_library(
         "//nsis/private:defs.bzl",
         "//nsis/private:options.bzl",
         "//nsis/private:cli.bzl",
+        "//nsis/private:plugins.bzl",
         "//nsis/private:shortcuts.bzl",
         "//nsis/private:transitions.bzl",
     ],
@@ -38,4 +39,11 @@ bzl_library(
     deps = [
         "//nsis/toolchain:toolchains.bzl",
     ],
+)
+
+bzl_library(
+    name = "repositories",
+    srcs = ["repositories.bzl"],
+    visibility = ["//visibility:public"],
+    deps = [":defs"],
 )

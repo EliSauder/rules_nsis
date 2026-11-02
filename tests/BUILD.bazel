@@ -1,5 +1,5 @@
 load("//tests:defs.bzl", "nsis_installer_test", "signing_env_test")
-load("//tests:analysis_tests.bzl", "eventlog_requires_admin_test")
+load("//tests:analysis_tests.bzl", "eventlog_requires_admin_test", "plugin_tests")
 load(
     "//nsis:defs.bzl",
     "nsis_component",
@@ -9,6 +9,7 @@ load(
     "nsis_eventlog_source",
     "nsis_option",
     "nsis_option_group",
+    "nsis_plugin",
     "nsis_options_page",
     "nsis_shortcut",
 )
@@ -1178,4 +1179,32 @@ nsis_installer_test(
         "/O:shortcuts.desktop=0",
         "/O:shortcuts.start_menu_folder=Custom\\Folder",
     ],
+)
+
+plugin_tests(name = "plugins")
+
+# A user plugin: a second copy of the nsArray DLL under another command prefix.
+genrule(
+    name = "nsarray2_dll",
+    srcs = ["@nsis_plugin_nsarray//:Plugins/x86-unicode/nsArray.dll"],
+    outs = ["nsarray2/nsArray2.dll"],
+    cmd = "cp $< $@",
+)
+
+nsis_plugin(
+    name = "nsarray2",
+    plugin_name = "nsArray2",
+    x86_unicode = ":nsarray2_dll",
+    license = "@nsis_plugin_nsarray//:Docs/nsArray/Readme.txt",
+)
+
+nsis_installer(
+    name = "minimal_installer_with_plugins",
+    testable = True,
+    id = "0c7d3b52-9a4e-4d1f-8b6a-5e2f1c3d4a70",
+    components = [":minimal_component"],
+    product = "Minimal Installer Plugins",
+    product_path = "Minimal Installer Plugins",
+    plugins = [":nsarray2"],
+    post_init = "//tests/testdata:plugins_post_init.nsh",
 )

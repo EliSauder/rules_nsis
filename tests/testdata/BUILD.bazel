@@ -13,6 +13,7 @@ exports_files([
     "options_post_install.nsh",
     "options_pre_uninstall.nsh",
     "test_icon.ico",
+    "plugins_post_init.nsh",
 ])
 
 # Built rather than checked in so the signing tests have a genuine PE
