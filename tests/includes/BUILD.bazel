@@ -8,6 +8,7 @@ load(":event_log.bzl", "event_log_cases")
 load(":formatting.bzl", "formatting_cases")
 load(":guid.bzl", "guid_cases")
 load(":icacls.bzl", "icacls_cases")
+load(":ini.bzl", "ini_cases")
 load(":logging.bzl", "logging_cases")
 load(":move_file_folder.bzl", "move_file_folder_cases")
 load(":mutex.bzl", "mutex_cases")
@@ -32,6 +33,7 @@ _INCLUDES = [
     "Formatting.nsh",
     "Guid.nsh",
     "iCacls.nsh",
+    "Ini.nsh",
     "Logging.nsh",
     "MoveFileFolder.nsh",
     "Mutex.nsh",
@@ -92,6 +94,7 @@ include_api_suite(
             formatting_cases() +
             guid_cases() +
             icacls_cases() +
+            ini_cases() +
             logging_cases() +
             move_file_folder_cases() +
             mutex_cases() +

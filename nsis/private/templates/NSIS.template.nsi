@@ -121,6 +121,7 @@ Var __instdir_default
 {{- end }}
 !macroend
 {{- end }}
+!include Ini.nsh
 !include Options.nsh
 
 {{- /* BEGIN shortcuts: state */}}
@@ -1004,77 +1005,6 @@ Function __Opt_IniIsKnown
     Pop $0
 FunctionEnd
 
-; Stack: ini file, section, key (top). Puts every value the key has in the
-; section (a list option repeats its key) into the array __opt_chk. The error
-; flag is set when there is none.
-Function __Opt_IniReadList
-    Exch $2 ; key
-    Exch
-    Exch $1 ; section
-    Exch 2
-    Exch $0 ; ini file
-    Push $3
-    Push $4
-    Push $5
-    Push $6
-    Push $7
-    Push $8
-    Push $9
-
-    nsArray::Set __opt_chk /key=0 ""
-    nsArray::Clear __opt_chk
-    StrCpy $7 0
-    System::Alloc 131072
-    Pop $3
-    System::Call 'kernel32::GetPrivateProfileSectionW(w r1, p r3, i 65535, w r0)'
-    StrCpy $4 $3
-    ${Do}
-        System::Call 'kernel32::lstrlenW(p r4) i .r6'
-        ${If} $6 = 0
-            ${Break}
-        ${EndIf}
-        System::Call 'kernel32::lstrcpyW(w .r5, p r4)'
-        StrCpy $8 0
-        ${Do}
-            StrCpy $9 $5 1 $8
-            ${If} $9 == ""
-            ${OrIf} $9 == "="
-                ${Break}
-            ${EndIf}
-            IntOp $8 $8 + 1
-        ${Loop}
-        ${If} $8 > 0
-        ${AndIf} $8 < $6
-            StrCpy $9 $5 $8
-            ${If} $9 == $2
-                IntOp $8 $8 + 1
-                StrCpy $9 $5 "" $8
-                nsArray::Set __opt_chk /key=$7 "$9"
-                IntOp $7 $7 + 1
-            ${EndIf}
-        ${EndIf}
-        IntOp $6 $6 + 1
-        IntOp $6 $6 * 2
-        IntPtrOp $4 $4 + $6
-    ${Loop}
-    System::Free $3
-    ClearErrors
-    ${If} $7 = 0
-        SetErrors
-    ${EndIf}
-
-    Pop $9
-    Pop $8
-    Pop $7
-    Pop $6
-    Pop $5
-    Pop $4
-    Pop $3
-    Pop $2
-    Pop $1
-    Pop $0
-FunctionEnd
-
 ; Stack: ini file. Rejects unknown sections and keys, then applies known values.
 Function __Options_ApplyIni
     Exch $0
@@ -1084,59 +1014,44 @@ Function __Options_ApplyIni
     Push $4
     Push $5
     Push $6
-    Push $7
-    System::Alloc 131072
+    ${Ini_Sections} $0 __opt_ini_sections
+    nsArray::Length __opt_ini_sections
     Pop $1
-    System::Alloc 131072
-    Pop $2
-    System::Call 'kernel32::GetPrivateProfileSectionNamesW(i r1, i 65535, w r0)'
-    IntOp $3 $1 + 0
-    ${Do}
-        System::Call 'kernel32::lstrlenW(i r3) i .r4'
-        ${If} $4 = 0
-            ${Break}
-        ${EndIf}
-        System::Call 'kernel32::lstrcpyW(w .r5, i r3)'
-        StrCpy $__opt_chk_what $5
+    StrCpy $2 0
+    ${While} $2 < $1
+        nsArray::Get __opt_ini_sections /at=$2
+        Pop $3
+        Pop $3
+        StrCpy $__opt_chk_what $3
         StrCpy $__opt_chk_val ""
         Call __Opt_IniIsKnown
         ${If} $__opt_chk_enabled != 1
-            ${Cli_Fail} "Unknown section [$5] in the options file."
+            ${Cli_Fail} "Unknown section [$3] in the options file."
         ${EndIf}
-        System::Call 'kernel32::GetPrivateProfileStringW(w r5, i 0, w "", i r2, i 65535, w r0)'
-        IntOp $6 $2 + 0
-        ${Do}
-            System::Call 'kernel32::lstrlenW(i r6) i .r7'
-            ${If} $7 = 0
-                ${Break}
-            ${EndIf}
-            System::Call 'kernel32::lstrcpyW(w .r4, i r6)'
-            StrCpy $__opt_chk_what $5
-            StrCpy $__opt_chk_val $4
+        ${Ini_Keys} $0 $3 __opt_ini_keys
+        nsArray::Length __opt_ini_keys
+        Pop $4
+        StrCpy $5 0
+        ${While} $5 < $4
+            nsArray::Get __opt_ini_keys /at=$5
+            Pop $6
+            Pop $6
+            StrCpy $__opt_chk_what $3
+            StrCpy $__opt_chk_val $6
             Call __Opt_IniIsKnown
             ${If} $__opt_chk_enabled != 1
-                ${Cli_Fail} "Unknown option [$5] $4 in the options file."
+                ${Cli_Fail} "Unknown option [$3] $6 in the options file."
             ${EndIf}
-            IntOp $7 $7 + 1
-            IntOp $7 $7 * 2
-            IntOp $6 $6 + $7
-        ${Loop}
-        System::Call 'kernel32::lstrlenW(i r3) i .r4'
-        IntOp $4 $4 + 1
-        IntOp $4 $4 * 2
-        IntOp $3 $3 + $4
-    ${Loop}
-    System::Free $1
-    System::Free $2
+            IntOp $5 $5 + 1
+        ${EndWhile}
+        IntOp $2 $2 + 1
+    ${EndWhile}
     {{- range (ds "in").Options }}
     ClearErrors
 {{- if .MultiSelect }}
-    Push $0
-    Push "{{.Page}}"
-    Push "{{.Key}}"
-    Call __Opt_IniReadList
+    ${Ini_ReadList} $0 "{{.Page}}" "{{.Key}}" __opt_chk
 {{- else }}
-    ReadINIStr $__opt_chk_val $0 "{{.Page}}" "{{.Key}}"
+    ${Ini_ReadStr} $0 "{{.Page}}" "{{.Key}}" $__opt_chk_val
 {{- end }}
     ${IfNot} ${Errors}
 {{- if .Secret }}
@@ -1146,7 +1061,6 @@ Function __Options_ApplyIni
 {{- template "optApplyOne" . }}
     ${EndIf}
     {{- end }}
-    Pop $7
     Pop $6
     Pop $5
     Pop $4
@@ -1670,8 +1584,8 @@ Function __Components_ApplyCli
         ${IfNot} ${FileExists} "$2"
             ${Cli_Fail} "The options file given with /OPTIONS= does not exist."
         ${EndIf}
-        ReadINIStr $0 "$2" "setup" "components"
-        ReadINIStr $1 "$2" "setup" "insttype"
+        ${Ini_ReadStr} "$2" "setup" "components" $0
+        ${Ini_ReadStr} "$2" "setup" "insttype" $1
     ${EndIf}
     ${If} ${Cli_HasArg} "/COMPONENTS"
         ClearErrors
@@ -1871,69 +1785,6 @@ Function __Help_TextUsage
     !insertmacro __HelpNL
 FunctionEnd
 
-{{- /* Stack: list array name. Writes the items separated by commas. */}}
-Function __Help_ListText
-    Exch $0
-    Push $1
-    Push $2
-    Push $3
-
-    Push $0
-    Call Option_ListCount
-    Pop $1
-    StrCpy $2 0
-    ${While} $2 < $1
-        Push $0
-        Push $2
-        Call Option_ListGet
-        Pop $3
-        ${If} $2 > 0
-            !insertmacro __HelpW ","
-        ${EndIf}
-        !insertmacro __HelpW "$3"
-        IntOp $2 $2 + 1
-    ${EndWhile}
-
-    Pop $3
-    Pop $2
-    Pop $1
-    Pop $0
-FunctionEnd
-
-{{- /* Stack: list array name, key (top). Writes one `key=item` line per item, or `key=` for none. */}}
-Function __Help_ListIni
-    Exch $1 ; key
-    Exch
-    Exch $0 ; array
-    Push $2
-    Push $3
-    Push $4
-
-    Push $0
-    Call Option_ListCount
-    Pop $2
-    ${If} $2 = 0
-        !insertmacro __HelpW "$1="
-        !insertmacro __HelpNL
-    ${EndIf}
-    StrCpy $3 0
-    ${While} $3 < $2
-        Push $0
-        Push $3
-        Call Option_ListGet
-        Pop $4
-        !insertmacro __HelpW "$1=$4"
-        !insertmacro __HelpNL
-        IntOp $3 $3 + 1
-    ${EndWhile}
-
-    Pop $4
-    Pop $3
-    Pop $2
-    Pop $1
-    Pop $0
-FunctionEnd
-
 Function __Help_TextOptions
     !insertmacro __HelpW "Options:"
     !insertmacro __HelpNL
@@ -1943,8 +1794,11 @@ Function __Help_TextOptions
 {{- if .Secret }}
     !insertmacro __HelpW "<secret>"
 {{- else if .MultiSelect }}
-    Push "${{.Var}}"
-    Call __Help_ListText
+    Push $0
+    nsArray::Join "${{.Var}}" ","
+    Pop $0
+    !insertmacro __HelpW "$0"
+    Pop $0
 {{- else }}
     !insertmacro __HelpW "${{.Var}}"
 {{- end }}
@@ -2012,9 +1866,10 @@ Function __Help_IniOptions
     !insertmacro __HelpW "{{ template "nsq" .IniComment }}"
     !insertmacro __HelpNL
 {{- if .MultiSelect }}
-    Push "${{.Var}}"
-    Push "{{.Key}}"
-    Call __Help_ListIni
+    Push $0
+    ${Ini_FormatList} "${{.Var}}" "{{.Key}}" $0
+    !insertmacro __HelpW "$0"
+    Pop $0
 {{- else }}
     !insertmacro __HelpW "{{.Key}}="
 {{- if not .Secret }}
