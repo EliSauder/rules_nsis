@@ -229,7 +229,7 @@ nsis_component(
     service_start_type = "auto",
     selection_mode = "required",
     display_name = "README Service",
-    description = "README Service Description",
+    description = "README Service Description\nwith a second line",
     install_categories = ["Full", "Typical", "Minimal"],
     srcs = [":nsis_files"],
 )
@@ -242,7 +242,7 @@ nsis_installer(
     product_path = "SSI",
     vendor = "Company Department",
     vendor_path = "Company\\Department",
-    description = "Description",
+    description = "Description\nwith a second line",
     version = "0.0.0.1",
     execution_level = "admin",
     components = [

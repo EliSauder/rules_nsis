@@ -50,7 +50,7 @@ SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 !define PUBLISHER "{{ (ds "in").Vendor }}"
 !define PUBLISHER_PATH "{{ (ds "in").VendorPath }}"
 
-!define PRODUCT_DESCRIPTION "{{ (ds "in").Description }}"
+!define PRODUCT_DESCRIPTION "{{ template "nsq" (ds "in").Description }}"
 !define PRODUCT_COPYRIGHT "{{ (ds "in").Copyright }}"
 
 {{- if (ds "in").Version }}
