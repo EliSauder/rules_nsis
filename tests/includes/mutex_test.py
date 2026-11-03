@@ -28,7 +28,8 @@ def run_case(case, harness, args):
     # sequential run also succeeds.
     for _ in range(2):
         assert harness.run(name=name).returncode == 0
-    kernel, handle = _hold(name)
+    # The library appends the test id to the mutex name.
+    kernel, handle = _hold(name + harness.test_id)
     try:
         harness.run(name=name, expected_exitcode=_ALREADY_RUNNING)
     finally:

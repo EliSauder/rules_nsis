@@ -69,24 +69,25 @@ def _assert_only_in(winreg, path, view, expected):
 def _view_case(base, harness):
     import winreg
 
-    path = "Software\\RulesNsisIncludeApi\\" + str(uuid.uuid4())
+    root = "Software\\RulesNsisIncludeApi\\" + str(uuid.uuid4())
+    path = common.scoped(harness, root)
     try:
         if base == "registry_view_set_string":
             for view in _VIEWS:
-                harness.run(view=view, key=path, subkey="Value", value=view + " view")
+                harness.run(view=view, key=root, subkey="Value", value=view + " view")
                 _assert_only_in(winreg, path, view, (view + " view", winreg.REG_SZ))
                 _hklm_delete(winreg, path)
             # An unknown view falls back to the native view.
-            harness.run(view="bogus", key=path, subkey="Value", value="native")
+            harness.run(view="bogus", key=root, subkey="Value", value="native")
             _assert_only_in(winreg, path, _native_view(), ("native", winreg.REG_SZ))
         elif base == "registry_view_set_dword":
             for view in _VIEWS:
-                harness.run(view=view, key=path, subkey="Value", value=int(view))
+                harness.run(view=view, key=root, subkey="Value", value=int(view))
                 _assert_only_in(winreg, path, view, (int(view), winreg.REG_DWORD))
                 _hklm_delete(winreg, path)
         elif base == "registry_view_set_binary":
             for view in _VIEWS:
-                harness.run(view=view, key=path, subkey="Value")
+                harness.run(view=view, key=root, subkey="Value")
                 _assert_only_in(winreg, path, view, (_BINARY, winreg.REG_BINARY))
                 _hklm_delete(winreg, path)
         elif base == "registry_view_get":
@@ -94,27 +95,28 @@ def _view_case(base, harness):
             for view in views:
                 _hklm_seed(winreg, path, view, view + " view")
             for view in views:
-                harness.run(view=view, key=path, subkey="Value").assert_outputs(value=view + " view")
+                harness.run(view=view, key=root, subkey="Value").assert_outputs(value=view + " view")
         elif base == "registry_view_remove":
             for view in _VIEWS:
                 for seeded in _VIEWS:
                     _hklm_seed(winreg, path, seeded, seeded)
-                harness.run(view=view, key=path)
+                harness.run(view=view, key=root)
                 assert _hklm_value(winreg, path, view) is None, view
                 if _split_views():
                     other = "32" if view == "64" else "64"
                     assert _hklm_value(winreg, path, other) == (other, winreg.REG_SZ), view
                 _hklm_delete(winreg, path)
         elif base == "registry_pinned_set_string":
-            harness.run(key=path, subkey="Value", value="pinned")
+            harness.run(key=root, subkey="Value", value="pinned")
             _assert_only_in(winreg, path, "32", ("pinned", winreg.REG_SZ))
         elif base == "registry_pinned_set_binary":
-            harness.run(key=path, subkey="Value")
+            harness.run(key=root, subkey="Value")
             _assert_only_in(winreg, path, "32", (_BINARY, winreg.REG_BINARY))
         else:
             raise common.unhandled(base)
     finally:
         _hklm_delete(winreg, path)
+        _hklm_delete(winreg, root)
 
 
 def _registry_case(base, harness):

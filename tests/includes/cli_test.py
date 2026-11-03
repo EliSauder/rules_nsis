@@ -21,7 +21,7 @@ def run_case(case, harness, args):
     elif base == "cli_get_arg":
         extra = ["plain", '"two words"', 'a"b c"d', '""', "/n=1", "last"]
         expected = ["plain", "two words", "ab cd", "", "/n=1", "last"]
-        # The harness command line follows the args: /S, /output=..., then one
+        # The harness command line follows the args: /S, /output=..., /TESTID=..., then one
         # arg per input.
         for offset, value in enumerate(expected):
             harness.run(
@@ -30,12 +30,15 @@ def run_case(case, harness, args):
         after = len(extra)
         harness.run(index=after, command_args=extra, expect_errors=False).assert_outputs(value="/S")
         harness.run(index=after + 2, command_args=extra, expect_errors=False).assert_outputs(
-            value=f"/index={after + 2}"
+            value=f"/TESTID={harness.test_id}"
+        )
+        harness.run(index=after + 3, command_args=extra, expect_errors=False).assert_outputs(
+            value=f"/index={after + 3}"
         )
         harness.run(index=1000, expect_errors=True).assert_outputs(value="")
         harness.run(index=-1, expect_errors=True).assert_outputs(value="")
         # The uninstaller harness adds one more arg, _?=, after /index.
-        fixed = 4 if case.startswith("un_") else 3
+        fixed = 5 if case.startswith("un_") else 4
         harness.run(index=after + fixed, command_args=extra, expect_errors=True).assert_outputs(value="")
         # Args are not delimited by anything, so they may contain LF.
         harness.run(index=0, command_args=['"a\nb"', "c"], expect_errors=False).assert_outputs(value="a\nb")

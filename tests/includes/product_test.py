@@ -46,6 +46,8 @@ def _product_registry(base, harness, root):
             harness.run(subkey="InstallDir").assert_outputs(value="seeded")
             harness.run(subkey="Missing").assert_outputs(value="")
         else:
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, path):
+                pass
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, common.scoped(harness, root + "\\Options")) as handle:
                 winreg.SetValueEx(handle, "page.key", 0, winreg.REG_SZ, "remove me")
             assert harness.run(child="Options").returncode == 0
