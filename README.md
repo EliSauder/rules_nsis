@@ -73,6 +73,8 @@ nsis_installer(
     ],
     product = "My Minimal Product",
     product_path = "My Minimal Product",
+    # Optional; defaults to "Uninstall.exe".
+    uninstaller_name = "Remove My Minimal Product.exe",
 )
 ```
 
