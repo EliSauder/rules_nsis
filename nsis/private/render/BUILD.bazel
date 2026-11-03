@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 
 py_binary(
     name = "stamp_data",
@@ -9,3 +9,10 @@ py_binary(
     visibility = ["//visibility:public"],
 )
 
+py_test(
+    name = "stamp_data_test",
+    srcs = [
+        "stamp_data.py",
+        "stamp_data_test.py",
+    ],
+)

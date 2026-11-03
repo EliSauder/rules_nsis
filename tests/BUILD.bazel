@@ -1,4 +1,4 @@
-load("//tests:defs.bzl", "nsis_installer_test", "signing_env_test")
+load("//tests:defs.bzl", "nsis_installer_test", "signing_env_test", "uninstall_tree_fixture")
 load("//tests:analysis_tests.bzl", "eventlog_requires_admin_test", "plugin_tests")
 load(
     "//nsis:defs.bzl",
@@ -175,6 +175,46 @@ nsis_installer_test(
     name = "minimal_installer_outfile_test",
     installer = ":minimal_installer_outfile",
     must_have_files = ["README.md"],
+)
+
+uninstall_tree_fixture(
+    name = "uninstall_tree_artifact",
+    src = "//tests/testdata:README.md",
+)
+
+nsis_component(
+    name = "tree_artifact_component",
+    srcs = [":uninstall_tree_artifact"],
+)
+
+nsis_component(
+    name = "tree_artifact_component_with_directory",
+    directory = "component",
+    srcs = [":uninstall_tree_artifact"],
+)
+
+nsis_installer(
+    name = "tree_artifact_installer",
+    testable = True,
+    id = "8a19f90b-c272-4e16-a6e3-1c96e3d71f52",
+    components = [
+        ":tree_artifact_component",
+        ":tree_artifact_component_with_directory",
+    ],
+    product = "Tree Artifact Installer",
+    product_path = "Tree Artifact Installer",
+    execution_level = "user",
+)
+
+py_test(
+    name = "tree_artifact_installer_test",
+    srcs = ["tree_artifact_installer_test.py"],
+    args = ["$(rlocationpath :tree_artifact_installer)"],
+    data = [":tree_artifact_installer"],
+    target_compatible_with = ["@platforms//os:windows"],
+    deps = [
+        "@rules_python//python/runfiles",
+    ],
 )
 
 nsis_component(
