@@ -13,9 +13,9 @@ def run_case(case, harness, args):
         raise common.unhandled(case)
     code, *children = args
     assert len(children) == len(_CHILD_EXIT_CODES), children
-    path = common.uninstall_key(code)
+    root = common.uninstall_key(code)
+    path = common.scoped(harness, root)
     try:
-        common.delete_registry_tree(winreg, path)
         harness.run(appkey="missing-test-product").assert_outputs(exitcode=0)
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, path) as key:
             winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, str(harness.directory / "missing.exe"))
@@ -36,7 +36,7 @@ def run_case(case, harness, args):
             # A successful uninstaller deletes itself; a failed one is left.
             assert program.exists() is (expected != 0)
     finally:
-        common.delete_registry_tree(winreg, path)
+        common.delete_registry_tree(winreg, root)
 
 
 if __name__ == "__main__":

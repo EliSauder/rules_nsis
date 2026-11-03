@@ -118,6 +118,7 @@ NsisComponentInfo = provider(
     fields = {
         "name": "Component Name",
         "directory": "Optional Sub Directory of the component.",
+        "add_to_path": "Whether the component's install directory is added to PATH.",
         "service": "Whether the component is a windows service.",
         "service_executable": "The executable of the service.",
         "service_args": "The arguments for the service.",
@@ -397,6 +398,7 @@ def _nsis_component_impl(ctx):
     return NsisComponentInfo(
         name = str(ctx.label.name),
         directory = str(ctx.attr.directory),
+        add_to_path = ctx.attr.add_to_path,
         service = bool(ctx.attr.service),
         service_executable = ctx.attr.service_executable,
         service_args = [str(x) for x in ctx.attr.service_args],
@@ -434,6 +436,16 @@ Represents a NSIS installer section.
             mandatory = False,
             default = "",
             doc = "The sub directory path under $INSTPATH where the component will be installed.",
+        ),
+        "add_to_path": attr.bool(
+            default = False,
+            doc = """
+Adds the folder the component installs into (`$INSTDIR` plus `directory`) to
+the `PATH` environment variable, and removes it again on uninstall. The machine
+`PATH` is changed when the installer runs as admin, the current user's otherwise.
+`PATH` is edited in place by the EnVar plugin and never copied into an NSIS
+string, which would truncate it at `NSIS_MAX_STRLEN`.
+""",
         ),
         "service": attr.bool(
             mandatory = False,
@@ -601,6 +613,7 @@ Notes:
 - Shortcuts is a list of {Name, LinkName, Target, TargetRelative, Arguments, Description, Icon, IconRelative, IconIndex, StartMenu, Desktop, Path, StartMenuSubfolder, LocationPath}.
   Shortcuts are created after all `post_install` hooks have run, so the links do not exist yet in a hook.
 - HasShortcuts is available as a bool field.
+- AddToPath is available as a bool field.
 - HasEventLog is available as a bool field.
 - EventLog is available as a nsis_eventlog_source rule (same CamelCaseName field access).
 
@@ -1241,6 +1254,7 @@ def _get_component_ds(toolchain, component, inst_cat):
     data = {
         "Name": str(component.name),
         "Directory": str(_make_win_path(component.directory)),
+        "AddToPath": component.add_to_path,
         "Service": bool(component.service),
         "ServiceArgs": " ".join(component.service_args),
         "ServiceDependencies": "\\".join(component.service_dependencies),
@@ -2041,7 +2055,10 @@ For more details see `post_init`.
             doc = "Additional NSIS plugins (nsis_plugin targets) made available to the script.",
         ),
         "_default_plugins": attr.label_list(
-            default = [Label("@nsis_plugin_nsarray//:plugin")],
+            default = [
+                Label("@nsis_plugin_nsarray//:plugin"),
+                Label("@nsis_plugin_envar//:plugin"),
+            ],
             providers = [NsisPluginInfo],
         ),
     }, **dict(SIGNING_ATTRS, **STAMP_ATTRS)),

@@ -53,7 +53,8 @@ class ContractResult:
 
 
 def contract_harness(spec, *, stop_at_invocation=False):
-    def run(expected_exitcode=0, expect_errors=None, command_args=(), command_tail=(), **values):
+    def run(expected_exitcode=0, expect_errors=None, test_id=None, command_args=(), command_tail=(), **values):
+        assert test_id is None or type(test_id) is str
         assert type(expected_exitcode) is int
         assert expect_errors is None or type(expect_errors) is bool
         parameters = inputs(spec)
@@ -66,6 +67,7 @@ def contract_harness(spec, *, stop_at_invocation=False):
 
     return SimpleNamespace(
         run=MagicMock(side_effect=run),
+        test_id="contract-test-id",
         directory=Path(tempfile.mkdtemp(dir=os.environ["TEST_TMPDIR"])),
     )
 

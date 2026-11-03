@@ -215,6 +215,13 @@ characters; longer values raise `ValueError` before the harness runs.
 Scalar inputs of up to 100 escaped characters (`name=value` included) are also
 passed on the command line as `/name=value` options, so APIs that read the command line (`GetOptions`, `TestIdInit`) see them;
 the harness itself reads the file. List items are only in the file.
+Every run also gets a unique `/TESTID=` (`Harness.test_id`, a fresh uuid per
+`Harness`; `run(test_id=...)` overrides it, `""` removes it). When the source
+includes `Testing.nsh`, the generated `.onInit`/`un.onInit` calls `TestIdInit`
+before any `on_init` lines, so under `TESTABLE_INSTALLER` the library scopes
+registry keys with that id and parallel tests cannot collide. Assertions about
+such keys must use `harness.test_id`. `testid` and `test_id` are reserved
+input names.
 `expected_exitcode=N` supports failure tests. A zero exit without an output
 record is an error, including an API that silently calls `Abort` or `Quit`.
 
@@ -466,8 +473,7 @@ independently and in parallel. Each include has its own files in
 - `<api>_adapters.nsh`, where needed, adds `Harness*` macros for cases a direct
   symbol call cannot express: aliasing registers as operands, expanding a
   macro more than once in one function, reading state a call leaves in globals
-  (`DetectArch`), or observing a command-line option (`TestIdInit` reads the
-  harness's `testid` input). Prefer a direct symbol (with `const:`
+  (`DetectArch`), or observing a command-line option. Prefer a direct symbol (with `const:`
   params, defines, or `on_init`) whenever possible.
 
 The command line and options pages rely on includes with their own suites:

@@ -686,6 +686,28 @@ nsis_installer_test(
     must_have_dirs = ["C:\\ROOT"],
 )
 
+nsis_component(
+    name = "add_to_path_component",
+    srcs = [":nsis_files"],
+    directory = "bin",
+    selection_mode = "default",
+    add_to_path = True,
+)
+
+nsis_installer(
+    name = "add_to_path_installer",
+    testable = True,
+    id = "4b0c2d8e-6f1a-4d3b-9a57-2e8c1f7d9b60",
+    components = [":add_to_path_component"],
+    product = "Add To Path Installer",
+    product_path = "Add To Path Installer",
+)
+
+nsis_installer_test(
+    name = "add_to_path_installer_test",
+    installer = ":add_to_path_installer",
+)
+
 nsis_eventlog_source(
     name = "minimal_eventlog_source",
     source = "MinimalSource",

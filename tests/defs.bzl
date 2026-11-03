@@ -65,6 +65,7 @@ def _get_installer_test_details(ctx, inst, target):
     ds = dict()
     services = dict()
     elsrcs =dict()
+    path_dirs = []
 
     numcomp = 0
 
@@ -90,6 +91,8 @@ def _get_installer_test_details(ctx, inst, target):
             if cmp.eventlog != None and NsisEventLogSourceInfo in cmp.eventlog:
                 elg = cmp.eventlog[NsisEventLogSourceInfo]
                 elsrcs["{}/{}".format(elg.key, elg.source)] = elg
+            if cmp.add_to_path:
+                path_dirs.append(cmp.directory)
             if cmp.service:
                 services[cmp.name] = {
                     "start_type": cmp.service_start_type,
@@ -154,6 +157,7 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_execution_level": inst.execution_level,
         "expected_services": services,
         "expected_eventlog": elsrcs,
+        "expected_path_dirs": path_dirs,
         "expected_installer_exitcode": 0,
     }
 

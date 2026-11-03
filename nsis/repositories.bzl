@@ -57,7 +57,7 @@ nsis_plugin(
     name = "plugin",
     plugin_name = "{name}",
 {attrs}
-    includes = glob(["Include/*.nsh"]),
+    includes = glob(["Include/*.nsh"], allow_empty = True),
     license = "{license}",
 )
 """.format(

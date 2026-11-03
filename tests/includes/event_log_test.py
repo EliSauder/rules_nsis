@@ -13,7 +13,7 @@ def run_case(case, harness, args):
         # Event sources always live under HKLM with the active test id appended.
         source = "RulesNsisHarness" + uuid.uuid4().hex
         root = _APPLICATION + source
-        path = root + "\\framework-test-id"
+        path = common.scoped(harness, root)
         try:
             result = harness.run(
                 key="Application", source=source, types=7,
@@ -36,7 +36,7 @@ def run_case(case, harness, args):
     elif base == "eventlog_remove_source":
         source = "RulesNsisHarnessRemove" + uuid.uuid4().hex
         root = _APPLICATION + source
-        path = root + "\\framework-test-id"
+        path = common.scoped(harness, root)
         with winreg.CreateKey(winreg.HKEY_LOCAL_MACHINE, path) as handle:
             winreg.SetValueEx(handle, "TypesSupported", 0, winreg.REG_DWORD, 1)
         try:

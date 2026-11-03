@@ -406,6 +406,37 @@ def _validate_files(testcase: unittest.TestCase, config, install_root):
         testcase.assertFalse(os.path.isdir(path), f"Expected file is a directory: {path}. Found: {fs}")
         testcase.assertTrue(os.path.isfile(path), f"Expected file is not a file: {path}. Found: {fs}")
 
+def _path_entries(config):
+    if (config["expected_execution_level"] or "admin") == "admin":
+        root, key = winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+    else:
+        root, key = winreg.HKEY_CURRENT_USER, "Environment"
+    try:
+        with winreg.OpenKey(root, key) as handle:
+            value, _ = winreg.QueryValueEx(handle, "Path")
+    except FileNotFoundError:
+        return []
+    return [x.rstrip("\\").lower() for x in value.split(";") if x]
+
+
+def _expected_path_entry(install_root, directory):
+    return os.path.join(install_root, directory).rstrip("\\").lower()
+
+
+def _validate_path(testcase, config, install_root):
+    entries = _path_entries(config)
+    for d in config.get("expected_path_dirs", []):
+        expected = _expected_path_entry(install_root, d)
+        testcase.assertEqual(1, entries.count(expected), f"Expected exactly one PATH entry {expected}. PATH: {entries}")
+
+
+def _validate_removed_path(testcase, config, install_root):
+    entries = _path_entries(config)
+    for d in config.get("expected_path_dirs", []):
+        expected = _expected_path_entry(install_root, d)
+        testcase.assertNotIn(expected, entries, f"PATH entry {expected} left after uninstall")
+
+
 def _validate_removed_services(testcase, config, install_root):
     expected_services = config.get("expected_services", {})
 
@@ -493,6 +524,8 @@ def _validate_install(testcase, install_root, subpath, appkey, config, installer
         _validate_reg(testcase, config, install_root, subpath, appkey)
     with testcase.subTest(msg="Validate Installed Services"):
         _validate_services(testcase, config, install_root)
+    with testcase.subTest(msg="Validate PATH"):
+        _validate_path(testcase, config, install_root)
     with testcase.subTest(msg="Validate EventLog Registry"):
         _validate_eventlog(testcase, config, appkey)
 
@@ -527,6 +560,8 @@ def _validate_uninstall(testcase, install_root, subpath, appkey, config, runun=T
         _validate_removed_reg(testcase, config, subpath, appkey)
     with testcase.subTest(msg="Validate Removed Services"):
         _validate_removed_services(testcase, config, install_root)
+    with testcase.subTest(msg="Validate Removed PATH"):
+        _validate_removed_path(testcase, config, install_root)
     with testcase.subTest(msg="Validate Removed EventLog Reg"):
         _validate_removed_eventlog(testcase, config, appkey)
 

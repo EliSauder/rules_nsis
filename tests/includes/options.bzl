@@ -7,12 +7,6 @@ _PRODUCT_KEY = {
     "uninstaller": ['${un.SetProductKey} "rules_nsis_tests"'],
 }
 
-# Persisting cases also isolate the registry with a test id.
-_TEST_ID = {
-    context: ['${SetTestId} "framework-test-id"'] + lines
-    for context, lines in _PRODUCT_KEY.items()
-}
-
 def options_cases():
     cases = []
     for name, symbol, parameters in [
@@ -44,7 +38,7 @@ def options_cases():
         symbol = "HarnessOptionPersist",
         parameters = ["in:value", "out:result"],
         contexts = ["installer"],
-        on_init = _TEST_ID,
+        on_init = _PRODUCT_KEY,
     )
     cases += include_api_case(
         name = "option_persist_kinds",
@@ -54,7 +48,7 @@ def options_cases():
         symbol = "HarnessOptionPersistKinds",
         parameters = ["in:items:list", "in:text", "out:count", "out:items_out:list", "out:text_out"],
         contexts = ["installer"],
-        on_init = _TEST_ID,
+        on_init = _PRODUCT_KEY,
     )
     cases += include_api_case(
         name = "option_load_stored",
@@ -64,7 +58,7 @@ def options_cases():
         symbol = "HarnessOptionLoad",
         parameters = ["out:count", "out:items:list", "out:text"],
         contexts = ["installer"],
-        on_init = _TEST_ID,
+        on_init = _PRODUCT_KEY,
     )
     cases += include_api_case(
         name = "option_load_missing",
@@ -73,6 +67,6 @@ def options_cases():
         src = "options_adapters.nsh",
         symbol = "HarnessOptionLoadMissing",
         parameters = ["in:default", "out:result"],
-        on_init = _TEST_ID,
+        on_init = _PRODUCT_KEY,
     )
     return cases

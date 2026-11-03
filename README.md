@@ -91,7 +91,7 @@ nsis_installer(
 - [x] StartMenu and Desktop Shortcuts (`nsis_shortcut`).
 - [x] Options pages (`nsis_options_page`) with persisted values.
 - [x] Installer command line: `/COMPONENTS`, `/INSTTYPE`, `/OPTIONS=`, `/O:`, `/HELP`.
-- [ ] Update Path. \[Help Wanted]
+- [x] Update Path (`add_to_path` on `nsis_component`).
 - [ ] Set Environment Variables. \[Help Wanted]
 - [ ] Don't prompt for components if all hidden or all required.
 - [ ] Enable adding files directly to installer (add to hidden section).
@@ -480,6 +480,14 @@ an installer that embeds it.
 - When `/TESTID={{.TestId}}` is passed, will append TestId to the registry
   keys it uses. This is to handle race conditions while testing installers.
 - If version is not provided, will default to `0.0.0.0`.
+- `add_to_path = True` on a component adds its install folder (`$INSTDIR` plus
+  `directory`) to `PATH` and removes it on uninstall. The machine `PATH` is
+  changed for `execution_level = "admin"` installers, the user's otherwise.
+  `PATH` is edited in place with the bundled
+  [EnVar plugin](https://nsis.sourceforge.io/EnVar_plug-in) and never copied
+  into an NSIS string, which would truncate it at `NSIS_MAX_STRLEN` and corrupt
+  it. Duplicates are not added. The `EnvPath_Add`/`EnvPath_Remove` macros
+  (`EnvPath.nsh`) are available to hooks.
 - EventLog keys written to `SYSTEM\CurrentControlSet\Services\EventLog\Application\{{.Id}}`
   under `HKLM` (always, since the Event Log service only reads `HKLM`). Using an
   `eventlog` component in an installer whose `execution_level` is not `admin`
