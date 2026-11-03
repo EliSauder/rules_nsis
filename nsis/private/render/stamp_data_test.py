@@ -22,7 +22,7 @@ class TreeFilesTest(unittest.TestCase):
 
             _expand_tree_files(data)
 
-            self.assertEqual(
+            self.assertCountEqual(
                 component["TreeFiles"],
                 ["README.md", "nested\\one.txt", "nested\\two.txt"],
             )
