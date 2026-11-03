@@ -64,8 +64,12 @@ Sleep 2000
 SetFileAttributes "$INSTDIR\{{$d}}\{{ .Name }}" NORMAL
 Delete "$INSTDIR\{{$d}}\{{ .Name }}"
 {{- end}}
-{{- range $.Directories }}
-RMDir /r "$INSTDIR\{{$d}}\{{.}}"
+{{- range .TreeFiles }}
+SetFileAttributes "$INSTDIR\{{$d}}\{{.}}" NORMAL
+Delete "$INSTDIR\{{$d}}\{{.}}"
+{{- end}}
+{{- range .TreeDirectories }}
+RMDir "$INSTDIR\{{$d}}\{{.}}"
 {{- end}}
 
 RMDir "$INSTDIR\{{$d}}"
@@ -74,8 +78,12 @@ RMDir "$INSTDIR\{{$d}}"
 SetFileAttributes "$INSTDIR\{{ .Name }}" NORMAL
 Delete "$INSTDIR\{{ .Name }}"
 {{- end}}
-{{- range .Directories }}
-RMDir /r "$INSTDIR\{{ . }}"
+{{- range .TreeFiles }}
+SetFileAttributes "$INSTDIR\{{.}}" NORMAL
+Delete "$INSTDIR\{{.}}"
+{{- end}}
+{{- range .TreeDirectories }}
+RMDir "$INSTDIR\{{.}}"
 {{- end}}
 {{- end}}
 

@@ -1523,6 +1523,7 @@ def _stamp_file(ctx, nm, data):
     outfile = ctx.actions.declare_file(outname)
 
     inputs = [datafile, defaultsfile, ctx.executable._render_script]
+    inputs += [f for f in _all_files(ctx).to_list() if f.is_directory]
     if stamp:
         inputs = inputs + [stamp.stable_status_file, stamp.volatile_status_file]
 

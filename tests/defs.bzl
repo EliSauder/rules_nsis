@@ -10,6 +10,26 @@ load(
 )
 load("@aspect_bazel_lib//lib:paths.bzl", "to_rlocation_path")
 
+def _uninstall_tree_fixture_impl(ctx):
+    tree = ctx.actions.declare_directory(ctx.label.name + ".dir")
+    ctx.actions.run_shell(
+        inputs = [ctx.file.src],
+        outputs = [tree],
+        arguments = [tree.path, ctx.file.src.path],
+        command = """
+mkdir -p "$1/nested"
+cp "$2" "$1/README.md"
+cp "$2" "$1/nested/file with spaces.txt"
+cp "$2" "$1/"'${LITERAL}.txt'
+""",
+    )
+    return [DefaultInfo(files = depset([tree]))]
+
+uninstall_tree_fixture = rule(
+    implementation = _uninstall_tree_fixture_impl,
+    attrs = {"src": attr.label(allow_single_file = True, mandatory = True)},
+)
+
 def _signing_env_test_impl(ctx):
     env = analysistest.begin(ctx)
     actions = [action for action in analysistest.target_actions(env) if action.mnemonic == "MakeNSIS"]

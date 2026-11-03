@@ -1,6 +1,7 @@
 import json
 import sys
 import re
+from pathlib import Path
 
 #from python.runfiles import Runfiles
 
@@ -37,6 +38,40 @@ def _generate_substitutions(stable, volatile, defaults: str) -> dict:
     return result
 
 
+def _nsis_path(path):
+    return path.as_posix().replace("/", "\\").replace("$", "$$").replace('"', '$\\"')
+
+
+def _expand_tree_files(data):
+    if isinstance(data, dict):
+        if "Files" in data and "Directories" in data:
+            files = set()
+            directories = set()
+            for source in data["Directories"]:
+                root = Path(source)
+                pending = [root]
+                while pending:
+                    directory = pending.pop()
+                    for child in sorted(directory.iterdir()):
+                        relative = child.relative_to(root)
+                        if child.is_dir():
+                            directories.add(relative)
+                            pending.append(child)
+                        else:
+                            files.add(relative)
+            data["TreeFiles"] = [_nsis_path(path) for path in sorted(files)]
+            data["TreeDirectories"] = [
+                _nsis_path(path)
+                for path in sorted(directories, key=lambda p: (-len(p.parts), str(p)))
+            ]
+        for value in data.values():
+            _expand_tree_files(value)
+    elif isinstance(data, list):
+        for value in data:
+            _expand_tree_files(value)
+    return data
+
+
 def main(argv):
     if len(argv) < 4:
        raise Exception("Not enough args, needs at least 4")
@@ -61,6 +96,7 @@ def main(argv):
         indata = indata.replace("{" + key + "}", value)
 
     indata = re.sub("\\{[A-Z0-9_]+\\}", "", indata)
+    indata = json.dumps(_expand_tree_files(json.loads(indata)))
 
     with open(outfile, 'w') as file:
         file.write(indata)
