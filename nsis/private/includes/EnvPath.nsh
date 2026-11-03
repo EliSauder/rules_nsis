@@ -3,7 +3,7 @@
 
 !include LogicLib.nsh
 !include Logging.nsh
-!include ShellContext.nsh
+!include Registry.nsh
 
 ; Adds and removes one folder of the PATH environment variable with the EnVar
 ; plugin. PATH is never read into an NSIS string: values longer than
@@ -12,7 +12,8 @@
 ; EnVar edits the registry value directly, keeps it REG_EXPAND_SZ, ignores
 ; duplicates, matches whole entries only, and broadcasts the change.
 ;
-; The hive follows the shell context (see SelectEnVarHive in ShellContext.nsh).
+; The hive is chosen like for the other registry helpers: HKLM in the "admin"
+; shell context, HKCU otherwise.
 ; The error flag is set on failure.
 
 ; Trailing backslashes are dropped so that the entry matches what other tools
@@ -36,7 +37,12 @@ Function ${PREFIX}EnvPath_Add
 
     !insertmacro _EnvPath_Normalize $0
     ClearErrors
-    !insertmacro SelectEnVarHive
+    !insertmacro _RegShellHive $9
+    ${If} $9 == 0x80000002
+        EnVar::SetHKLM
+    ${Else}
+        EnVar::SetHKCU
+    ${EndIf}
     EnVar::AddValue "Path" "$0"
     Pop $1
     ${If} $1 = 0
@@ -58,7 +64,12 @@ Function ${PREFIX}EnvPath_Remove
 
     !insertmacro _EnvPath_Normalize $0
     ClearErrors
-    !insertmacro SelectEnVarHive
+    !insertmacro _RegShellHive $9
+    ${If} $9 == 0x80000002
+        EnVar::SetHKLM
+    ${Else}
+        EnVar::SetHKCU
+    ${EndIf}
     EnVar::DeleteValue "Path" "$0"
     Pop $1
     ; 3 and 5 mean PATH or the entry is already gone.
