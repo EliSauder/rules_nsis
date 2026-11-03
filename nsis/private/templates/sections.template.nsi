@@ -53,7 +53,7 @@ Call un.__Shortcuts_Remove
 !insertmacro LogInfo "Removing section {{.Name}}-{{.DisplayName}}"
 {{- if .Service }}
 !insertmacro Service_StopAndWait "{{ .Name }}" 30000 $0
-!insertmacro Service_Delete "{{ .Name }}" $0
+!insertmacro Service_DeleteAndWait "{{ .Name }}" 30000 $0
 {{- end }}
 
 {{- if .Directory }}

@@ -13,6 +13,7 @@ _OPERATIONS = [
     ("start_and_wait", "Service_StartAndWait", ["in:name", "in:timeout", "out:result"]),
     ("stop_and_wait", "Service_StopAndWait", ["in:name", "in:timeout", "out:result"]),
     ("delete", "Service_Delete", ["in:name", "out:result"]),
+    ("delete_and_wait", "Service_DeleteAndWait", ["in:name", "in:timeout", "out:result"]),
     ("set_description", "Service_SetDescription", ["in:name", "in:description", "out:result"]),
 ]
 

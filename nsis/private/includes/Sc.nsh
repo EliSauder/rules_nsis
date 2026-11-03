@@ -216,6 +216,57 @@
 !macroend
 !define Service_Delete `!insertmacro Service_Delete`
 
+; Deletes the service and polls until it no longer exists or TIMEOUT_MS elapses.
+; sc delete only marks a service for deletion; it is removed once it is stopped and
+; all handles to it are closed. OUT_RC is 0 when removed (or not installed), the sc
+; exit code if the delete request failed, 1 on timeout.
+!macro Service_DeleteAndWait SERVICE_NAME TIMEOUT_MS OUT_RC
+    Push $0
+    Push $1
+    Push $2
+    Push $3
+
+    !insertmacro Service_Delete "${SERVICE_NAME}" $0
+    ; 1060: service does not exist, 1072: service already marked for deletion
+    ${If} $0 = 1060
+        StrCpy $3 0
+    ${ElseIf} $0 = 0
+    ${OrIf} $0 = 1072
+        StrCpy $1 0
+        StrCpy $3 1
+        ${Do}
+            !insertmacro Service_Query "${SERVICE_NAME}" $0 $2
+            ${If} $0 = 1060
+                StrCpy $3 0
+                ${Break}
+            ${EndIf}
+            ${If} $1 >= ${TIMEOUT_MS}
+                ${Break}
+            ${EndIf}
+            Sleep 250
+            IntOp $1 $1 + 250
+        ${Loop}
+    ${Else}
+        StrCpy $3 $0
+    ${EndIf}
+    ${If} $3 = 0
+        !insertmacro LogInfo `Service ${SERVICE_NAME} deleted`
+    ${ElseIf} $3 = 1
+        !insertmacro LogInfo `Timed out waiting for service ${SERVICE_NAME} to be deleted`
+    ${Else}
+        !insertmacro LogInfo `Failed to delete service ${SERVICE_NAME}: $3`
+    ${EndIf}
+
+    Push $3
+    Exch 4
+    Pop $0
+    Pop $3
+    Pop $2
+    Pop $1
+    Pop ${OUT_RC}
+!macroend
+!define Service_DeleteAndWait `!insertmacro Service_DeleteAndWait`
+
 !macro Service_SetDescription SERVICE_NAME DESCRIPTION OUT_RC
     !insertmacro _ServiceScExec \
         `description "${SERVICE_NAME}" "${DESCRIPTION}"` ${OUT_RC} ${OUT_RC}
