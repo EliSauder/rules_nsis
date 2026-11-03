@@ -14,8 +14,13 @@
 ;                                        when there is none
 ;   ${Array_Join} ARRAY SEPARATOR OUT    the items joined; "" when the array is missing
 ;   ${Array_Split} ARRAY TEXT SEPARATOR  replaces the items with the parts of TEXT
+;   ${Array_Copy} SOURCE DEST            DEST becomes a copy of SOURCE, keys included;
+;                                        empty when SOURCE is missing
+;   ${Array_ToString} ARRAY OUT          "key => value, key => value"; "" when the array
+;                                        is missing. The error flag is set when the text
+;                                        was cut off at NSIS_MAX_STRLEN
 ;
-; The error flag is cleared, except where it reports a missing item.
+; The error flag is cleared, except where it reports a missing item or a cut-off.
 
 !ifndef ARRAY_NSH
 !define ARRAY_NSH
@@ -105,5 +110,35 @@
     ClearErrors
 !macroend
 !define Array_Split `!insertmacro Array_Split`
+
+!macro Array_Copy SOURCE DEST
+    Push $R9
+    ClearErrors
+    nsArray::Length "${SOURCE}"
+    ${If} ${Errors}
+        Pop $R9
+        ${Array_Reset} "${DEST}"
+    ${Else}
+        Pop $R9 ; the length
+        nsArray::Copy "${SOURCE}" "${DEST}"
+        Pop $R9
+        ClearErrors
+    ${EndIf}
+!macroend
+!define Array_Copy `!insertmacro Array_Copy`
+
+!macro Array_ToString ARRAY OUT
+    ClearErrors
+    nsArray::Length "${ARRAY}"
+    ${If} ${Errors}
+        StrCpy ${OUT} ""
+        ClearErrors
+    ${Else}
+        Pop ${OUT}
+        nsArray::ToString "${ARRAY}"
+        Pop ${OUT}
+    ${EndIf}
+!macroend
+!define Array_ToString `!insertmacro Array_ToString`
 
 !endif

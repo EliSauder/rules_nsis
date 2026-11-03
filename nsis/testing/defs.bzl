@@ -27,8 +27,8 @@ def _symbol_impl(ctx):
             parameters.append({"name": parts[1], "direction": "const", "value": ctx.attr.constants[parts[1]]})
             continue
         typ = parts[2] if len(parts) == 3 else "string"
-        if typ not in ["string", "int", "bool"]:
-            fail("parameter type must be string, int, or bool: " + parameter)
+        if typ not in ["string", "int", "bool", "list"]:
+            fail("parameter type must be string, int, bool, or list: " + parameter)
         parameters.append({"name": parts[1], "direction": parts[0], "type": typ})
     for name in ctx.attr.constants:
         if name not in names:
@@ -70,7 +70,7 @@ The default output is the generated JSON description consumed by Harness.
         "kind": attr.string(mandatory = True, values = ["macro", "definition", "function", "condition"]),
         "context": attr.string(default = "installer", values = ["installer", "uninstaller"]),
         "parameters": attr.string_list(
-            doc = "Ordered 'direction:name[:type]' operands (in, out, inout, const); type is string (default), int, or bool.",
+            doc = "Ordered 'direction:name[:type]' operands (in, out, inout, const); type is string (default), int, bool, or list.",
         ),
         "constants": attr.string_dict(
             doc = "Verbatim NSIS operand text for each const parameter.",

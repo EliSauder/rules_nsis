@@ -90,6 +90,6 @@ http_archive with a build_file_content that calls nsis_plugin.
             doc = "Folder with the plugin's C sources. When set, both Unicode DLLs are compiled from " +
                   "its .c files with Zig, without a C runtime, instead of taken from the archive.",
         ),
-        "copts": attr.string_list(doc = "Compiler flags for a source build."),
+        "copts": attr.string_list(doc = "Compiler flags for a source build, including -DNAME definitions."),
     },
 )

@@ -32,3 +32,22 @@
     ${Array_Set} harness_named "k" `${A}`
     ${Array_GetKey} harness_named "k" ${NAMED}
 !macroend
+
+!macro HarnessArrayCopy A B COPY_COUNT COPY_JOINED SOURCE_COUNT NAMED MISSING_COUNT TEXT TEXT_MISSING
+    ${Array_Reset} harness_source
+    ${Array_Append} harness_source `${A}`
+    ${Array_Append} harness_source `${B}`
+    ${Array_Copy} harness_source harness_copy
+    ${Array_Append} harness_source "z"
+    ${Array_Length} harness_copy ${COPY_COUNT}
+    ${Array_Join} harness_copy "," ${COPY_JOINED}
+    ${Array_Length} harness_source ${SOURCE_COUNT}
+    ${Array_ToString} harness_source ${TEXT}
+    ${Array_Set} harness_named "k" `${A}`
+    ${Array_Copy} harness_named harness_named_copy
+    ${Array_GetKey} harness_named_copy "k" ${NAMED}
+    ${Array_Append} harness_filled "stale"
+    ${Array_Copy} harness_never harness_filled
+    ${Array_Length} harness_filled ${MISSING_COUNT}
+    ${Array_ToString} harness_never ${TEXT_MISSING}
+!macroend

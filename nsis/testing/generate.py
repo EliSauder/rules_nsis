@@ -55,8 +55,8 @@ def validate(spec):
             or parameter.keys() - {"name", "direction", "type", "value"}
         ):
             raise ValueError("Each parameter requires name and direction, with optional type")
-        if parameter.get("type", "string") not in ("string", "int", "bool"):
-            raise ValueError("Parameter type must be string, int, or bool")
+        if parameter.get("type", "string") not in ("string", "int", "bool", "list"):
+            raise ValueError("Parameter type must be string, int, bool, or list")
         name = parameter["name"]
         if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", name):
             raise ValueError("Parameter names must match [a-z][a-z0-9_]*")
@@ -72,6 +72,11 @@ def validate(spec):
             or any(c in parameter["value"] for c in "\r\n")
         ):
             raise ValueError(f"const {name} needs a single-line string value and no type")
+        if parameter.get("type") == "list" and (
+            parameter["direction"] == "const" or spec["kind"] == "function"
+            or spec.get("invocation") == "value" or spec["kind"] == "condition"
+        ):
+            raise ValueError(f"list parameter {name} needs a macro or definition, and not const")
         if spec["kind"] == "function" and parameter["direction"] == "inout":
             raise ValueError("Stack functions use separate in and out parameters")
     if spec.get("invocation") == "value" and (
@@ -101,6 +106,11 @@ def literal(value):
 
 
 def write_records(path, records):
+    """Records are (name, variable), or (name, array, "list") for an nsArray.
+
+    A list is written as "name:count:" followed by "length:item" per item, so
+    items need no escaping and the list has no size limit.
+    """
     lines = [
         "ClearErrors",
         f'FileOpen $_harness_file "{path}" w',
@@ -108,7 +118,36 @@ def write_records(path, records):
         f'FileWriteUTF16LE $_harness_file "{HEADER}$\\n"',
         "IfErrors harness_output_error",
     ]
-    for name, variable in records:
+    for number, record in enumerate(records):
+        if len(record) == 3:
+            name, array, _ = record
+            label = str(number)
+            lines += [
+                "ClearErrors",
+                f'nsArray::Length "{array}"',
+                f"IfErrors list_missing_{label}",
+                "Pop $_harness_count",
+                f"Goto list_counted_{label}",
+                f"list_missing_{label}:",
+                "StrCpy $_harness_count 0",
+                f"list_counted_{label}:",
+                f'FileWriteUTF16LE $_harness_file "{name}:$_harness_count:"',
+                "IfErrors harness_output_error",
+                "StrCpy $_harness_index 0",
+                f"list_item_{label}:",
+                f"IntCmp $_harness_index $_harness_count list_done_{label} 0 list_done_{label}",
+                f'nsArray::Get "{array}" /at=$_harness_index',
+                "Pop $_harness_item",
+                "Pop $_harness_item",
+                "StrLen $_harness_length $_harness_item",
+                'FileWriteUTF16LE $_harness_file "$_harness_length:$_harness_item"',
+                "IfErrors harness_output_error",
+                "IntOp $_harness_index $_harness_index + 1",
+                f"Goto list_item_{label}",
+                f"list_done_{label}:",
+            ]
+            continue
+        name, variable = record
         lines += [
             f"StrLen $_harness_length {variable}",
             f'FileWriteUTF16LE $_harness_file "{name}:$_harness_length:{variable}"',
@@ -117,9 +156,107 @@ def write_records(path, records):
     return lines + ["FileClose $_harness_file"]
 
 
+def _array_name(parameter):
+    return f'_harness_list_{parameter["name"]}'
+
+
+def _function_lines(prefix, decode):
+    """The function that unescapes inputs (%XX, %uXXXX) read from the input file."""
+    lines = []
+    if decode:
+        lines += [
+            f"Function {prefix}_harness_decode",
+            "Exch $0",
+            "Push $1", "Push $2", "Push $3", "Push $4", "Push $5", "Push $6",
+            'StrCpy $1 ""', "StrCpy $2 0", "StrLen $3 $0",
+            "decode_loop:",
+            "IntCmp $2 $3 decode_done 0 decode_done",
+            "StrCpy $4 $0 1 $2",
+            'StrCmp $4 "%" 0 decode_plain',
+            "IntOp $6 $2 + 1", "StrCpy $5 $0 1 $6",
+            'StrCmp $5 "u" 0 decode_byte',
+            "IntOp $6 $2 + 2", "StrCpy $5 $0 4 $6",
+            'IntOp $5 "0x$5" + 0', 'IntFmt $4 "%c" $5',
+            "IntOp $2 $2 + 5", "Goto decode_plain",
+            "decode_byte:",
+            "StrCpy $5 $0 2 $6",
+            'IntOp $5 "0x$5" + 0', 'IntFmt $4 "%c" $5',
+            "IntOp $2 $2 + 2",
+            "decode_plain:",
+            'StrCpy $1 "$1$4"', "IntOp $2 $2 + 1", "Goto decode_loop",
+            "decode_done:",
+            "StrCpy $0 $1",
+            "Pop $6", "Pop $5", "Pop $4", "Pop $3", "Pop $2", "Pop $1",
+            "Exch $0",
+            "FunctionEnd",
+        ]
+    return lines
+
+
+def _read_input(prefix, number, parameter):
+    """Reads one input from the input file: a scalar's "name=value" line, or a
+    list's "name=item" lines, one per item. Values are percent-escaped, so a
+    line never holds CR or LF."""
+    name = parameter["name"]
+    typ = parameter.get("type", "string")
+    marker = f"{name}="
+    n = number
+    lines = ["FileSeek $_harness_in 0 SET"]
+    if typ == "list":
+        array = _array_name(parameter)
+        lines += [
+            f'nsArray::Set "{array}" /key=0 ""',
+            f'nsArray::Clear "{array}"',
+            "StrCpy $_harness_index 0",
+        ]
+    else:
+        lines += ['StrCpy $_harness_found "0"']
+    lines += [
+        f"input_scan_{n}:",
+        "ClearErrors",
+        "FileRead $_harness_in $_harness_line",
+        f"IfErrors input_end_{n}",
+        f"input_chomp_{n}:",
+        "StrCpy $_harness_c $_harness_line 1 -1",
+        f'StrCmp $_harness_c "$\\n" input_strip_{n}',
+        f'StrCmp $_harness_c "$\\r" input_strip_{n}',
+        f"Goto input_chomped_{n}",
+        f"input_strip_{n}:",
+        "StrCpy $_harness_line $_harness_line -1",
+        f"Goto input_chomp_{n}",
+        f"input_chomped_{n}:",
+        f"StrCpy $_harness_c $_harness_line {len(marker)}",
+        f'StrCmpS $_harness_c "{marker}" 0 input_scan_{n}',
+        f'StrCpy $_harness_line $_harness_line "" {len(marker)}',
+    ]
+    if typ == "list":
+        lines += [
+            "Push $_harness_line", f"Call {prefix}_harness_decode", "Pop $_harness_line",
+            f'nsArray::Set "{array}" /key=$_harness_index $_harness_line',
+            "IntOp $_harness_index $_harness_index + 1",
+            f"Goto input_scan_{n}",
+            f"input_end_{n}:",
+        ]
+        return lines
+    if typ == "string":
+        lines += ["Push $_harness_line", f"Call {prefix}_harness_decode", "Pop $_harness_line"]
+    lines += [
+        f"StrCpy $_harness_param_{name} $_harness_line",
+        'StrCpy $_harness_found "1"',
+        f"input_end_{n}:",
+        f'StrCmp $_harness_found "1" input_found_{n}',
+        "Goto harness_bad_arguments",
+        f"input_found_{n}:",
+    ]
+    return lines
+
+
 def _operand(parameter):
     if parameter["direction"] == "const":
         return parameter["value"]
+    if parameter.get("type") == "list":
+        # The API receives the name of an nsArray the harness fills or reads.
+        return f'"{_array_name(parameter)}"'
     # Macro output operands must be variables, not quoted literal values.
     variable = f'$_harness_param_{parameter["name"]}'
     return f'"{variable}"' if parameter["direction"] == "in" else variable
@@ -201,8 +338,24 @@ def generate(spec, source, include_dirs=(), defines=None, on_init=(), plugin_lin
     context = spec.get("context", "installer")
     lines += _on_init(context, on_init)
     parameters = spec.get("parameters", [])
+    prefix = "un." if context == "uninstaller" else ""
+    list_inputs = [p for p in inputs(spec) if p.get("type") == "list"]
+    list_outputs = [p for p in outputs(spec) if p.get("type") == "list"]
+    string_inputs = [p for p in inputs(spec) if p.get("type", "string") == "string"]
+    lines += _function_lines(
+        prefix,
+        decode=bool(string_inputs or list_inputs),
+    )
     lines += [
         "Var _harness_args",
+        "Var _harness_input",
+        "Var _harness_in",
+        "Var _harness_line",
+        "Var _harness_c",
+        "Var _harness_found",
+        "Var _harness_index",
+        "Var _harness_count",
+        "Var _harness_item",
         "Var _harness_output",
         "Var _harness_uninstaller",
         "Var _harness_file",
@@ -224,12 +377,23 @@ def generate(spec, source, include_dirs=(), defines=None, on_init=(), plugin_lin
         "IfErrors harness_bad_arguments",
         'StrCmp $_harness_output "" harness_bad_arguments',
     ]
-    for parameter in inputs(spec):
-        name = parameter["name"]
+    if inputs(spec):
         body += [
             "ClearErrors",
-            f'${{GetOptions}} $_harness_args "/{name}=" $_harness_param_{name}',
+            '${GetOptions} $_harness_args "/input=" $_harness_input',
             "IfErrors harness_bad_arguments",
+            'StrCmp $_harness_input "" harness_bad_arguments',
+            'FileOpen $_harness_in "$_harness_input" r',
+            "IfErrors harness_bad_arguments",
+        ]
+    for number, parameter in enumerate(inputs(spec)):
+        body += _read_input(prefix, number, parameter)
+    if inputs(spec):
+        body += ["FileClose $_harness_in"]
+    for parameter in list_outputs:
+        body += [
+            f'nsArray::Set "{_array_name(parameter)}" /key=0 ""',
+            f'nsArray::Clear "{_array_name(parameter)}"',
         ]
     # An absent output file distinguishes Abort/Quit from a successful call.
     body += [
@@ -283,7 +447,8 @@ def generate(spec, source, include_dirs=(), defines=None, on_init=(), plugin_lin
         ]
     body += write_records(
         "$_harness_output",
-        [(p["name"], f'$_harness_param_{p["name"]}') for p in outputs(spec)]
+        [(p["name"], _array_name(p), "list") if p.get("type") == "list"
+         else (p["name"], f'$_harness_param_{p["name"]}') for p in outputs(spec)]
         + [(ERRORS_RECORD, "$_harness_errors")],
     )
     body += ['StrCmp $_harness_corrupted "0" harness_check_stack']

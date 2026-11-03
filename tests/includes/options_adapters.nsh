@@ -31,26 +31,19 @@ Var __opt_test_c
     ${EndIf}
 !macroend
 
-; A list crosses the harness as one string whose items are joined by this
-; separator; the tests build and split it with the same one.
-!define _HARNESS_SEP "~|~"
-
-; Makes the list option `test b` hold the items of ITEMS, any number of them.
+; Makes the list option `test b` hold a copy of the array ITEMS.
 !macro _HarnessListSet ITEMS
     ${Option_Set} test b "__opt_test_b"
-    ${Array_Reset} __opt_test_b
-    ${If} `${ITEMS}` != ""
-        ${Array_Split} __opt_test_b `${ITEMS}` "${_HARNESS_SEP}"
-    ${EndIf}
+    ${Array_Copy} "${ITEMS}" __opt_test_b
 !macroend
 
 !macro HarnessOptionListContains ITEMS VALUE OUT
-    !insertmacro _HarnessListSet `${ITEMS}`
+    !insertmacro _HarnessListSet "${ITEMS}"
     ${Option_ListContains} test b `${VALUE}` ${OUT}
 !macroend
 
 !macro un.HarnessOptionListContains ITEMS VALUE OUT
-    !insertmacro _HarnessListSet `${ITEMS}`
+    !insertmacro _HarnessListSet "${ITEMS}"
     ${un.Option_ListContains} test b `${VALUE}` ${OUT}
 !macroend
 
@@ -84,17 +77,19 @@ Var __opt_test_c
 
 !macro _HarnessListOut COUNT ITEMS
     ${Option_ListCount} test b ${COUNT}
-    ${Array_Join} __opt_test_b "${_HARNESS_SEP}" ${ITEMS}
+    ${Array_Copy} __opt_test_b "${ITEMS}"
 !macroend
 
 ; Persists a list and multiline text, clobbers them and loads them back. The
 ; stored values are left for the test to inspect and delete.
 !macro HarnessOptionPersistKinds ITEMS TEXT COUNT ITEMS_OUT TEXT_OUT
     !insertmacro _HarnessOptionClear ""
-    !insertmacro _HarnessListSet `${ITEMS}`
+    !insertmacro _HarnessListSet "${ITEMS}"
     ${Option_Set} test c `${TEXT}`
     ${Option_Persist}
-    !insertmacro _HarnessListSet "clobbered"
+    ${Array_Reset} __opt_clobbered
+    ${Array_Append} __opt_clobbered "clobbered"
+    !insertmacro _HarnessListSet __opt_clobbered
     ${Option_Set} test c "clobbered"
     ${Option_LoadPersisted}
     !insertmacro _HarnessListOut ${COUNT} ${ITEMS_OUT}
@@ -103,7 +98,8 @@ Var __opt_test_c
 
 ; Loads the values the test stored, without clearing them.
 !macro HarnessOptionLoad COUNT ITEMS TEXT
-    !insertmacro _HarnessListSet ""
+    ${Array_Reset} __opt_empty
+    !insertmacro _HarnessListSet __opt_empty
     ${Option_LoadPersisted}
     !insertmacro _HarnessListOut ${COUNT} ${ITEMS}
     ${Option_Get} test c ${TEXT}

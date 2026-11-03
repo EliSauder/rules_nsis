@@ -82,8 +82,16 @@ def main():
                     winreg.DeleteKey(winreg.HKEY_CURRENT_USER, path)
                 except FileNotFoundError:
                     pass
+        elif name == "list":
+            tricky = ['say "hi"', "line1\r\nline2", "a,b", ",", "100%", "%41 %u0041", "\u03bb \U0001f600", "\u00ad", " pad "]
+            for items in [[], [""], ["", ""], ["x"], tricky, [f"item{i:03}" for i in range(2000)]]:
+                harness.run(items=items).assert_outputs(copy=items)
         else:
-            for value in ["", "hello world", "Unicode: \u03bb", "dollars $ and ; = %", "  whitespace  "]:
+            for value in [
+                "", "hello world", "Unicode: \u03bb", "dollars $ and ; = %", "  whitespace  ",
+                'quoted "text"', '"', "line1\r\nline2\n", "\n", "%41 %u0041 %", "soft\u00adhyphen",
+                "emoji \U0001f600", "x" * 900, "C:\\dir\\", "/x=/y",
+            ]:
                 harness.run(text=value).assert_outputs(result=value)
 
 
