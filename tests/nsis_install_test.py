@@ -283,7 +283,7 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, sub
         iconval, icontyp = _reg_value(root, unpath, access, "DisplayIcon")
         testcase.assertEqual(icontyp, winreg.REG_SZ)
         testcase.assertEqual(
-            f"{inst_root}\\Uninstall.exe,0",
+            f"{inst_root}\\{config['expected_uninstaller_name']},0",
             iconval,
             f"expected {unpath}\\DisplayIcon to reference the uninstaller icon",
         )
@@ -294,9 +294,9 @@ def _validate_reg(testcase: unittest.TestCase, config: dict, inst_root: str, sub
         f"expected {inpath}\\InstallDir to equal install path",
     )
     testcase.assertEqual(
-        f"{inst_root}\\Uninstall.exe",
+        f"{inst_root}\\{config['expected_uninstaller_name']}",
         unstr,
-        f"expected {unpath}\\UninstallString to equal install path + Uninstall.exe",
+        f"expected {unpath}\\UninstallString to reference the uninstaller",
     )
     testcase.assertEqual(
         versionval,
@@ -340,8 +340,8 @@ def _get_app_key_and_subpath(config: dict) -> str:
     return subpath, (config["expected_id"] or "").replace("\\", " ")
 
 
-def _get_uninstaller_cmd(install_root):
-    base_uninstaller = os.path.join(install_root, "Uninstall.exe")
+def _get_uninstaller_cmd(install_root, config):
+    base_uninstaller = os.path.join(install_root, config["expected_uninstaller_name"])
     new_uninstaller_path = os.path.join(TEST_TMPDIR, "Uninstall.exe")
     shutil.copy(base_uninstaller, new_uninstaller_path)
     cmd = [
@@ -365,7 +365,7 @@ def _get_installer_cmd(installer, install_root, config):
 
 def _validate_removed_files(testcase: unittest.TestCase, config: dict, install_root: str):
     expected_files = config.get("expected_files", [])
-    expected_files.append("Uninstall.exe")
+    expected_files.append(config["expected_uninstaller_name"])
     dircontent = _print_directory_tree(install_root)
 
     for path in expected_files:
@@ -394,7 +394,7 @@ def _validate_directories(testcase: unittest.TestCase, config):
 
 def _validate_files(testcase: unittest.TestCase, config, install_root):
     expected_files = config.get("expected_files", [])
-    expected_files.append("Uninstall.exe")
+    expected_files.append(config["expected_uninstaller_name"])
     for path in expected_files:
         if not os.path.isabs(path):
             path = os.path.join(install_root, path)
@@ -498,7 +498,7 @@ def _validate_install(testcase, install_root, subpath, appkey, config, installer
 
 def _validate_uninstall(testcase, install_root, subpath, appkey, config, runun=True):
     if runun:
-        uninstaller_cmd = _get_uninstaller_cmd(install_root)
+        uninstaller_cmd = _get_uninstaller_cmd(install_root, config)
 
         proc = subprocess.run(
             uninstaller_cmd,

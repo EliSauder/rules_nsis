@@ -90,6 +90,7 @@ The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
         "verbosity": "The verbosity of output.",
         "components": "List of root components and component groups.",
         "outfile": "Specify the outfile.",
+        "uninstaller_name": "The uninstaller file name. Defaults to Uninstall.exe.",
         "arch": "The architecture to built the installer for.",
         "allow_32bit_on_64bit": "Allow a 32bit installer to run on the 64bit OS of the same ISA (x86_32 on x86_64, arm32 on arm64).",
         "post_init": "The post .onInit nsh script to run.",
@@ -1177,6 +1178,7 @@ def _get_installer_ds(ctx, toolchain):
             else None
         ),
         "Outfile": str(ctx.attr.outfile),
+        "UninstallerName": str(ctx.attr.uninstaller_name),
         "HasPostInit": ctx.attr.post_init != None,
         "HasPreInit": ctx.attr.pre_init != None,
         "HasPostUninit": ctx.attr.post_uninit != None,
@@ -1721,6 +1723,7 @@ def _nsis_installer_impl(ctx):
             verbosity = ctx.attr._verbosity,
             components = ctx.attr.components,
             outfile = ctx.attr.outfile,
+            uninstaller_name = ctx.attr.uninstaller_name,
             arch = ctx.attr.arch,
             testable = ctx.attr.testable,
             log_level = ctx.attr.log_level,
@@ -1905,6 +1908,11 @@ when attached to a console, to stdout.
             mandatory = False,
             default = "",
             doc = "The outfile to create. Defaults to '{{.Vendor}} {{Product}} Setup.exe'",
+        ),
+        "uninstaller_name": attr.string(
+            mandatory = False,
+            default = "Uninstall.exe",
+            doc = "The name of the uninstaller file to create in the installation directory. Defaults to 'Uninstall.exe'.",
         ),
         "arch": attr.string(
             mandatory = False,

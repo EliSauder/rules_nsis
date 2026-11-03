@@ -142,6 +142,7 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_files": files,
         "expected_dirs": ds,
         "expected_installer_name": outfile,
+        "expected_uninstaller_name": inst.uninstaller_name,
         "expected_product_path": inst.product_path or "",
         "expected_product": inst.product or "",
         "expected_vendor_path": inst.vendor_path or "",

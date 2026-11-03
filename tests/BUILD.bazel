@@ -217,6 +217,22 @@ py_test(
     ],
 )
 
+nsis_installer(
+    name = "minimal_installer_custom_uninstaller_name",
+    testable = True,
+    id = "07c7ab61-d6dc-4ad0-9c2c-c0f1f3a5dbdc",
+    components = [":minimal_component"],
+    product = "Minimal Installer Custom Uninstaller",
+    product_path = "Minimal Installer Custom Uninstaller",
+    uninstaller_name = "Remove Minimal Installer.exe",
+)
+
+nsis_installer_test(
+    name = "minimal_installer_custom_uninstaller_name_test",
+    installer = ":minimal_installer_custom_uninstaller_name",
+    must_have_files = ["README.md"],
+)
+
 nsis_component(
     name = "minimal_component_depsA",
     srcs = [":nsis_files"],

@@ -75,7 +75,7 @@ SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 !define OUTFILE_NAME "{{ (ds "in").Outfile }}"
 !endif
 
-!define UNINSTALLER_NAME "Uninstall.exe"
+!define UNINSTALLER_NAME "{{ (ds "in").UninstallerName }}"
 !ifdef SIGN_CMD
 !uninstfinalize "${SIGN_CMD}" = 0
 !finalize "${SIGN_CMD}" = 0
