@@ -146,10 +146,10 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     Pop $1
     ${If} $0 = 0
         !insertmacro Service_Update "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${SERVICE_DISPLAY_PREFIX} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
-        !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
+        !insertmacro Service_SetDescription "{{ .Name }}" "{{ template "nsq" .Description }}" $0
     ${Else}
         !insertmacro Service_Create "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${SERVICE_DISPLAY_PREFIX} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
-        !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
+        !insertmacro Service_SetDescription "{{ .Name }}" "{{ template "nsq" .Description }}" $0
     ${EndIf}
     {{- end }}
 
