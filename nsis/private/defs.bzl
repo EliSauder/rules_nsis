@@ -74,9 +74,9 @@ The root path to install the software into. Defaults to NSIS's built in
 $PROGRAMFILES64 (or $PROGRAMFILES if 32bit) when installed as admin. When
 installed as a user, defaults to $LOCALAPPDATA\\Programs.
 
-The final $INSTPATH for the software will be {{.InstallRoot}}\\{{.VendorPath}}.
+The final $INSTDIR for the software will be {{.InstallRoot}}\\{{.VendorPath}}\\{{.ProductPath}}.
 """,
-        "install_path": "Overrides product_path and vendor_path with a specific path.",
+        "install_path": "Overrides vendor_path\\product_path with a specific path.",
         "testable": "Whether test-ID based isolation is enabled.",
         "log_level": "The runtime logging level: none, debug, info, warn or error.",
         "execution_level": "Set the execution level for the installer.",
@@ -129,10 +129,7 @@ NsisComponentInfo = provider(
         "display_name": "The display name of the group.",
         "install_categories": "The install categories (types) the component is enabled in.",
         "srcs": """
-The file sources of the component, already signed if `signing_certificate`
-is set. Each source keeps its own shape (a directory source stays a
-directory) rather than collapsing into one signed tree artifact, so this can
-be consumed the same way whether or not the component is signed.
+Depset of the component's files (srcs plus service_executable) and their runfiles.
 """,
         "dirs": "The directories to create with the component.",
         "dependencies": "The components this one depends on.",
@@ -290,7 +287,7 @@ Defines an event log source to be installed and utilized,
         ),
         "source": attr.string(
             mandatory = True,
-            doc = "The sourec name to utilize",
+            doc = "The source name to utilize",
         ),
         "supported_types": attr.string_list(
             mandatory = False,
@@ -435,7 +432,7 @@ Represents a NSIS installer section.
         "directory": attr.string(
             mandatory = False,
             default = "",
-            doc = "The sub directory path under $INSTPATH where the component will be installed.",
+            doc = "The sub directory path under $INSTDIR where the component will be installed.",
         ),
         "add_to_path": attr.bool(
             default = False,
@@ -610,6 +607,8 @@ Notes:
 - CreateDirectories is available as a list of nsis_directory rules (same CamelCaseName field access works).
 - Files is a list of {Name,Source} with Name being the output file name and source the bazel path to access the file from.
 - Directories is a list of source paths that are directories
+- TreeFiles is a list of the paths of files inside the directory sources, relative to the install folder.
+- TreeDirectories is a list of the paths of subdirectories inside the directory sources, relative to the install folder, deepest first.
 - Shortcuts is a list of {Name, LinkName, Target, TargetRelative, Arguments, Description, Icon, IconRelative, IconIndex, StartMenu, Desktop, Path, StartMenuSubfolder, LocationPath}.
   Shortcuts are created after all `post_install` hooks have run, so the links do not exist yet in a hook.
 - HasShortcuts is available as a bool field.
@@ -646,7 +645,7 @@ For more details see `post_install`.
 Provide a .nsh file that defines a `PostUninstall_<bazel name>` macro that takes
 one argument OUTPATH
 
-This will be included and called before the component's uninstall logic has finished.
+This will be included and called after the component's uninstall logic has finished.
 The script should properly handle the stack and not overwrite values.
 
 For more details see `post_install`.
@@ -661,7 +660,7 @@ For more details see `post_install`.
 Provide a .nsh file that defines a `PreUninstall_<bazel name>` macro that takes
 one argument OUTPATH
 
-This will be included and called after the component's uninstall logic has finished.
+This will be included and called before the component's uninstall logic starts.
 The script should properly handle the stack and not overwrite values.
 
 For more details see `post_install`.
@@ -1810,15 +1809,15 @@ The root path to install the software into. Defaults to NSIS's built in
 $PROGRAMFILES64 (or $PROGRAMFILES if 32bit) when installed as admin. When
 installed as a user, defaults to $LOCALAPPDATA\\Programs.
 
-The final $INSTPATH for the software will be one of
-- {{.InstallRoot}}\\{{.VendorPath}}\\{{.ProductPath}.
-- {{.InstallRoot}}\\{{.ProductPath}.
+The final $INSTDIR for the software will be one of
+- {{.InstallRoot}}\\{{.VendorPath}}\\{{.ProductPath}}.
+- {{.InstallRoot}}\\{{.ProductPath}}.
 """,
         ),
         "install_path": attr.string(
             mandatory = False,
             default = "",
-            doc = "Overrides install_root and vendor_path with a specific path.",
+            doc = "Overrides vendor_path\\product_path with a specific path.",
         ),
         "execution_level": attr.string(
             mandatory = False,
@@ -1921,7 +1920,7 @@ when attached to a console, to stdout.
         "outfile": attr.string(
             mandatory = False,
             default = "",
-            doc = "The outfile to create. Defaults to '{{.Vendor}} {{Product}} Setup.exe'",
+            doc = "The outfile to create. Defaults to '{{.Vendor}} {{.Product}} Setup.exe', or '{{.Product}} Setup.exe' when no vendor is set.",
         ),
         "uninstaller_name": attr.string(
             mandatory = False,
@@ -1973,10 +1972,10 @@ available which is a list of:
     // decremented when the Component is deselected.
     "RemoveRefs": []
 }
+```
 
 For details about the component or component group data structure, see the
 `nsis_component` and `nsis_component_group` rule documentation.
-```
 """,
         ),
         "pre_init": attr.label(
