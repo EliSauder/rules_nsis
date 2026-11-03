@@ -109,6 +109,16 @@ nsis_plugin_archive(
     copts = ["-fcommon", "-DARRAY_COPY", "-DARRAY_TOSTRING"],
 )
 
+# EnVar (zlib-style license) edits PATH without copying it into an NSIS string,
+# which would truncate it at NSIS_MAX_STRLEN. The DLLs are used as shipped.
+nsis_plugin_archive(
+    name = "nsis_plugin_envar",
+    plugin_name = "EnVar",
+    urls = ["https://nsis.sourceforge.io/mediawiki/images/7/7f/EnVar_plugin.zip"],
+    sha256 = "e9aa92de351345ed82795251d838f1ae9041ba35af9d381a5780c7843b01f56a",
+    license = "Docs/EnVar/license.txt",
+)
+
 zlib_toolchain = use_extension("//nsis/private:zlib.bzl", "zlib_toolchain")
 use_repo(zlib_toolchain, zlib_zig = "zig_config")
 

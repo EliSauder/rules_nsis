@@ -50,6 +50,10 @@ Push "{{.Name}}"
 Call un.__Shortcuts_Remove
 {{- end }}
 
+{{- if .AddToPath }}
+${un.EnvPath_Remove} "$INSTDIR\{{.Directory}}"
+{{- end }}
+
 !insertmacro LogInfo "Removing section {{.Name}}-{{.DisplayName}}"
 {{- if .Service }}
 !insertmacro Service_Stop "{{ .Name }}" $0
@@ -176,6 +180,10 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     {{- if .IntegrityLevel}}
     !insertmacro iCacls_IntegrityLevel "{{$p}}" "{{.IntegrityLevel}}" "{{.IntegrityLevelInheritanceRights}}" {{$r}} $0
     {{- end}}
+    {{- end }}
+
+    {{- if .AddToPath }}
+    ${EnvPath_Add} "$OUTDIR"
     {{- end }}
 
     {{- if .EventLog }}

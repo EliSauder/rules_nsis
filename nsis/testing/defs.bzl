@@ -179,7 +179,10 @@ Without a description the harness only checks that src compiles on its own.
             doc = "Additional NSIS plugins (nsis_plugin targets) made available to the script.",
         ),
         "_default_plugins": attr.label_list(
-            default = [Label("@nsis_plugin_nsarray//:plugin")],
+            default = [
+                Label("@nsis_plugin_nsarray//:plugin"),
+                Label("@nsis_plugin_envar//:plugin"),
+            ],
             providers = [NsisPluginInfo],
         ),
         "src": attr.label(mandatory = True, allow_single_file = [".nsh"]),

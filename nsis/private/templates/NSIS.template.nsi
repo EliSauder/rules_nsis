@@ -29,6 +29,7 @@ SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 !include Utility.nsh
 !include Sc.nsh
 !include EventLog.nsh
+!include EnvPath.nsh
 !include Mutex.nsh
 !include iCacls.nsh
 !include Uninstall.nsh
