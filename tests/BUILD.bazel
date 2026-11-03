@@ -229,7 +229,8 @@ nsis_component(
     service_start_type = "auto",
     selection_mode = "required",
     display_name = "README Service",
-    description = "README Service Description\nwith a second line",
+    description = """README Service Description
+with a second line""",
     install_categories = ["Full", "Typical", "Minimal"],
     srcs = [":nsis_files"],
 )
