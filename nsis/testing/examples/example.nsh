@@ -4,6 +4,10 @@
 !define Echo `!insertmacro Echo`
 !define Answer "42"
 
+!macro EchoList ITEMS COPY
+    nsArray::Copy "${ITEMS}" "${COPY}"
+!macroend
+
 !macro _EchoFunction PREFIX
 Function ${PREFIX}Echo
 FunctionEnd

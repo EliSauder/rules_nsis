@@ -11,20 +11,57 @@ from pathlib import Path
 from .generate import ERRORS_RECORD, HEADER, REGISTERS, STACK_RECORDS, inputs as input_parameters, outputs as output_parameters, validate
 
 
+# NSIS strings, and so the lines of the input file, hold at most 1023 characters.
+MAX_INPUT_LINE = 1000
+MAX_COMMAND_LINE_INPUT = 100
+
+
+def escape(text):
+    """Percent-escapes quotes, control characters and non-ASCII (as UTF-16 code
+    units, %uXXXX), so that an input line is plain ASCII with no line break."""
+    out = []
+    for char in text:
+        if char in '%"' or ord(char) < 0x20 or ord(char) > 0x7E:
+            if ord(char) < 0x100:
+                out.append(f"%{ord(char):02X}")
+            else:
+                units = char.encode("utf-16-le")
+                out += [f"%u{int.from_bytes(units[i:i + 2], 'little'):04X}" for i in range(0, len(units), 2)]
+        else:
+            out.append(char)
+    return "".join(out)
+
+
+def _check_text(name, value):
+    if not isinstance(value, str) or "\0" in value:
+        raise ValueError(f"{name} must be a string without NUL")
+    return value
+
+
+def _input_line(name, value):
+    line = f"{name}={escape(_check_text(name, value))}"
+    if len(line) > MAX_INPUT_LINE:
+        raise ValueError(f"{name}: an escaped input value can have at most {MAX_INPUT_LINE - len(name) - 1} characters")
+    return line
+
+
 def serialize_input(parameter, value):
+    """The "name=value" line of an input, or one such line per item of a list."""
     name = parameter["name"]
     typ = parameter.get("type", "string")
     if typ == "bool":
         if type(value) is not bool:
             raise ValueError(f"{name} must be a bool")
-        return "1" if value else "0"
+        return f"{name}={int(value)}"
     if typ == "int":
         if type(value) is not int or not -(2**31) <= value < 2**31:
             raise ValueError(f"{name} must be a signed 32-bit int")
-        return str(value)
-    if not isinstance(value, str) or any(c in value for c in '\x00\r\n"'):
-        raise ValueError(f"{name} must be a single-line string without quotes or NUL")
-    return value
+        return f"{name}={value}"
+    if typ == "list":
+        if isinstance(value, str) or not all(isinstance(item, str) for item in value):
+            raise ValueError(f"{name} must be a sequence of strings")
+        return [_input_line(name, item) for item in value]
+    return _input_line(name, value)
 
 
 def deserialize_output(parameter, value):
@@ -63,8 +100,29 @@ def command_line(command):
     return " ".join(arguments)
 
 
-def read_outputs(path, names):
-    """Read length-prefixed UTF-16 records without trimming or interpolation."""
+def _take_number(raw, name):
+    # Search only aligned UTF-16 code units.
+    end = next((i for i in range(0, len(raw), 2) if raw[i:i + 2] == b":\0"), None)
+    if end is None:
+        raise ValueError(f"Missing output length for {name}")
+    text = raw[:end].decode("utf-16-le")
+    if not text.isascii() or not text.isdigit():
+        raise ValueError(f"Invalid output length for {name}")
+    return int(text), raw[end + 2:]
+
+
+def _take_text(raw, size, name):
+    if len(raw) < size * 2:
+        raise ValueError(f"Truncated output parameter {name}")
+    return raw[:size * 2].decode("utf-16-le"), raw[size * 2:]
+
+
+def read_outputs(path, names, lists=()):
+    """Read length-prefixed UTF-16 records without trimming or interpolation.
+
+    A record is name:length:text. A list in lists is name:count: and then
+    length:text for each item.
+    """
     raw = Path(path).read_bytes()
     header = f"{HEADER}\n".encode("utf-16-le")
     if not raw.startswith(header):
@@ -75,20 +133,15 @@ def read_outputs(path, names):
         prefix = (name + ":").encode("utf-16-le")
         if not raw.startswith(prefix):
             raise ValueError(f"Missing output parameter {name}")
-        raw = raw[len(prefix):]
-        # Search only aligned UTF-16 code units.
-        end = next((i for i in range(0, len(raw), 2) if raw[i:i + 2] == b":\0"), None)
-        if end is None:
-            raise ValueError(f"Missing output length for {name}")
-        size_text = raw[:end].decode("utf-16-le")
-        if not size_text.isascii() or not size_text.isdigit():
-            raise ValueError(f"Invalid output length for {name}")
-        size = int(size_text) * 2
-        raw = raw[end + 2:]
-        if len(raw) < size:
-            raise ValueError(f"Truncated output parameter {name}")
-        values[name] = raw[:size].decode("utf-16-le")
-        raw = raw[size:]
+        number, raw = _take_number(raw[len(prefix):], name)
+        if name in lists:
+            values[name] = []
+            for _ in range(number):
+                size, raw = _take_number(raw, name)
+                item, raw = _take_text(raw, size, name)
+                values[name].append(item)
+        else:
+            values[name], raw = _take_text(raw, number, name)
     if raw:
         raise ValueError("Unexpected trailing harness output")
     return values
@@ -102,7 +155,7 @@ class Result:
     when the harness exited before reporting outputs.
     """
 
-    outputs: dict[str, str | int | bool]
+    outputs: dict[str, str | int | bool | list[str]]
     errors: bool | None
     returncode: int
     stdout: str
@@ -175,10 +228,12 @@ class Harness:
             raise ValueError(
                 f"Expected inputs {sorted(required)}; got {sorted(inputs)}"
             )
-        serialized = {
-            p["name"]: serialize_input(p, inputs[p["name"]])
-            for p in input_parameters(self.spec)
-        }
+        input_lines = []
+        for p in input_parameters(self.spec):
+            line = serialize_input(p, inputs[p["name"]])
+            input_lines += line if isinstance(line, list) else [line]
+        input_file = self.directory / "outputs.dat.inputs"
+        input_file.write_bytes("".join(f"{line}\n" for line in input_lines).encode("ascii"))
         output = self.directory / "outputs.dat"
         output.unlink(missing_ok=True)
         registers = self.directory / "outputs.dat.registers"
@@ -198,8 +253,15 @@ class Harness:
                 )
         command = [
             str(executable), "/S", f"/output={output}",
-            *(f"/{name}={value}" for name, value in serialized.items()),
         ]
+        # The harness reads its inputs from the file next to the output. Short
+        # scalars are also passed as options, for APIs that read the command line;
+        # NSIS truncates a long command line, and then loses the uninstaller's _?=.
+        for p in input_parameters(self.spec):
+            if p.get("type") != "list":
+                line = serialize_input(p, inputs[p["name"]])
+                if len(line) <= MAX_COMMAND_LINE_INPUT:
+                    command.append("/" + line)
         if self.spec.get("context", "installer") == "uninstaller":
             command.append(f"_?={self.directory}")
         command = [command[0], *map(Raw, command_args), *command[1:], *map(Raw, command_tail)]
@@ -241,12 +303,13 @@ class Harness:
         errors = None
         if output.exists():
             names = [p["name"] for p in output_parameters(self.spec)]
-            values = read_outputs(output, [*names, ERRORS_RECORD])
+            lists = {p["name"] for p in output_parameters(self.spec) if p.get("type") == "list"}
+            values = read_outputs(output, [*names, ERRORS_RECORD], lists)
             if values[ERRORS_RECORD] not in ("0", "1"):
                 raise ValueError(f"Invalid error flag record {values[ERRORS_RECORD]!r}")
             errors = values[ERRORS_RECORD] == "1"
             values = {
-                p["name"]: deserialize_output(p, values[p["name"]])
+                p["name"]: values[p["name"]] if p["name"] in lists else deserialize_output(p, values[p["name"]])
                 for p in output_parameters(self.spec)
             }
         elif expected_exitcode == 0:

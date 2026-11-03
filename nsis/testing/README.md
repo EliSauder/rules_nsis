@@ -54,7 +54,7 @@ with Harness(binary_path, description_path, directory=test_tmpdir) as api:
 `kind` is `macro` (`!insertmacro`), `definition` (`${...}`), `function`
 (`Call`), or `condition` (a LogicLib test, see below). `parameters` is an
 ordered list of `direction:name[:type]` strings, where direction is `in`,
-`out`, `inout`, or `const`. Types are `string` (default), `int`, and `bool`.
+`out`, `inout`, or `const`. Types are `string` (default), `int`, `bool`, and `list`.
 Declare the actual symbol, including `un.` when appropriate.
 
 Macros and callable definitions receive input values and output variable
@@ -74,8 +74,8 @@ including the source. Harnesses run at user execution level; they do not elevate
 
 A `const:name` parameter is compiled into the harness instead of being passed
 at run time. Give its NSIS operand text in `constants`; it is inserted verbatim
-in its declared position. Use it for values the command line cannot carry
-(quotes, characters such as `${U+00AD}`) or for APIs that only accept literals:
+in its declared position. Use it for values longer than an input line allows
+or for APIs that only accept literals:
 
 ```starlark
 nsis_symbol(
@@ -109,7 +109,7 @@ nsis_symbol(
 
 ## Parameter types
 
-Append `:int` or `:bool` to a parameter to give it a Python type:
+Append `:int`, `:bool` or `:list` to a parameter to give it a Python type:
 
 ```starlark
 nsis_symbol(
@@ -125,6 +125,7 @@ nsis_symbol(
 | `string` | `str` | Unchanged string |
 | `int` | `int`, from -2147483648 through 2147483647 | Decimal string, such as `-42` |
 | `bool` | `bool` | Exactly `1` for `True` or `0` for `False` |
+| `list` | `list[str]` of any length | An nsArray, passed to the API by name |
 
 Python inputs must match the declared types. Returned values are converted to
 the corresponding Python types, including inout parameters. Invalid input
@@ -134,6 +135,13 @@ whitespace are rejected. Boolean outputs must be exactly `0` or `1`, not
 `true`/`false`. Python's `bool` is not accepted as an `int`, and
 `assert_outputs` distinguishes them. `in:text` remains equivalent to
 `in:text:string` for backward compatibility.
+
+A `list` parameter (`in`, `out` or `inout`, on a macro or definition) is an
+nsArray the harness creates, before the call, from a Python list, and reads back
+after it. Lists have no size limit. The macro receives the array's name where it would take a value, so it
+can pass it on to anything that takes an nsArray. An empty list is an empty
+array. A missing array reads back as `[]`. Stack functions, conditions and
+`const` parameters cannot be lists.
 
 Types describe the Python boundary; NSIS still receives and returns strings.
 The generated executable does not independently enforce types when invoked
@@ -195,16 +203,22 @@ missing include of either is not detected.
 
 `run()` requires exactly the declared input/inout parameters, with their declared
 Python types. String outputs preserve whitespace, quotes, newlines and Unicode.
-String inputs currently cannot contain literal quotes, newlines or NUL because the
-NSIS command-line parser cannot round-trip them reliably. Characters that
-Windows string comparison ignores (for example the soft hyphen U+00AD) also
-truncate the value, because `GetOptions` treats them as the end of the string;
-embed such characters in an adapter macro (for example `${U+00AD}`) instead.
-NSIS's compiled string length limit still applies. Use file inputs for larger or arbitrary data.
+String inputs may hold any text except NUL, which NSIS strings cannot contain.
+The runner writes the inputs to a file next to the output file, `<output>.inputs` (one `name=value`
+line per scalar, and one per list item). Values are percent-escaped (`%XX`, or
+`%uXXXX` per UTF-16 code unit for non-ASCII) so a line is plain ASCII, and the
+generated harness decodes them before the call, so quotes, CR/LF and characters
+such as the soft hyphen U+00AD arrive unchanged. The harness does not otherwise
+alter them, so an API still sees the decoded value only. Because NSIS strings
+are limited, an escaped scalar or list item line can have at most 1000
+characters; longer values raise `ValueError` before the harness runs.
+Scalar inputs of up to 100 escaped characters (`name=value` included) are also
+passed on the command line as `/name=value` options, so APIs that read the command line (`GetOptions`, `TestIdInit`) see them;
+the harness itself reads the file. List items are only in the file.
 `expected_exitcode=N` supports failure tests. A zero exit without an output
 record is an error, including an API that silently calls `Abort` or `Quit`.
 
-`Result.outputs` is a dictionary of `str`, `int`, or `bool` values according to
+`Result.outputs` is a dictionary of `str`, `int`, `bool` or `list[str]` values according to
 the declaration. `assert_outputs` checks both values and exact Python types;
 expecting `1` for a declared boolean returned as `True` fails.
 
@@ -408,7 +422,8 @@ generation failures exit with 70; output creation/write errors exit with 74.
 Otherwise, the API's exit code is preserved.
 
 The output file is UTF-16LE without a BOM: `NSIS-HARNESS-2\n` followed by
-`name:length:value` records in declared output order, then a final
+`name:length:value` records in declared output order (a list is
+`name:count:` followed by `length:item` for each item), then a final
 `harness.errors` record (`1` when the error flag was set after the call, else
 `0`). Length is in UTF-16 code
 units. This avoids JSON/INI escaping and trimming in NSIS. The runner validates

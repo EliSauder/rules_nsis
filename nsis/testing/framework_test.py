@@ -4,8 +4,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from nsis.testing.generate import REGISTERS, generate, validate
-from nsis.testing.runner import Harness, command_line, read_outputs
+from nsis.testing.generate import HEADER, REGISTERS, generate, validate
+from nsis.testing.runner import (
+    Harness, command_line, deserialize_output, escape, read_outputs, serialize_input,
+)
 
 
 ECHO = {
@@ -131,8 +133,10 @@ class RunnerTest(unittest.TestCase):
         with Harness("example.exe", spec) as harness:
             for number, enabled in [(-2147483648, False), (2147483647, True)]:
                 def execute(command):
-                    self.assertIn(f"/number={number}", command)
-                    self.assertIn(f"/enabled={int(enabled)}", command)
+                    self.assertEqual(
+                        (harness.directory / "outputs.dat.inputs").read_text(),
+                        f"number={number}\nenabled={int(enabled)}\n",
+                    )
                     (harness.directory / "outputs.dat").write_bytes(
                         outputs(number=str(number), enabled=str(int(enabled)))
                     )
@@ -177,6 +181,47 @@ class RunnerTest(unittest.TestCase):
                             with self.assertRaisesRegex(ValueError, "result"):
                                 harness.run()
 
+    def test_escaping_leaves_plain_ascii_lines(self):
+        for text, expected in [
+            ("", ""), ('"', "%22"), ("a\r\nb", "a%0D%0Ab"), ("%41", "%2541"), ("\u00ad", "%AD"),
+            ("\u03bb", "%u03BB"), ("\U0001f600", "%uD83D%uDE00"), ("C:\\x\\", "C:\\x\\"), ("a,b=c", "a,b=c"),
+        ]:
+            with self.subTest(text=text):
+                self.assertEqual(escape(text), expected)
+
+    def test_input_serialization(self):
+        parameter = {"name": "items", "direction": "in", "type": "list"}
+        self.assertEqual(serialize_input(parameter, []), [])
+        self.assertEqual(serialize_input(parameter, [""]), ["items="])
+        self.assertEqual(serialize_input(parameter, ["a,b", "%", "x\ny"]), ["items=a,b", "items=%25", "items=x%0Ay"])
+        self.assertEqual(serialize_input({"name": "n", "type": "int"}, -5), "n=-5")
+        self.assertEqual(serialize_input({"name": "b", "type": "bool"}, True), "b=1")
+        for bad in ["text", [1], ["a\0"], ["x" * 2000]]:
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                serialize_input(parameter, bad)
+
+    def test_list_outputs_are_read_item_by_item(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "outputs"
+            items = ["a,b", "", '"q"\r\n', "\u03bb"] + [f"item{i}" for i in range(500)]
+            body = f"items:{len(items)}:" + "".join(f"{len(item)}:{item}" for item in items) + "after:2:ok"
+            output.write_bytes(f"{HEADER}\n{body}".encode("utf-16-le"))
+            self.assertEqual(
+                read_outputs(output, ["items", "after"], {"items"}), {"items": items, "after": "ok"},
+            )
+            output.write_bytes(f"{HEADER}\nitems:2:1:a".encode("utf-16-le"))
+            with self.assertRaises(ValueError):
+                read_outputs(output, ["items"], {"items"})
+
+    def test_list_parameters_are_validated(self):
+        base = {"symbol": "Api", "kind": "macro", "parameters": [{"name": "items", "direction": "in", "type": "list"}]}
+        validate(base)
+        for change in [{"kind": "function"}, {"kind": "condition"}]:
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                validate(dict(base, **change))
+        with self.assertRaises(ValueError):
+            validate(dict(base, parameters=[{"name": "items", "direction": "const", "type": "list", "value": "x"}]))
+
     def test_nsis_command_line_quotes_values_not_entire_options(self):
         self.assertEqual(
             command_line([r"C:\a b\test.exe", "/S", "/text=  a /other=value  ", "/empty=", r"_?=C:\a b"]),
@@ -194,6 +239,16 @@ class RunnerTest(unittest.TestCase):
                 with self.subTest(bad=bad), self.assertRaises(ValueError):
                     read_outputs(output, ["result"])
 
+    def test_long_scalars_stay_off_the_command_line(self):
+        with Harness("example.exe", ECHO) as harness:
+            def execute(command):
+                self.assertFalse(any(str(c).startswith("/text=") for c in command))
+                self.assertEqual((harness.directory / "outputs.dat.inputs").read_text(), "text=" + "x" * 900 + "\n")
+                (harness.directory / "outputs.dat").write_bytes(outputs(result="x" * 900))
+                return subprocess.CompletedProcess(command, 0, "", "")
+            with patch.object(harness, "_execute", side_effect=execute):
+                harness.run(text="x" * 900).assert_outputs(result="x" * 900)
+
     def test_run_captures_streams_and_inputs_and_removes_stale_outputs(self):
         with Harness("example.exe", ECHO) as harness:
             output = harness.directory / "outputs.dat"
@@ -202,6 +257,7 @@ class RunnerTest(unittest.TestCase):
             def execute(command):
                 self.assertFalse(output.exists())
                 self.assertIn("/text=hello world", command)
+                self.assertEqual((harness.directory / "outputs.dat.inputs").read_text(), "text=hello world\n")
                 output.write_bytes(outputs(result="hello world"))
                 return subprocess.CompletedProcess(command, 0, "stdout", "stderr")
 
@@ -220,7 +276,7 @@ class RunnerTest(unittest.TestCase):
 
     def test_invalid_inputs_and_expected_failure(self):
         with Harness("example.exe", ECHO) as harness:
-            for inputs in [{}, {"text": "x", "unknown": ""}, {"text": '"quoted"'}, {"text": "\0"}]:
+            for inputs in [{}, {"text": "x", "unknown": ""}, {"text": "\0"}]:
                 with self.subTest(inputs=inputs), self.assertRaises(ValueError):
                     harness.run(**inputs)
             with patch.object(harness, "_execute", return_value=subprocess.CompletedProcess([], 3, "", "failed")):

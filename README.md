@@ -407,7 +407,7 @@ To fix a plugin, build it from its sources instead: `patches` (with
 `source_dir` the `.c` files in that folder are compiled into both Unicode DLLs
 with Zig. Like the plugins shipped with NSIS, they are linked without a C
 runtime (entry point `DllMain`, importing only kernel32 and user32). `copts`
-adds compiler flags.
+adds compiler flags, including preprocessor definitions such as `-DNAME`.
 
 ```starlark
 nsis_plugin_archive(
@@ -415,6 +415,7 @@ nsis_plugin_archive(
     ...
     patches = ["//third_party:inetc-fix.patch"],  # a git diff of the archive
     source_dir = "Contrib/inetc",
+    copts = ["-DINETC_FEATURE"],
 )
 ```
 
