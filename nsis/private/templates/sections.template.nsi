@@ -52,10 +52,8 @@ Call un.__Shortcuts_Remove
 
 !insertmacro LogInfo "Removing section {{.Name}}-{{.DisplayName}}"
 {{- if .Service }}
-!insertmacro Service_Stop "{{ .Name }}" $0
-Sleep 2000
+!insertmacro Service_StopAndWait "{{ .Name }}" 30000 $0
 !insertmacro Service_Delete "{{ .Name }}" $0
-Sleep 2000
 {{- end }}
 
 {{- if .Directory }}
@@ -123,8 +121,7 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     SetOutPath "$INSTDIR\{{.Directory}}"
 
     {{- if .Service }}
-    !insertmacro Service_Stop "{{ .Name }}" $0
-    Sleep 2000
+    !insertmacro Service_StopAndWait "{{ .Name }}" 30000 $0
     {{- end }}
 
     {{- range .Files }}
@@ -136,7 +133,9 @@ Section {{if .DisabledByDefault}}/o{{end}} "{{if .IsHidden}}-{{end}}{{.DisplayNa
     {{- end }}
 
     {{- if .Service }}
-    !insertmacro Service_Query "{{.Name}}" $0
+    Push $1
+    !insertmacro Service_Query "{{.Name}}" $0 $1
+    Pop $1
     ${If} $0 = 0
         !insertmacro Service_Update "{{ .Name }}" "$OUTDIR\{{ .ServiceExecutable.Name }} {{ .ServiceArgs }}" "${SERVICE_DISPLAY_PREFIX} {{.DisplayName}}" "{{ .ServiceStartType }}" "{{ .ServiceDependencies }}" $0
         !insertmacro Service_SetDescription "{{ .Name }}" "{{.Description}}" $0
