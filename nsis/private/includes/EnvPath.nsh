@@ -12,16 +12,8 @@
 ; EnVar edits the registry value directly, keeps it REG_EXPAND_SZ, ignores
 ; duplicates, matches whole entries only, and broadcasts the change.
 ;
-; The "admin" shell context edits the machine PATH (HKLM), otherwise the
-; current user's PATH (HKCU). The error flag is set on failure.
-
-!macro _EnvPath_SelectHive
-    ${IfAdmin}
-        EnVar::SetHKLM
-    ${Else}
-        EnVar::SetHKCU
-    ${EndIf}
-!macroend
+; The hive follows the shell context (see SelectEnVarHive in ShellContext.nsh).
+; The error flag is set on failure.
 
 ; Trailing backslashes are dropped so that the entry matches what other tools
 ; write, except for a bare drive root such as C:\.
@@ -44,7 +36,7 @@ Function ${PREFIX}EnvPath_Add
 
     !insertmacro _EnvPath_Normalize $0
     ClearErrors
-    !insertmacro _EnvPath_SelectHive
+    !insertmacro SelectEnVarHive
     EnVar::AddValue "Path" "$0"
     Pop $1
     ${If} $1 = 0
@@ -66,7 +58,7 @@ Function ${PREFIX}EnvPath_Remove
 
     !insertmacro _EnvPath_Normalize $0
     ClearErrors
-    !insertmacro _EnvPath_SelectHive
+    !insertmacro SelectEnVarHive
     EnVar::DeleteValue "Path" "$0"
     Pop $1
     ; 3 and 5 mean PATH or the entry is already gone.

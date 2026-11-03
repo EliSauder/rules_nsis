@@ -51,6 +51,18 @@ Var current_context
 !macroend
 !define un.SetShellContext `!insertmacro un.SetShellContext`
 
+; Points the EnVar plugin at the machine environment (HKLM) in the "admin"
+; context and at the current user's (HKCU) otherwise.
+!macro SelectEnVarHive
+    !insertmacro __shellctx_init
+    ${IfAdmin}
+        EnVar::SetHKLM
+    ${Else}
+        EnVar::SetHKCU
+    ${EndIf}
+!macroend
+!define SelectEnVarHive `!insertmacro SelectEnVarHive`
+
 !macro UpdateShellContextToAdmin
     StrCpy $current_context "admin"
     StrCpy $__shellctx_init "y"
