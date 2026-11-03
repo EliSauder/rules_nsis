@@ -280,18 +280,20 @@ def _default_combobox(label, a):
 
 def _default_list(label, a):
     if not a.multi_select:
+        if a.defaults:
+            _fail(label, "attribute 'defaults' is only used with multi_select")
         return _default_enum(label, a)
-    if not a.default:
-        return ""
+    if a.default:
+        _fail(label, "multi_select options take 'defaults' (a list), not 'default'")
     chosen = {}
-    for item in a.default.split("|"):
+    for item in a.defaults:
         match = [c for c in a.choices if c.lower() == item.lower()]
         if not match:
             _fail(label, "default item '{}' is not one of choices {}".format(item, a.choices))
         if match[0] in chosen:
             _fail(label, "default item '{}' is listed twice".format(item))
         chosen[match[0]] = True
-    return "|".join([c for c in a.choices if c in chosen])
+    return [c for c in a.choices if c in chosen]
 
 def _default_date(label, a):
     if not a.default:
@@ -448,14 +450,14 @@ _CONTROLS = {
     },
     "listbox": {
         "type": "enum",
-        "uses": ["choices", "multi_select", "lines"],
+        "uses": ["choices", "multi_select", "defaults", "lines"],
         "required": True,
         "default": _default_list,
         "layout": _layout_multiline,
     },
     "sorted_listbox": {
         "type": "enum",
-        "uses": ["choices", "multi_select", "lines"],
+        "uses": ["choices", "multi_select", "defaults", "lines"],
         "required": True,
         "default": _default_list,
         "layout": _layout_multiline,
@@ -515,6 +517,7 @@ def _net_flags(label, types):
 _CONTROL_ATTRS = {
     "choices": [],
     "multi_select": False,
+    "defaults": [],
     "min": "",
     "max": "",
     "max_length": 0,
@@ -532,6 +535,7 @@ def _option_attrs(ctx):
         required = ctx.attr.required,
         choices = list(ctx.attr.choices),
         multi_select = ctx.attr.multi_select,
+        defaults = list(ctx.attr.defaults),
         min = ctx.attr.min,
         max = ctx.attr.max,
         max_length = ctx.attr.max_length,
@@ -547,8 +551,6 @@ def _validate_choices(label, choices):
     for c in choices:
         if not c:
             _fail(label, "choices must not contain an empty value")
-        if "|" in c:
-            _fail(label, "choice '{}' contains '|', which separates list values".format(c))
         if "\n" in c or "\r" in c:
             _fail(label, "choice '{}' contains a line break".format(c))
         if c.lower() in seen:
@@ -712,6 +714,7 @@ number closest to 0 within min/max, an empty string, or the first choice.
             doc = "The valid values of radio, droplist, listbox and sorted_listbox controls; the suggestions of combobox.",
         ),
         "multi_select": attr.bool(default = False, doc = "List controls: select several values."),
+        "defaults": attr.string_list(default = [], doc = "Listbox and sorted_listbox with multi_select: the initially selected choices (instead of `default`)."),
         "min": attr.string(default = "", doc = "Lower bound of number (integer) and date (YYYY-MM-DD) controls."),
         "max": attr.string(default = "", doc = "Upper bound of number (integer) and date (YYYY-MM-DD) controls."),
         "max_length": attr.int(default = 0, doc = "Maximum text length, 0 for unlimited."),

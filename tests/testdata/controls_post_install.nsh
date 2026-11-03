@@ -1,6 +1,19 @@
+; Writes one `<key>[<index>]=<item>` line per item of a list option.
+!macro _ControlsDumpList PREFIX PAGE KEY
+    !insertmacro ${PREFIX}Option_ListCount ${PAGE} ${KEY} $1
+    StrCpy $2 0
+    ${While} $2 < $1
+        !insertmacro ${PREFIX}Option_ListGet ${PAGE} ${KEY} $2 $3
+        FileWrite $0 "${KEY}[$2]=$3$\n"
+        IntOp $2 $2 + 1
+    ${EndWhile}
+!macroend
+
 !macro _ControlsDump FILE PREFIX
     Push $0
     Push $1
+    Push $2
+    Push $3
     FileOpen $0 "${FILE}" w
     ${Option_Get} value_controls release_date $1
     FileWrite $0 "release_date=$1$\n"
@@ -12,10 +25,8 @@
     FileWrite $0 "peer=$1$\n"
     ${Option_Get} list_controls flavor $1
     FileWrite $0 "flavor=$1$\n"
-    ${Option_Get} list_controls toppings $1
-    FileWrite $0 "toppings=$1$\n"
-    ${Option_Get} list_controls extras $1
-    FileWrite $0 "extras=$1$\n"
+    !insertmacro _ControlsDumpList "${PREFIX}" list_controls toppings
+    !insertmacro _ControlsDumpList "${PREFIX}" list_controls extras
     ${Option_Get} text_controls note $1
     FileWrite $0 "note=$1$\n"
     !insertmacro ${PREFIX}Option_GetMultiline text_controls note $1
@@ -27,6 +38,8 @@
     ${Option_Get} text_controls host_name $1
     FileWrite $0 "host_name=$1$\n"
     FileClose $0
+    Pop $3
+    Pop $2
     Pop $1
     Pop $0
 !macroend

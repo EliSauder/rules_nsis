@@ -109,7 +109,7 @@ built from three rules, all loaded from `//nsis:defs.bzl`:
 
 - `nsis_option`: one control. `key` (default: the rule name) must match
   `[a-z][a-z0-9_]*`. Other attrs: `control`, `label_text`, `description`,
-  `default`, `required`, `enabled_by`, `persist`, plus the control-specific
+  `default`, `defaults`, `required`, `enabled_by`, `persist`, plus the control-specific
   `choices`, `multi_select`, `min`, `max`, `max_length`, `lines`, `filter`,
   `save`, `must_exist` and `address_types`. Attrs a control does not use are
   rejected at analysis time.
@@ -166,7 +166,7 @@ only with `position = "after_components"`).
 | `file_request` | file | absolute file path, Browse button | `filter`, `save`, `must_exist` |
 | `dir_request` | dir | absolute directory, Browse button | `must_exist` |
 | `combobox` | string | text with suggested `choices` | `choices`, `max_length` |
-| `listbox`, `sorted_listbox` | enum | one of `choices`, or `a\|b` with `multi_select` | `choices`, `multi_select`, `lines` |
+| `listbox`, `sorted_listbox` | enum | one of `choices`; with `multi_select` a list (`defaults` is a list of strings, not `default`) | `choices`, `multi_select`, `lines` |
 | `date` | date | `YYYY-MM-DD` | `min`, `max` |
 | `ip_address` | ipv4 | `a.b.c.d` | |
 | `net_address` | net | IPv4, IPv6 or DNS name, optionally with port or prefix | `address_types` |
@@ -198,7 +198,7 @@ allowed, cycles are not.
 (one string per list item, a single string otherwise; multiline text keeps its
 line breaks) and
 are loaded again by the uninstaller and by the next install (as the defaults
-of an upgrade). `REG_SZ` values stored by older versions are still read and are
+of an upgrade). `REG_SZ` values stored by older versions (lists as `a|b`) are still read and are
 rewritten as `REG_MULTI_SZ` on upgrade.
 
 ### Reading values in hooks
@@ -214,12 +214,21 @@ plain words, not strings.
         ; checkbox is checked
     ${EndIf}
     ${Option_ListContains} list_page toppings "nuts" $1  ; $1 = 1 or 0
+    ${Option_ListCount} list_page toppings $3            ; number of items
+    ${Option_ListGet} list_page toppings 0 $4            ; first item
     ${Option_GetMultiline} text_page note $2            ; \n -> CRLF
     ${Option_Set} install_settings port 9090
 !macroend
 ```
 
-`Option_Get`, `Option_Set`, `Option_IsSet` and `Option_ListContains` work
+A `multi_select` option is a list: `Option_Get` returns the name of an
+nsArray holding the items (in the order of `choices`), so use `Option_ListContains`,
+`Option_ListCount` and `Option_ListGet` rather than reading it as text. On the
+command line and in `/OPTIONS` files, repeat the option for each item
+(`/O:page.key=a /O:page.key=b`; repeated `key=` lines in the file).
+
+`Option_Get`, `Option_Set`, `Option_IsSet`, `Option_ListContains`,
+`Option_ListCount` and `Option_ListGet` work
 unchanged in uninstall hooks; use `${un.Option_GetMultiline}` there. Passwords
 are not persisted, so uninstall hooks see their default.
 

@@ -121,6 +121,7 @@ Var __instdir_default
 {{- end }}
 !macroend
 {{- end }}
+!include Ini.nsh
 !include Options.nsh
 
 {{- /* BEGIN shortcuts: state */}}
@@ -336,7 +337,14 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
 {{end}}
 
 {{define "optDefault"}}
-{{- if and (eq .Opt.Control "date") (eq .Opt.Default "") }}
+{{- if .Opt.MultiSelect }}
+    {{- /* A list option's variable holds the name of the array with its items. */}}
+    StrCpy ${{.Opt.Var}} "{{.Opt.Var}}"
+    ${Array_Reset} {{.Opt.Var}}
+    {{- range $i, $d := .Opt.Default }}
+    ${Array_Set} {{$.Opt.Var}} {{$i}} "{{ template "nsq" $d }}"
+    {{- end }}
+{{- else if and (eq .Opt.Control "date") (eq .Opt.Default "") }}
     Push "{{.Opt.Min}}"
     Push "{{.Opt.Max}}"
     Call {{.Prefix}}Option_Today
@@ -506,17 +514,15 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
     Pop $__opt_chk_val
 {{- else if or (eq .Control "listbox") (eq .Control "sorted_listbox") }}
     {{- if .MultiSelect }}
-    StrCpy $__opt_chk_val ""
+    {{- /* The selected choices go to the array __opt_chk. */}}
+    ${Array_Reset} __opt_chk
     {{- range .Choices }}
     ${NSD_LB_FindStringExact} {{$h}} "{{ template "nsq" . }}" $0
     ${If} $0 <> -1
         SendMessage {{$h}} ${LB_GETSEL} $0 0 $1
         ${If} $1 > 0
-            ${If} $__opt_chk_val == ""
-                StrCpy $__opt_chk_val "{{ template "nsq" . }}"
-            ${Else}
-                StrCpy $__opt_chk_val "$__opt_chk_val|{{ template "nsq" . }}"
-            ${EndIf}
+            ${Array_Length} __opt_chk $1
+            ${Array_Set} __opt_chk $1 "{{ template "nsq" . }}"
         ${EndIf}
     ${EndIf}
     {{- end }}
@@ -644,30 +650,39 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
     ${EndIf}
 {{- else if or (eq .Control "listbox") (eq .Control "sorted_listbox") }}
     {{- if .MultiSelect }}
-    ${If} $__opt_chk_val != ""
-        Push $__opt_chk_val
-        Call Option_ListCount
-        Pop $1
-        StrCpy $0 ""
+    {{- /* The items are in the array __opt_chk; the valid ones, in the order of the choices, replace them. */}}
+    ${Array_Reset} __opt_chk_out
+    Push "__opt_chk"
+    Call Option_ListCount
+    Pop $1
+    ${If} $1 = 1
+        Push "__opt_chk"
+        Push 0
+        Call Option_ListGet
+        Pop $0
+        ${If} $0 == ""
+            ${Array_Clear} __opt_chk
+            StrCpy $1 0
+        ${EndIf}
+    ${EndIf}
+    ${If} $1 > 0
         StrCpy $2 0
         {{- range .Choices }}
-        Push $__opt_chk_val
+        Push "__opt_chk"
         Push "{{ template "nsq" . }}"
         Call Option_ListHas
         Pop $3
         ${If} $3 == 1
+            ${Array_Set} __opt_chk_out $2 "{{ template "nsq" . }}"
             IntOp $2 $2 + 1
-            ${If} $0 == ""
-                StrCpy $0 "{{ template "nsq" . }}"
-            ${Else}
-                StrCpy $0 "$0|{{ template "nsq" . }}"
-            ${EndIf}
         ${EndIf}
         {{- end }}
         ${If} $1 <> $2
-            StrCpy $__opt_chk_err "must be a '|' separated list of distinct values from: {{ range $i, $c := .Choices }}{{ if $i }}, {{ end }}{{ template "nsq" $c }}{{ end }}"
+            StrCpy $__opt_chk_err "must be distinct values from: {{ range $i, $c := .Choices }}{{ if $i }}, {{ end }}{{ template "nsq" $c }}{{ end }}"
         ${Else}
-            StrCpy $__opt_chk_val $0
+            Push "__opt_chk_out"
+            Push "__opt_chk"
+            Call Option_ArrayCopy
         ${EndIf}
     {{- if .Required }}
     ${ElseIf} $__opt_chk_enabled == "1"
@@ -936,6 +951,17 @@ Function __Page_{{.Name}}_Leave
 FunctionEnd
 {{end}}
 
+{{- /* Stores the checked value: a list option's items are copied into its array. */}}
+{{define "optCommit"}}
+{{- if .MultiSelect }}
+    Push "__opt_chk"
+    Push "{{.Var}}"
+    Call Option_ArrayCopy
+{{- else }}
+    StrCpy ${{.Var}} $__opt_chk_val
+{{- end }}
+{{end}}
+
 {{define "optApplyOne"}}
     StrCpy $__opt_chk_what "{{.Id}}"
     StrCpy $__opt_chk_enabled 1
@@ -943,7 +969,7 @@ FunctionEnd
     ${If} $__opt_chk_err != ""
         ${Cli_Fail} "Invalid value for option {{.Id}}: $__opt_chk_err"
     ${EndIf}
-    StrCpy ${{.Var}} $__opt_chk_val
+{{- template "optCommit" . }}
 {{end}}
 
 {{define "optCli"}}
@@ -984,53 +1010,39 @@ Function __Options_ApplyIni
     Push $4
     Push $5
     Push $6
-    Push $7
-    System::Alloc 131072
-    Pop $1
-    System::Alloc 131072
-    Pop $2
-    System::Call 'kernel32::GetPrivateProfileSectionNamesW(i r1, i 65535, w r0)'
-    IntOp $3 $1 + 0
-    ${Do}
-        System::Call 'kernel32::lstrlenW(i r3) i .r4'
-        ${If} $4 = 0
-            ${Break}
-        ${EndIf}
-        System::Call 'kernel32::lstrcpyW(w .r5, i r3)'
-        StrCpy $__opt_chk_what $5
+    ${Ini_Sections} $0 __opt_ini_sections
+    ${Array_Length} __opt_ini_sections $1
+    StrCpy $2 0
+    ${While} $2 < $1
+        ${Array_GetAt} __opt_ini_sections $2 $3
+        StrCpy $__opt_chk_what $3
         StrCpy $__opt_chk_val ""
         Call __Opt_IniIsKnown
         ${If} $__opt_chk_enabled != 1
-            ${Cli_Fail} "Unknown section [$5] in the options file."
+            ${Cli_Fail} "Unknown section [$3] in the options file."
         ${EndIf}
-        System::Call 'kernel32::GetPrivateProfileStringW(w r5, i 0, w "", i r2, i 65535, w r0)'
-        IntOp $6 $2 + 0
-        ${Do}
-            System::Call 'kernel32::lstrlenW(i r6) i .r7'
-            ${If} $7 = 0
-                ${Break}
-            ${EndIf}
-            System::Call 'kernel32::lstrcpyW(w .r4, i r6)'
-            StrCpy $__opt_chk_what $5
-            StrCpy $__opt_chk_val $4
+        ${Ini_Keys} $0 $3 __opt_ini_keys
+        ${Array_Length} __opt_ini_keys $4
+        StrCpy $5 0
+        ${While} $5 < $4
+            ${Array_GetAt} __opt_ini_keys $5 $6
+            StrCpy $__opt_chk_what $3
+            StrCpy $__opt_chk_val $6
             Call __Opt_IniIsKnown
             ${If} $__opt_chk_enabled != 1
-                ${Cli_Fail} "Unknown option [$5] $4 in the options file."
+                ${Cli_Fail} "Unknown option [$3] $6 in the options file."
             ${EndIf}
-            IntOp $7 $7 + 1
-            IntOp $7 $7 * 2
-            IntOp $6 $6 + $7
-        ${Loop}
-        System::Call 'kernel32::lstrlenW(i r3) i .r4'
-        IntOp $4 $4 + 1
-        IntOp $4 $4 * 2
-        IntOp $3 $3 + $4
-    ${Loop}
-    System::Free $1
-    System::Free $2
+            IntOp $5 $5 + 1
+        ${EndWhile}
+        IntOp $2 $2 + 1
+    ${EndWhile}
     {{- range (ds "in").Options }}
     ClearErrors
-    ReadINIStr $__opt_chk_val $0 "{{.Page}}" "{{.Key}}"
+{{- if .MultiSelect }}
+    ${Ini_ReadList} $0 "{{.Page}}" "{{.Key}}" __opt_chk
+{{- else }}
+    ${Ini_ReadStr} $0 "{{.Page}}" "{{.Key}}" $__opt_chk_val
+{{- end }}
     ${IfNot} ${Errors}
 {{- if .Secret }}
     {{- /* An answer file written by /HELP leaves secrets empty. */}}
@@ -1039,7 +1051,6 @@ Function __Options_ApplyIni
 {{- template "optApplyOne" . }}
     ${EndIf}
     {{- end }}
-    Pop $7
     Pop $6
     Pop $5
     Pop $4
@@ -1057,6 +1068,12 @@ Function __Options_ApplyCli
     Push $3
     Push $4
     Push $5
+    {{- /* The values of /O: arguments for list options are collected in arrays first. */}}
+    {{- range (ds "in").Options }}
+    {{- if .MultiSelect }}
+    ${Array_Reset} __optcli_{{.Var}}
+    {{- end }}
+    {{- end }}
     ClearErrors
     ${Cli_GetArgValue} "/OPTIONS" $0
     ${IfNot} ${Errors}
@@ -1089,8 +1106,14 @@ Function __Options_ApplyCli
             StrCpy $3 $3 "" $5
             {{- range (ds "in").Options }}
             ${If} $4 == "{{.Id}}"
+{{- if .MultiSelect }}
+                {{- /* The option may be repeated: every value is one item. */}}
+                ${Array_Length} __optcli_{{.Var}} $5
+                ${Array_Set} __optcli_{{.Var}} $5 "$3"
+{{- else }}
                 StrCpy $__opt_chk_val $3
 {{- template "optApplyOne" . }}
+{{- end }}
                 Goto __cli_next
             ${EndIf}
             {{- end }}
@@ -1099,6 +1122,17 @@ Function __Options_ApplyCli
         __cli_next:
         IntOp $2 $2 + 1
     ${EndWhile}
+    {{- range (ds "in").Options }}
+    {{- if .MultiSelect }}
+    ${Array_Length} __optcli_{{.Var}} $0
+    ${If} $0 > 0
+        Push "__optcli_{{.Var}}"
+        Push "__opt_chk"
+        Call Option_ArrayCopy
+{{- template "optApplyOne" . }}
+    ${EndIf}
+    {{- end }}
+    {{- end }}
     Pop $5
     Pop $4
     Pop $3
@@ -1124,7 +1158,7 @@ FunctionEnd
     Call __Opt_Check_{{.Page}}_{{.Key}}
     StrCmp $__opt_chk_err "" +2 0
         Goto __fail
-    StrCpy ${{.Var}} $__opt_chk_val
+{{- template "optCommit" . }}
 {{- if .EnabledChain }}
     {{$n}}:
 {{- end }}
@@ -1537,8 +1571,8 @@ Function __Components_ApplyCli
         ${IfNot} ${FileExists} "$2"
             ${Cli_Fail} "The options file given with /OPTIONS= does not exist."
         ${EndIf}
-        ReadINIStr $0 "$2" "setup" "components"
-        ReadINIStr $1 "$2" "setup" "insttype"
+        ${Ini_ReadStr} "$2" "setup" "components" $0
+        ${Ini_ReadStr} "$2" "setup" "insttype" $1
     ${EndIf}
     ${If} ${Cli_HasArg} "/COMPONENTS"
         ClearErrors
@@ -1746,6 +1780,11 @@ Function __Help_TextOptions
     !insertmacro __HelpW "{{ template "nsq" .TextPrefix }}"
 {{- if .Secret }}
     !insertmacro __HelpW "<secret>"
+{{- else if .MultiSelect }}
+    Push $0
+    ${Array_Join} "${{.Var}}" "," $0
+    !insertmacro __HelpW "$0"
+    Pop $0
 {{- else }}
     !insertmacro __HelpW "${{.Var}}"
 {{- end }}
@@ -1812,11 +1851,18 @@ Function __Help_IniOptions
 {{- range .Options }}
     !insertmacro __HelpW "{{ template "nsq" .IniComment }}"
     !insertmacro __HelpNL
+{{- if .MultiSelect }}
+    Push $0
+    ${Ini_FormatList} "${{.Var}}" "{{.Key}}" $0
+    !insertmacro __HelpW "$0"
+    Pop $0
+{{- else }}
     !insertmacro __HelpW "{{.Key}}="
 {{- if not .Secret }}
     !insertmacro __HelpW "${{.Var}}"
 {{- end }}
     !insertmacro __HelpNL
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

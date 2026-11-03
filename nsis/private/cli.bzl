@@ -81,16 +81,20 @@ def _group_expansions(groups):
 def _is_persisted(opt):
     return bool(opt.get("Persist", False))
 
+def _display_default(opt):
+    d = opt.get("Default", "")
+    return ",".join(d) if type(d) == "list" else d
+
 def _option_details(opt, owners):
     secret = opt.get("Secret", False)
     parts = []
     if secret:
         parts.append("default=<secret>")
     else:
-        parts.append("default={}".format(opt.get("Default", "") or "(none)"))
+        parts.append("default={}".format(_display_default(opt) or "(none)"))
     parts.append("persisted" if _is_persisted(opt) else "not persisted")
     if opt.get("Choices"):
-        parts.append("choices={}".format("|".join(opt["Choices"])))
+        parts.append("choices={}".format(",".join(opt["Choices"])))
     if opt.get("Min") or opt.get("Max"):
         parts.append("range={}..{}".format(opt.get("Min", "") or "", opt.get("Max", "") or ""))
     if opt.get("MaxLength"):
@@ -200,6 +204,7 @@ def cli_data(components, groups, deps, component_map, install_types, testable, p
                 "Id": o["Id"],
                 "Var": o["Var"],
                 "Secret": bool(o.get("Secret", False)),
+                "MultiSelect": bool(o.get("MultiSelect", False)),
                 "TextPrefix": "  {}  {}  value=".format(_pad(o["Id"], id_width), _pad(_option_kind(o), kind_width)),
                 "TextDetail": "      {}".format(details),
                 "TextDescription": "      {}".format(desc) if desc else "",
@@ -263,7 +268,7 @@ def options_doc_content(product, version, data):
                 o["id"],
                 o["control"],
                 o["type"],
-                "`{}`".format(o["default"]) if o["default"] else "",
+                "`{}`".format(",".join(o["default"]) if type(o["default"]) == "list" else o["default"]) if o["default"] else "",
                 "yes" if o["persisted"] else "no",
                 _one_line(o["description"]).replace("|", "\\|"),
             ))

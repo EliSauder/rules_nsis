@@ -2,6 +2,7 @@
 !define __INCLUDE_CLI
 
 !include LogicLib.nsh
+!include Array.nsh
 !include FileFunc.nsh
 !include Console.nsh
 !include Formatting.nsh
@@ -59,8 +60,8 @@ Function ${PREFIX}Cli_Init
   Push $6 ; scratch
 
   StrCpy $__cli_argc 0
-  nsArray::Clear __cli_args
-  nsArray::Clear __cli_named
+  ${Array_Clear} __cli_args
+  ${Array_Clear} __cli_named
   StrCpy $5 0
 
   System::Call 'kernel32::GetCommandLineW() p .r1'
@@ -103,7 +104,7 @@ FunctionEnd
 ; Adds $4 to the args and the named args. Called with Cli_Init's registers. The name is what precedes the first =; a
 ; later arg with the same name replaces the earlier one.
 Function ${PREFIX}CliInitAdd
-  nsArray::Set __cli_args /key=$__cli_argc $4
+  ${Array_Set} __cli_args $__cli_argc $4
   IntOp $__cli_argc $__cli_argc + 1
 
   Push $0 ; index
@@ -129,7 +130,7 @@ ${PREFIX}CliInitAddValue:
 ${PREFIX}CliInitAddSet:
   StrCmp $2 "" ${PREFIX}CliInitAddDone
   !insertmacro _Cli_Lower 2
-  nsArray::Set __cli_named /key=$2 $3
+  ${Array_Set} __cli_named $2 $3
 ${PREFIX}CliInitAddDone:
   Pop $3
   Pop $2
@@ -151,9 +152,7 @@ Function ${PREFIX}Cli_GetArg
     StrCpy $0 ""
     SetErrors
   ${Else}
-    nsArray::Get __cli_args /at=$0
-    Pop $1
-    Pop $0
+    ${Array_GetAt} __cli_args $0 $0
   ${EndIf}
 
   Pop $1
@@ -185,11 +184,8 @@ ${PREFIX}CliLookupScan:
   Goto ${PREFIX}CliLookupScan
 ${PREFIX}CliLookupFind:
   !insertmacro _Cli_Lower 0
-  ClearErrors
-  nsArray::Get __cli_named $0
-  ; A missing name leaves nothing on the stack.
+  ${Array_GetKey} __cli_named $0 $2
   IfErrors ${PREFIX}CliLookupAbsent
-  Pop $2
   StrCpy $1 $2 1
   StrCpy $2 $2 "" 1
   StrCmp $1 "B" 0 +3

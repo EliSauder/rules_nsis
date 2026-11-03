@@ -1,6 +1,7 @@
 load("@rules_python//python:py_library.bzl", "py_library")
 load("//nsis/testing:defs.bzl", "nsis_compile_test")
 load(":arch.bzl", "arch_cases")
+load(":array.bzl", "array_cases")
 load(":cli.bzl", "cli_cases")
 load(":console.bzl", "console_cases")
 load(":defs.bzl", "include_api_suite", "include_label")
@@ -8,6 +9,7 @@ load(":event_log.bzl", "event_log_cases")
 load(":formatting.bzl", "formatting_cases")
 load(":guid.bzl", "guid_cases")
 load(":icacls.bzl", "icacls_cases")
+load(":ini.bzl", "ini_cases")
 load(":logging.bzl", "logging_cases")
 load(":move_file_folder.bzl", "move_file_folder_cases")
 load(":mutex.bzl", "mutex_cases")
@@ -25,6 +27,7 @@ load(":version.bzl", "version_cases")
 package(default_visibility = ["//visibility:private"])
 
 _INCLUDES = [
+    "Array.nsh",
     "Arch.nsh",
     "Cli.nsh",
     "Console.nsh",
@@ -32,6 +35,7 @@ _INCLUDES = [
     "Formatting.nsh",
     "Guid.nsh",
     "iCacls.nsh",
+    "Ini.nsh",
     "Logging.nsh",
     "MoveFileFolder.nsh",
     "Mutex.nsh",
@@ -86,12 +90,14 @@ _SC = sc_cases()
 include_api_suite(
     name = "tests",
     cases = arch_cases() +
+            array_cases() +
             cli_cases() +
             console_cases() +
             event_log_cases() +
             formatting_cases() +
             guid_cases() +
             icacls_cases() +
+            ini_cases() +
             logging_cases() +
             move_file_folder_cases() +
             mutex_cases() +
