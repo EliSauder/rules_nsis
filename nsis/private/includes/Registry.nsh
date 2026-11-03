@@ -405,21 +405,13 @@ FunctionEnd
 ; as an nsArray array (the name of the array is passed), one element per
 ; string, so a string can hold any character.
 ;
-; Sets HIVE to the handle of the hive matching the shell context: HKLM
-; (0x80000002) in the "admin" context, HKCU (0x80000001) otherwise.
-!macro _RegShellHive HIVE
-    !insertmacro __shellctx_init
+; Pushes the hive handle matching the shell context and the access mask for
+; VIEW (32 or 64, anything else selects the default view) combined with ACCESS.
+!macro _RegMultiSzAccess PREFIX VIEW ACCESS HIVE MASK
     StrCpy ${HIVE} 0x80000001
     ${IfAdmin}
         StrCpy ${HIVE} 0x80000002
     ${EndIf}
-!macroend
-
-; Sets HIVE to the hive handle matching the shell context and MASK to the access
-; mask for VIEW (32 or 64, anything else selects the default view) combined with
-; ACCESS.
-!macro _RegMultiSzAccess PREFIX VIEW ACCESS HIVE MASK
-    !insertmacro _RegShellHive ${HIVE}
     ${If} ${VIEW} != "32"
     ${AndIf} ${VIEW} != "64"
         !insertmacro ${PREFIX}GetRegView ${VIEW}
