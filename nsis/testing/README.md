@@ -212,8 +212,8 @@ such as the soft hyphen U+00AD arrive unchanged. The harness does not otherwise
 alter them, so an API still sees the decoded value only. Because NSIS strings
 are limited, an escaped scalar or list item line can have at most 1000
 characters; longer values raise `ValueError` before the harness runs.
-Scalar inputs are also passed on the command line as escaped `/name=value`
-options, so APIs that read the command line (`GetOptions`, `TestIdInit`) see them;
+Scalar inputs of up to 100 escaped characters (`name=value` included) are also
+passed on the command line as `/name=value` options, so APIs that read the command line (`GetOptions`, `TestIdInit`) see them;
 the harness itself reads the file. List items are only in the file.
 `expected_exitcode=N` supports failure tests. A zero exit without an output
 record is an error, including an API that silently calls `Abort` or `Quit`.

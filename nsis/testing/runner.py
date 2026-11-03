@@ -13,6 +13,7 @@ from .generate import ERRORS_RECORD, HEADER, REGISTERS, STACK_RECORDS, inputs as
 
 # NSIS strings, and so the lines of the input file, hold at most 1023 characters.
 MAX_INPUT_LINE = 1000
+MAX_COMMAND_LINE_INPUT = 100
 
 
 def escape(text):
@@ -253,11 +254,14 @@ class Harness:
         command = [
             str(executable), "/S", f"/output={output}",
         ]
-        # The harness reads its inputs from the file next to the output. The
-        # scalars are also passed as options, for APIs that read the command line.
+        # The harness reads its inputs from the file next to the output. Short
+        # scalars are also passed as options, for APIs that read the command line;
+        # NSIS truncates a long command line, and then loses the uninstaller's _?=.
         for p in input_parameters(self.spec):
             if p.get("type") != "list":
-                command.append("/" + serialize_input(p, inputs[p["name"]]))
+                line = serialize_input(p, inputs[p["name"]])
+                if len(line) <= MAX_COMMAND_LINE_INPUT:
+                    command.append("/" + line)
         if self.spec.get("context", "installer") == "uninstaller":
             command.append(f"_?={self.directory}")
         command = [command[0], *map(Raw, command_args), *command[1:], *map(Raw, command_tail)]

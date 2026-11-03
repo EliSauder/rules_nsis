@@ -239,6 +239,16 @@ class RunnerTest(unittest.TestCase):
                 with self.subTest(bad=bad), self.assertRaises(ValueError):
                     read_outputs(output, ["result"])
 
+    def test_long_scalars_stay_off_the_command_line(self):
+        with Harness("example.exe", ECHO) as harness:
+            def execute(command):
+                self.assertFalse(any(str(c).startswith("/text=") for c in command))
+                self.assertEqual((harness.directory / "outputs.dat.inputs").read_text(), "text=" + "x" * 900 + "\n")
+                (harness.directory / "outputs.dat").write_bytes(outputs(result="x" * 900))
+                return subprocess.CompletedProcess(command, 0, "", "")
+            with patch.object(harness, "_execute", side_effect=execute):
+                harness.run(text="x" * 900).assert_outputs(result="x" * 900)
+
     def test_run_captures_streams_and_inputs_and_removes_stale_outputs(self):
         with Harness("example.exe", ECHO) as harness:
             output = harness.directory / "outputs.dat"
