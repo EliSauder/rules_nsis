@@ -242,10 +242,7 @@ nsis_installer(
     product_path = "SSI",
     vendor = "Company Department",
     vendor_path = "Company\\Department",
-    description = """
-Description
-with multiple lines
-""",
+    description = "Description\r\nwith multiple lines",
     version = "0.0.0.1",
     execution_level = "admin",
     components = [
