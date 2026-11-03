@@ -31,12 +31,15 @@ Var current_context
 !define IfAdmin `${If} $current_context == "admin"`
 !define IfNotAdmin `${If} $current_context != "admin"`
 
+; EnVar has no SHCTX, so its hive is set next to SetShellVarContext.
 !macro SetShellContext
     !insertmacro __shellctx_init
     ${IfAdmin}
         SetShellVarContext all
+        EnVar::SetHKLM
     ${Else}
         SetShellVarContext current
+        EnVar::SetHKCU
     ${EndIf}
 !macroend
 !define SetShellContext `!insertmacro SetShellContext`
@@ -45,8 +48,10 @@ Var current_context
     !insertmacro __shellctx_init
     ${IfAdmin}
         SetShellVarContext all
+        EnVar::SetHKLM
     ${Else}
         SetShellVarContext current
+        EnVar::SetHKCU
     ${EndIf}
 !macroend
 !define un.SetShellContext `!insertmacro un.SetShellContext`
