@@ -60,10 +60,10 @@ SetCompressorDictSize {{ (ds "in").CompressorDictSize }}
 !define PRODUCT_VERSION "0.0.0.0"
 {{- end }}
 
-{{- if eq (ds "in").ExecutionLevel "current" }}
-!define INSTALL_ROOT "$LOCALAPPDATA\Programs"
-{{- else if (ds "in").InstallRoot }}
+{{- if (ds "in").InstallRoot }}
 !define INSTALL_ROOT "{{(ds "in").InstallRoot}}"
+{{- else if eq (ds "in").ExecutionLevel "user" }}
+!define INSTALL_ROOT "$LOCALAPPDATA\Programs"
 {{- else if (ds "in").ArchitectureIs64}}
 !define INSTALL_ROOT "$PROGRAMFILES64"
 {{- else}}
