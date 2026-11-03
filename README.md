@@ -344,7 +344,7 @@ are empty. Shortcuts the user repointed are kept (with a warning in the log).
 Use `nsis_symbol` to declare an API and `nsis_test_harness` to build a standalone
 test executable without writing JSON. Parameters use `direction:name[:type]`,
 for example `["in:count:int", "in:enabled:bool", "out:result:string"]`.
-Supported types are `string` (default), signed 32-bit `int`, and `bool`.
+Supported types are `string` (default), signed 32-bit `int`, and `bool`, and `list` (an nsArray in NSIS, a Python `list[str]`).
 The Python `Harness` validates inputs, converts outputs to their declared types,
 captures stdout/stderr, checks that all 20 NSIS registers are preserved and the
 stack is balanced, and can assert the NSIS error flag (`expect_errors`).
@@ -430,14 +430,22 @@ Every installer can use [nsArray](https://nsis.sourceforge.io/Arrays_in_NSIS)
 1.1.1.7 by Stuart "Afrow UK" Welch (zlib-style license), which the bundled
 includes use. It is downloaded from the NSIS wiki, pinned by sha256, and built
 from source with a patch that fixes a heap overflow in `nsArray::Split`
-(`nsis/plugins/patches`). Keep its
+(`nsis/plugins/patches`). It is built with `-DARRAY_COPY` and
+`-DARRAY_TOSTRING`, so `Array_Copy` and `Array_ToString` from `Array.nsh` are
+available. Keep its
 license notice, from the `plugin_licenses` output group, when you distribute
 an installer that embeds it.
+
+[EnVar](https://nsis.sourceforge.io/EnVar_plug-in) (zlib-style license) is
+bundled with every installer and test harness. It is downloaded from the NSIS
+wiki, pinned by sha256, and used by `add_to_path` (`EnvPath.nsh`). Its license
+is included in the `plugin_licenses` output group.
 
 ## Generated Installer Details
 
 - Unicode
-- Uninstaller file name: `Uninstaller.exe`
+- Uninstaller file name: `uninstaller_name` (default `Uninstall.exe`), also
+  used for `UninstallString`, `QuietUninstallString` and `DisplayIcon`.
 - Writes to Windows Registry `Software\{{.Product}}` or
   `Software\{{.Vendor}}\{{.Product}}`
   depending on what values are provided. Writes the values:
@@ -475,8 +483,14 @@ an installer that embeds it.
 - Ensures only one installer is running using a mutex.
 - Uninstalls previous installs when run.
 - Installs and updates windows services using `sc.exe`
-    - Will always attempt to stop the service before component section runs.
+    - Will always attempt to stop the service, waiting up to 30 seconds,
+      before component section runs.
+    - On uninstall, stops the service and waits up to 30 seconds for it to be
+      deleted.
     - All component files are updated before the service is updated or created.
+- Directory (tree artifact) sources are uninstalled file by file, then the
+  empty directories are removed bottom-up without recursion, so files the user
+  added are kept.
 - When `/TESTID={{.TestId}}` is passed, will append TestId to the registry
   keys it uses. This is to handle race conditions while testing installers.
 - If version is not provided, will default to `0.0.0.0`.
