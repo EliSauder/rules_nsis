@@ -444,7 +444,9 @@ def _validate_services(testcase, config, install_root):
 
         testcase.assertEqual(expst, svc.start_type(), f"Start type {svc.start_type()} not equal expected {expst}")
 
-        testcase.assertEqual(val["description"], svc.description(), f"Description '{svc.description()}' not equal expected '{val['description']}'")
+        expected_description = val["description"].replace("\r\n", "\n")
+        actual_description = svc.description().replace("\r\n", "\n")
+        testcase.assertEqual(expected_description, actual_description, f"Description '{svc.description()}' not equal expected '{val['description']}'")
 
 def _validate_file_contents(testcase, expected: dict, root: str):
     for path, content in expected.items():
