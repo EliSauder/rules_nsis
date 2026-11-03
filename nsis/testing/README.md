@@ -411,17 +411,21 @@ the generator CLI. The equivalent description for the Echo example is:
 }
 ```
 
-For typed standalone descriptions, use `"type": "int"` or `"type": "bool"`.
+For typed standalone descriptions, use `"type": "int"`, `"type": "bool"` or
+`"type": "list"`.
 Omitting `type` defaults to `string`, just as in the Bazel rule.
 
 ## Generated executable protocol
 
-The executable accepts `/name=value` for each input/inout and `/output=absolute-path`
-for its output file. Quote the value, not the entire option:
-`/text="hello world"`. Uninstaller bootstrap
-accepts `/harness_uninstaller=absolute-path`. The Python runner handles both.
-For typed parameters, use decimal integers and `1`/`0` booleans, for example
-`/number=41 /enabled=0`. Output records always contain strings on disk; the
+The executable requires `/output=absolute-path` for its output file and reads
+every input/inout from the percent-escaped `<output>.inputs` file next to it
+(one `name=value` line per scalar, one per list item). `/name=value` options on
+the command line are only a copy of short scalars for APIs that read the command
+line; lists are never passed there. See [Running an API](#running-an-api) for
+the escaping and length limits. Uninstaller bootstrap
+accepts `/harness_uninstaller=absolute-path`. The Python runner handles all of
+this. In the inputs file, use decimal integers and `1`/`0` booleans, for example
+`number=41` and `enabled=0`. Output records always contain strings on disk; the
 Python runner uses the symbol description to convert them to typed values.
 Missing arguments exit with 64; changed registers exit with 65; an unbalanced
 stack exits with 66 (65 takes precedence when both occur); random sentinel
@@ -440,6 +444,12 @@ all before/after snapshots; the runner reports every changed register.
 On stack imbalance, a sibling `.stack` file holds `expected`, `actual` and
 `underflow` records describing the sentinel check.
 
+
+## Plugins
+
+`nsis_test_harness` accepts additional NSIS plugins through its `plugins`
+attribute (`nsis_plugin` targets). The nsArray and EnVar plugins are always
+available without listing them.
 
 ## Examples and checks
 

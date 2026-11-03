@@ -53,7 +53,8 @@ nsis_symbol = rule(
     doc = """Describe an NSIS symbol without maintaining a JSON file.
 
 Parameters use direction:name[:type]. The Python runner validates and converts
-string (default), signed 32-bit int, and bool values; booleans use 1/0 in NSIS.
+string (default), signed 32-bit int, bool, and list values; booleans use 1/0 in
+NSIS, and a list is an nsArray passed to the API by name.
 A const:name parameter is not supplied at run time: its constants entry is
 inserted verbatim as that operand, for values only expressible at compile time.
 
