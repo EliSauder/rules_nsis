@@ -291,7 +291,7 @@ def _nsis_extension_impl(module_ctx):
         tc_defined = True
         if toolchain.name != _DEFAULT_TOOLCHAIN_NAME and not mod.is_root:
             fail("""\
-            Only the root module may override the default name for the mylang toolchain.
+            Only the root module may override the default name for the NSIS toolchain.
             This prevents conflicting registrations in the global namespace of external repos.
             """)
         if toolchain.name not in seen.keys():
@@ -302,7 +302,7 @@ def _nsis_extension_impl(module_ctx):
   for name, details in seen.items():
     if len(details) > 1:
         selected = sorted(details, reverse = True, key=lambda x: x["version"])[0]
-        print("NOTE: mylang toolchain {} has multiple versions {}, selected {}".format(name, [x["version"] for x in details], selected["version"]))
+        print("NOTE: NSIS toolchain {} has multiple versions {}, selected {}".format(name, [x["version"] for x in details], selected["version"]))
     else:
         selected = details[0]
 
@@ -344,19 +344,21 @@ def _nsis_extension_impl(module_ctx):
   )
 
 _nsis_toolchain_tag = tag_class(
+  doc = "Declares an NSIS toolchain to download and register.",
   attrs = {
     "name": attr.string(
       default = _DEFAULT_TOOLCHAIN_NAME,
-      doc = "Generating host-dispatching repository exposing :makensis and :nsis_files.",
+      doc = "Prefix for the generated repos `<name>_tool` and `<name>_toolchains`; only the root module may change it.",
     ),
     "version": attr.string(
       default = "3.11",
-      doc = "The version of nsis to use.",
+      doc = "The version of NSIS to use. Supported: 3.11.",
     ),
   }
 )
 
 nsis = module_extension(
+  doc = "Module extension that provides NSIS (makensis) tool and toolchain repositories.",
   implementation = _nsis_extension_impl,
   tag_classes = {
     "executable": _nsis_toolchain_tag,
