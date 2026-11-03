@@ -5,7 +5,8 @@ from tests.includes import common
 _CONSTANT = "uninstall_constant_"
 
 
-def _uninstall_registry(base, harness, path):
+def _uninstall_registry(base, harness, root):
+    path = common.scoped(harness, root)
     import winreg
 
     try:
@@ -27,10 +28,11 @@ def _uninstall_registry(base, harness, path):
             assert harness.run().returncode == 0
             common.assert_key_missing(winreg, path)
     finally:
-        common.delete_registry_tree(winreg, path)
+        common.delete_registry_tree(winreg, root)
 
 
-def _product_registry(base, harness, path):
+def _product_registry(base, harness, root):
+    path = common.scoped(harness, root)
     import winreg
 
     try:
@@ -44,22 +46,22 @@ def _product_registry(base, harness, path):
             harness.run(subkey="InstallDir").assert_outputs(value="seeded")
             harness.run(subkey="Missing").assert_outputs(value="")
         else:
-            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, path + "\\Options") as handle:
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, common.scoped(harness, root + "\\Options")) as handle:
                 winreg.SetValueEx(handle, "page.key", 0, winreg.REG_SZ, "remove me")
             assert harness.run(child="Options").returncode == 0
-            common.assert_key_missing(winreg, path + "\\Options")
+            common.assert_key_missing(winreg, common.scoped(harness, root + "\\Options"))
             winreg.OpenKey(winreg.HKEY_CURRENT_USER, path).Close()
             assert harness.run(child="").returncode == 0
             common.assert_key_missing(winreg, path)
     finally:
-        common.delete_registry_tree(winreg, path)
+        common.delete_registry_tree(winreg, root)
 
 
 def _install_detail(base, harness):
     import winreg
 
     publisher, product, component = str(uuid.uuid4()), "product", "component"
-    path = "Software\\" + publisher + "\\" + product + "\\Components\\" + component
+    path = common.scoped(harness, "Software\\" + publisher + "\\" + product + "\\Components\\" + component)
     try:
         if base == "install_detail_update":
             harness.run(publisher=publisher, product=product, component=component, subkey="Name", value="install detail")

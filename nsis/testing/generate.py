@@ -60,7 +60,7 @@ def validate(spec):
         name = parameter["name"]
         if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", name):
             raise ValueError("Parameter names must match [a-z][a-z0-9_]*")
-        if name in names or name in ("output", "harness_uninstaller", "expected_exitcode", "self"):
+        if name in names or name in ("output", "harness_uninstaller", "expected_exitcode", "self", "testid", "test_id"):
             raise ValueError(f"Duplicate or reserved parameter name: {name}")
         names.add(name)
         if parameter["direction"] not in ("in", "out", "inout", "const"):
@@ -295,10 +295,17 @@ def _defines(defines):
 
 
 def _on_init(context, on_init):
-    if not on_init:
-        return []
     name = "un.onInit" if context == "uninstaller" else ".onInit"
-    return [f"Function {name}", *on_init, "FunctionEnd"]
+    # Includes that use the test id (Testing.nsh) get one for free: every run
+    # is passed a unique /TESTID=, so library registry writes never collide.
+    return [
+        f"Function {name}",
+        "!ifdef __INCLUDE_TESTING",
+        "${TestIdInit}",
+        "!endif",
+        *on_init,
+        "FunctionEnd",
+    ]
 
 
 def generate(spec, source, include_dirs=(), defines=None, on_init=(), plugin_lines=()):

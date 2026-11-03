@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import tempfile
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -190,6 +191,9 @@ class Harness:
             prefix="nsis-api-", dir=directory
         )
         self.directory = Path(self._temporary.name)
+        # Passed to every run as /TESTID=, which the generated harness reads
+        # with TestIdInit; the include library scopes its registry keys with it.
+        self.test_id = str(uuid.uuid4())
 
     def __enter__(self):
         return self
@@ -207,7 +211,7 @@ class Harness:
             encoding="utf-8", errors="replace", timeout=self.timeout, check=False,
         )
 
-    def run(self, *, expected_exitcode=0, expect_errors=None, command_args=(), command_tail=(), **inputs):
+    def run(self, *, expected_exitcode=0, expect_errors=None, command_args=(), command_tail=(), test_id=None, **inputs):
         """Invoke the API once.
 
         expect_errors=True/False asserts the NSIS error flag after the call;
@@ -217,6 +221,8 @@ class Harness:
         end, where NSIS expects a /D= arg. Quoted args must come first because
         GetOptions, which the harness reads its own args with, mishandles
         quoted args that follow a quoted value.
+        test_id replaces the harness's unique test id for this run; "" runs
+        without one, as a production installer does.
         """
         for name, extra in (("command_args", command_args), ("command_tail", command_tail)):
             if isinstance(extra, str) or not all(isinstance(a, str) for a in extra):
@@ -253,6 +259,7 @@ class Harness:
                 )
         command = [
             str(executable), "/S", f"/output={output}",
+            f"/TESTID={self.test_id if test_id is None else test_id}",
         ]
         # The harness reads its inputs from the file next to the output. Short
         # scalars are also passed as options, for APIs that read the command line;

@@ -5,7 +5,7 @@ from tests.includes import common
 _TRICKY = ['say "hi"', "line1\r\nline2", "line1\nline2", "\u03bb \U0001f600", "100% $x ${y} $$", "a,b|c", " pad ", "C:\\dir\\"]
 
 
-_OPTIONS_KEY = "SOFTWARE\\rules_nsis_tests\\Options\\framework-test-id"
+_OPTIONS_KEY = "SOFTWARE\\rules_nsis_tests\\Options"
 
 
 def run_case(case, harness, args):
@@ -44,36 +44,38 @@ def run_case(case, harness, args):
     elif base == "option_persist_kinds":
         import winreg
 
+        key = common.scoped(harness, _OPTIONS_KEY)
         text = "l1\\n\\\\x\\n"
         for items in [["a", "b"], _TRICKY, [f"item{i:03}" for i in range(500)]]:
             try:
                 harness.run(items=items, text=text).assert_outputs(count=str(len(items)), items_out=items, text_out=text)
-                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _OPTIONS_KEY) as handle:
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
                     assert winreg.QueryValueEx(handle, "test.b") == (items, winreg.REG_MULTI_SZ)
                     assert winreg.QueryValueEx(handle, "test.c") == (["l1\r\n\\x\r\n"], winreg.REG_MULTI_SZ)
             finally:
-                common.delete_registry_tree(winreg, _OPTIONS_KEY)
+                common.delete_registry_tree(winreg, _OPTIONS_KEY + "\\" + harness.test_id)
         try:
             harness.run(items=[], text="t").assert_outputs(count="0", items_out=[], text_out="t")
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _OPTIONS_KEY) as handle:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
                 assert winreg.QueryValueEx(handle, "test.b") == ([], winreg.REG_MULTI_SZ)
         finally:
-            common.delete_registry_tree(winreg, _OPTIONS_KEY)
+            common.delete_registry_tree(winreg, _OPTIONS_KEY + "\\" + harness.test_id)
     elif base == "option_load_stored":
         import winreg
 
+        key = common.scoped(harness, _OPTIONS_KEY)
         try:
             # Values stored as REG_SZ by older versions are read, then promoted.
-            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _OPTIONS_KEY) as handle:
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key) as handle:
                 winreg.SetValueEx(handle, "test.b", 0, winreg.REG_SZ, "x|y")
                 winreg.SetValueEx(handle, "test.c", 0, winreg.REG_SZ, "m1\\nm2")
             harness.run().assert_outputs(count="2", items=["x", "y"], text="m1\\nm2")
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, _OPTIONS_KEY) as handle:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
                 assert winreg.QueryValueEx(handle, "test.b") == (["x", "y"], winreg.REG_MULTI_SZ)
                 assert winreg.QueryValueEx(handle, "test.c") == (["m1\r\nm2"], winreg.REG_MULTI_SZ)
             harness.run().assert_outputs(count="2", items=["x", "y"], text="m1\\nm2")
         finally:
-            common.delete_registry_tree(winreg, _OPTIONS_KEY)
+            common.delete_registry_tree(winreg, _OPTIONS_KEY + "\\" + harness.test_id)
     elif base == "option_load_missing":
         harness.run(default="kept").assert_outputs(result="kept")
     else:

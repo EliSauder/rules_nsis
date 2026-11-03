@@ -2,8 +2,6 @@
 
 load(":defs.bzl", "include_api_case")
 
-_TEST_ID = ['${SetTestId} "framework-test-id"']
-
 # HKCU\Software is shared by both registry views, so view cases use HKLM.
 _ADMIN = ["${UpdateShellContextToAdmin}"]
 _PINNED = {"REGISTRY_VIEW": "32"}
@@ -29,9 +27,10 @@ def registry_cases():
         )
 
     # WriteRegBin only accepts compile-time hex literals.
-    for name, on_init in [
-        ("registry_set_binary", []),
-        ("registry_set_binary_test_id", _TEST_ID),
+    for name, testable in [
+        ("registry_set_binary", True),
+        # Without TESTABLE_INSTALLER the test id is ignored.
+        ("registry_set_binary_production", False),
     ]:
         cases += include_api_case(
             name = name,
@@ -40,7 +39,7 @@ def registry_cases():
             symbol = "SetRegistrySubKeyBin",
             parameters = ["in:key", "in:subkey", "const:value"],
             constants = {"value": "000102FF"},
-            on_init = on_init,
+            testable = testable,
         )
 
     for name, symbol, parameters, constants, defines in [

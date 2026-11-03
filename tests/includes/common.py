@@ -28,6 +28,11 @@ def unhandled(case):
     return ValueError(f"Unhandled include API case: {case}")
 
 
+def scoped(harness, path):
+    """The key the library uses for path: the harness's test id is appended."""
+    return path + "\\" + harness.test_id
+
+
 def uninstall_key(product_code):
     return "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{" + product_code.upper() + "}"
 

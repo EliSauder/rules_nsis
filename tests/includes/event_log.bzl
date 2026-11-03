@@ -2,8 +2,6 @@
 
 load(":defs.bzl", "include_api_case")
 
-_TEST_ID = ['${SetTestId} "framework-test-id"']
-
 def event_log_cases():
     cases = []
     for name, symbol, parameters in [
@@ -23,6 +21,5 @@ def event_log_cases():
             include = "EventLog.nsh",
             symbol = symbol,
             parameters = parameters,
-            on_init = _TEST_ID,
         )
     return cases
