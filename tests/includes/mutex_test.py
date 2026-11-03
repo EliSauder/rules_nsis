@@ -6,7 +6,7 @@ from tests.includes import common
 _ALREADY_RUNNING = 10
 
 
-def _hold(name):
+def _hold(name, test_id):
     """Holds NAME's mutex as another running instance would; returns its handle."""
     import ctypes
     from ctypes import wintypes
@@ -14,7 +14,7 @@ def _hold(name):
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.CreateMutexW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR]
     kernel.CreateMutexW.restype = wintypes.HANDLE
-    handle = kernel.CreateMutexW(None, False, name + "Mutex")
+    handle = kernel.CreateMutexW(None, False, name + "Mutex" + test_id)
     if not handle:
         raise ctypes.WinError(ctypes.get_last_error())
     return kernel, handle
@@ -29,7 +29,7 @@ def run_case(case, harness, args):
     for _ in range(2):
         assert harness.run(name=name).returncode == 0
     # The library appends the test id to the mutex name.
-    kernel, handle = _hold(name + harness.test_id)
+    kernel, handle = _hold(name, harness.test_id)
     try:
         harness.run(name=name, expected_exitcode=_ALREADY_RUNNING)
     finally:
