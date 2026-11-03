@@ -229,8 +229,7 @@ nsis_component(
     service_start_type = "auto",
     selection_mode = "required",
     display_name = "README Service",
-    description = """README Service Description
-with a second line""",
+    description = "README Service Description\nwith a second line",
     install_categories = ["Full", "Typical", "Minimal"],
     srcs = [":nsis_files"],
 )
@@ -243,7 +242,10 @@ nsis_installer(
     product_path = "SSI",
     vendor = "Company Department",
     vendor_path = "Company\\Department",
-    description = "Description\r\nwith multiple lines",
+    description = """
+Description
+with multiple lines
+""",
     version = "0.0.0.1",
     execution_level = "admin",
     components = [
@@ -254,6 +256,15 @@ nsis_installer(
         "Typical",
         "Minimal",
     ],
+)
+
+nsis_installer(
+    name = "multiline_crlf_installer",
+    id = "46b8bbf4-4f71-4d7f-8ccf-d6fed27144f5",
+    components = [":minimal_component"],
+    product = "CRLF Description Installer",
+    product_path = "CRLF Description Installer",
+    description = "Description\r\nwith multiple lines",
 )
 
 nsis_installer_test(
