@@ -398,6 +398,301 @@ FunctionEnd
 !macroend
 !define un.SetRegistrySubKeyDWORD `!insertmacro un.SetRegistrySubKeyDWORD`
 
+; REG_MULTI_SZ values are handled through the System plugin (advapi32), the
+; way https://nsis.sourceforge.io/REG_MULTI_SZ_Reader does, because NSIS has no
+; instruction for them. The strings of a value are exchanged with the callers
+; as an nsArray array (the name of the array is passed), one element per
+; string, so a string can hold any character.
+;
+; Pushes the hive handle matching the shell context and the access mask for
+; VIEW (32 or 64, anything else selects the default view) combined with ACCESS.
+!macro _RegMultiSzAccess PREFIX VIEW ACCESS HIVE MASK
+    StrCpy ${HIVE} 0x80000001
+    ${IfAdmin}
+        StrCpy ${HIVE} 0x80000002
+    ${EndIf}
+    ${If} ${VIEW} != "32"
+    ${AndIf} ${VIEW} != "64"
+        !insertmacro ${PREFIX}GetRegView ${VIEW}
+    ${EndIf}
+    ${If} ${VIEW} == "64"
+        IntOp ${MASK} ${ACCESS} | 0x100
+    ${Else}
+        IntOp ${MASK} ${ACCESS} | 0x200
+    ${EndIf}
+!macroend
+
+!macro _RegMultiSzFunctions PREFIX
+; Stack: view (top), key, array, subkey. Replaces the value with a REG_MULTI_SZ
+; one holding the elements of the array (in order); sets the error flag on
+; failure. An array that does not exist is stored as an empty list.
+Function ${PREFIX}SetRegistrySubKeyMultiStrInView
+    !insertmacro ${PREFIX}SetShellContext
+    Exch $3 ; view
+    Exch
+    Exch $0 ; key
+    Exch 2
+    Exch $1 ; array
+    Exch 3
+    Exch $2 ; subkey
+    Push $4
+    Push $5
+    Push $6
+    Push $7
+    Push $8
+    Push $9
+    Push $R0
+    Push $R1
+    Push $R2
+    Push $R3
+
+    ClearErrors
+    !insertmacro _ApplyRegTestId $0 $4
+    !insertmacro _RegMultiSzAccess "${PREFIX}" $3 6 $4 $5
+
+    nsArray::Length $1
+    Pop $6
+    IfErrors 0 +2
+        StrCpy $6 0
+    ClearErrors
+
+    ; Room for every character, a terminator per string and the final
+    ; terminator. System::Alloc zeroes the memory.
+    StrCpy $R3 2
+    StrCpy $9 0
+    sizeloop:
+        IntCmp $9 $6 sizedone 0 sizedone
+        nsArray::Get $1 /at=$9
+        Pop $R0
+        Pop $R1
+        StrLen $R2 $R1
+        IntOp $R2 $R2 + 1
+        IntOp $R3 $R3 + $R2
+        IntOp $9 $9 + 1
+        Goto sizeloop
+    sizedone:
+    IntOp $R3 $R3 * 2
+    System::Alloc $R3
+    Pop $7
+    StrCpy $8 $7 ; end of the data written so far
+    StrCpy $9 0
+    copyloop:
+        IntCmp $9 $6 write 0 write
+        nsArray::Get $1 /at=$9
+        Pop $R0
+        Pop $R1
+        System::Call 'kernel32::lstrcpyW(p r8, w r11)'
+        StrLen $R2 $R1
+        IntOp $R2 $R2 + 1
+        IntOp $R2 $R2 * 2
+        IntPtrOp $8 $8 + $R2
+        IntOp $9 $9 + 1
+        Goto copyloop
+    write:
+    IntPtrOp $8 $8 - $7
+    IntPtrOp $8 $8 + 2
+    System::Call 'advapi32::RegCreateKeyExW(i r4, w r0, i 0, p 0, i 0, i r5, p 0, *p .r9, p 0) i .r6'
+    StrCmp $6 0 0 failed
+    System::Call 'advapi32::RegSetValueExW(p r9, w r2, i 0, i 7, p r7, i r8) i .r6'
+    System::Call 'advapi32::RegCloseKey(p r9)'
+    StrCmp $6 0 finish
+    failed:
+    SetErrors
+    !insertmacro LogWarn "Failed to set MultiStr registry entry: '$0'.'$2' (error: $6)"
+    Goto freed
+    finish:
+    !insertmacro LogInfo "Set MultiStr registry entry: '$0'.'$2' (view: $3)"
+    freed:
+    System::Free $7
+
+    Pop $R3
+    Pop $R2
+    Pop $R1
+    Pop $R0
+    Pop $9
+    Pop $8
+    Pop $7
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $2
+    Pop $3
+    Pop $0
+    Pop $1
+FunctionEnd
+
+Function ${PREFIX}SetRegistrySubKeyMultiStr
+    !insertmacro _PushRegView "${PREFIX}"
+    Call ${PREFIX}SetRegistrySubKeyMultiStrInView
+FunctionEnd
+
+; Stack: view (top), key, subkey, array. Replaces the elements of the array
+; with the strings of the value. Only REG_MULTI_SZ values are read: the error
+; flag is set (and the array left empty) when the value is missing or has
+; another type.
+Function ${PREFIX}GetRegistrySubKeyMultiStrInView
+    !insertmacro ${PREFIX}SetShellContext
+    Exch $3 ; view
+    Exch
+    Exch $0 ; key
+    Exch 2
+    Exch $1 ; subkey
+    Exch 3
+    Exch $2 ; array
+    Push $4
+    Push $5
+    Push $6
+    Push $7
+    Push $8
+    Push $9
+    Push $R0
+    Push $R1
+    Push $R2
+    Push $R3
+
+    nsArray::Clear $2
+    ClearErrors
+    !insertmacro _ApplyRegTestId $0 $4
+    !insertmacro _RegMultiSzAccess "${PREFIX}" $3 1 $4 $5
+    System::Call 'advapi32::RegOpenKeyExW(i r4, w r0, i 0, i r5, *p .r6) i .r7'
+    StrCmp $7 0 0 failed
+    ; $7 = type, $8 = size in bytes
+    System::Call 'advapi32::RegQueryValueExW(p r6, w r1, p 0, *i .r7, p 0, *i .r8) i .r5'
+    StrCmp $5 0 0 closefail
+    StrCmp $7 7 0 closefail
+
+    IntOp $9 $8 + 4
+    System::Alloc $9
+    Pop $9
+    System::Call '*(i r8) p .r10'
+    System::Call 'advapi32::RegQueryValueExW(p r6, w r1, p 0, p 0, p r9, p r10) i .r5'
+    System::Free $R0
+    StrCmp $5 0 0 freefail
+
+    ; Stop before the final terminator so empty strings in the list are kept.
+    StrCpy $R1 $9
+    IntPtrOp $R2 $9 + $8
+    IntPtrOp $R2 $R2 - 2
+    StrCpy $R3 0
+    loop:
+        IntPtrCmp $R1 $R2 done 0 done
+        System::Call 'kernel32::lstrcpyW(w .r4, p r11)'
+        System::Call 'kernel32::lstrlenW(p r11) i .r7'
+        nsArray::Set $2 /key=$R3 "$4"
+        IntOp $R3 $R3 + 1
+        IntOp $7 $7 + 1
+        IntOp $7 $7 * 2
+        IntPtrOp $R1 $R1 + $7
+        Goto loop
+    done:
+    System::Free $9
+    System::Call 'advapi32::RegCloseKey(p r6)'
+    ClearErrors
+    Goto finished
+    freefail:
+    System::Free $9
+    closefail:
+    System::Call 'advapi32::RegCloseKey(p r6)'
+    failed:
+    SetErrors
+    finished:
+
+    Pop $R3
+    Pop $R2
+    Pop $R1
+    Pop $R0
+    Pop $9
+    Pop $8
+    Pop $7
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $2
+    Pop $3
+    Pop $0
+    Pop $1
+FunctionEnd
+
+Function ${PREFIX}GetRegistrySubKeyMultiStr
+    !insertmacro _PushRegView "${PREFIX}"
+    Call ${PREFIX}GetRegistrySubKeyMultiStrInView
+FunctionEnd
+!macroend
+
+!insertmacro _RegMultiSzFunctions ""
+!insertmacro _RegMultiSzFunctions "un."
+
+!macro SetRegistrySubKeyMultiStrInView VIEW KEY SUBKEY ARRAY
+    Push "${SUBKEY}"
+    Push "${ARRAY}"
+    Push "${KEY}"
+    Push "${VIEW}"
+    Call SetRegistrySubKeyMultiStrInView
+!macroend
+!define SetRegistrySubKeyMultiStrInView `!insertmacro SetRegistrySubKeyMultiStrInView`
+
+!macro SetRegistrySubKeyMultiStr KEY SUBKEY ARRAY
+    Push "${SUBKEY}"
+    Push "${ARRAY}"
+    Push "${KEY}"
+    Call SetRegistrySubKeyMultiStr
+!macroend
+!define SetRegistrySubKeyMultiStr `!insertmacro SetRegistrySubKeyMultiStr`
+
+!macro un.SetRegistrySubKeyMultiStrInView VIEW KEY SUBKEY ARRAY
+    Push "${SUBKEY}"
+    Push "${ARRAY}"
+    Push "${KEY}"
+    Push "${VIEW}"
+    Call un.SetRegistrySubKeyMultiStrInView
+!macroend
+!define un.SetRegistrySubKeyMultiStrInView `!insertmacro un.SetRegistrySubKeyMultiStrInView`
+
+!macro un.SetRegistrySubKeyMultiStr KEY SUBKEY ARRAY
+    Push "${SUBKEY}"
+    Push "${ARRAY}"
+    Push "${KEY}"
+    Call un.SetRegistrySubKeyMultiStr
+!macroend
+!define un.SetRegistrySubKeyMultiStr `!insertmacro un.SetRegistrySubKeyMultiStr`
+
+!macro GetRegistrySubKeyMultiStrInView VIEW KEY SUBKEY ARRAY
+    Push "${ARRAY}"
+    Push "${SUBKEY}"
+    Push "${KEY}"
+    Push "${VIEW}"
+    Call GetRegistrySubKeyMultiStrInView
+!macroend
+!define GetRegistrySubKeyMultiStrInView `!insertmacro GetRegistrySubKeyMultiStrInView`
+
+!macro GetRegistrySubKeyMultiStr KEY SUBKEY ARRAY
+    Push "${ARRAY}"
+    Push "${SUBKEY}"
+    Push "${KEY}"
+    Call GetRegistrySubKeyMultiStr
+!macroend
+!define GetRegistrySubKeyMultiStr `!insertmacro GetRegistrySubKeyMultiStr`
+
+!macro un.GetRegistrySubKeyMultiStrInView VIEW KEY SUBKEY ARRAY
+    Push "${ARRAY}"
+    Push "${SUBKEY}"
+    Push "${KEY}"
+    Push "${VIEW}"
+    Call un.GetRegistrySubKeyMultiStrInView
+!macroend
+!define un.GetRegistrySubKeyMultiStrInView `!insertmacro un.GetRegistrySubKeyMultiStrInView`
+
+!macro un.GetRegistrySubKeyMultiStr KEY SUBKEY ARRAY
+    Push "${ARRAY}"
+    Push "${SUBKEY}"
+    Push "${KEY}"
+    Call un.GetRegistrySubKeyMultiStr
+!macroend
+!define un.GetRegistrySubKeyMultiStr `!insertmacro un.GetRegistrySubKeyMultiStr`
+
+; Reads REG_SZ and REG_DWORD values as is. REG_MULTI_SZ values are read as
+; their strings separated by line feeds; use GetRegistrySubKeyMultiStr to get
+; them exactly.
 !macro _GetRegistrySubKey PREFIX
 Function ${PREFIX}GetRegistrySubKeyInView
     !insertmacro ${PREFIX}SetShellContext
@@ -406,12 +701,28 @@ Function ${PREFIX}GetRegistrySubKeyInView
     Exch $0 ; key
     Exch 2
     Exch $1 ; subkey
+    Push $3
 
+    Push "__registry_multisz"
+    Push $1
+    Push $0
+    Push $2
+    Call ${PREFIX}GetRegistrySubKeyMultiStrInView
+    IfErrors legacy
+        nsArray::Join "__registry_multisz" "$\n"
+        Pop $3
+        ClearErrors
+        Goto found
+    legacy:
     !insertmacro _ApplyRegTestId $0 $3
     !insertmacro _ApplyRegView "${PREFIX}" $2
-    ReadRegStr $0 SHCTX "$0" "$1"
+    ClearErrors
+    ReadRegStr $3 SHCTX "$0" "$1"
     !insertmacro ${PREFIX}DefineRegView
+    found:
+    StrCpy $0 $3
 
+    Pop $3
     Pop $1
     Pop $2
     Exch $0

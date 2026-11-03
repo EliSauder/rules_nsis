@@ -194,9 +194,12 @@ allowed, cycles are not.
 
 `persist` is `auto` (default: persisted, except passwords), `yes` or `no`
 (`password` with `yes` is an error). Persisted values are written as
-`REG_SZ` values named `<page>.<key>` under `Software\...\<product>\Options` and
+`REG_MULTI_SZ` values named `<page>.<key>` under `Software\...\<product>\Options`
+(one string per list item, a single string otherwise; multiline text keeps its
+line breaks) and
 are loaded again by the uninstaller and by the next install (as the defaults
-of an upgrade).
+of an upgrade). `REG_SZ` values stored by older versions are still read and are
+rewritten as `REG_MULTI_SZ` on upgrade.
 
 ### Reading values in hooks
 

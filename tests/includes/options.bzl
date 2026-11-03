@@ -47,6 +47,26 @@ def options_cases():
         on_init = _TEST_ID,
     )
     cases += include_api_case(
+        name = "option_persist_kinds",
+        api = "options",
+        include = "Options.nsh",
+        src = "options_adapters.nsh",
+        symbol = "HarnessOptionPersistKinds",
+        parameters = ["in:list", "in:text", "out:list_out", "out:text_out"],
+        contexts = ["installer"],
+        on_init = _TEST_ID,
+    )
+    cases += include_api_case(
+        name = "option_load_stored",
+        api = "options",
+        include = "Options.nsh",
+        src = "options_adapters.nsh",
+        symbol = "HarnessOptionLoad",
+        parameters = ["out:list", "out:text"],
+        contexts = ["installer"],
+        on_init = _TEST_ID,
+    )
+    cases += include_api_case(
         name = "option_load_missing",
         api = "options",
         include = "Options.nsh",

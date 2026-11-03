@@ -1,9 +1,11 @@
 Var __opt_test_a
 Var __opt_test_b
+Var __opt_test_c
 
 !macro __Options_ForEachPersisted CALLBACK
-    !insertmacro ${CALLBACK} test a
-    !insertmacro ${CALLBACK} test b
+    !insertmacro ${CALLBACK} test a single
+    !insertmacro ${CALLBACK} test b list
+    !insertmacro ${CALLBACK} test c multiline
 !macroend
 
 !include "Options.nsh"
@@ -65,4 +67,25 @@ Var __opt_test_b
     ${Option_Set} test a `${DEFAULT}`
     ${un.Option_LoadPersisted}
     ${Option_Get} test a ${OUT}
+!macroend
+
+; Persists a list and multiline text, clobbers them and loads them back. The
+; stored values are left for the test to inspect and delete.
+!macro HarnessOptionPersistKinds LIST TEXT LIST_OUT TEXT_OUT
+    !insertmacro _HarnessOptionClear ""
+    ${Option_Set} test b `${LIST}`
+    ${Option_Set} test c `${TEXT}`
+    ${Option_Persist}
+    ${Option_Set} test b "clobbered"
+    ${Option_Set} test c "clobbered"
+    ${Option_LoadPersisted}
+    ${Option_Get} test b ${LIST_OUT}
+    ${Option_Get} test c ${TEXT_OUT}
+!macroend
+
+; Loads the values the test stored, without clearing them.
+!macro HarnessOptionLoad LIST TEXT
+    ${Option_LoadPersisted}
+    ${Option_Get} test b ${LIST}
+    ${Option_Get} test c ${TEXT}
 !macroend

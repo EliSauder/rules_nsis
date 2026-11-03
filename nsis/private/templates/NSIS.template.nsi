@@ -116,7 +116,7 @@ Var __instdir_default
 !macro __Options_ForEachPersisted CALLBACK
 {{- range (ds "in").Options }}
 {{- if .Persist }}
-    !insertmacro ${CALLBACK} {{.Page}} {{.Key}}
+    !insertmacro ${CALLBACK} {{.Page}} {{.Key}} {{.Type}}
 {{- end }}
 {{- end }}
 !macroend
@@ -2220,10 +2220,10 @@ Function __Shortcuts_CreateAll
     ${EndIf}
     {{- end }}
 
-    !insertmacro _Option_PersistOne shortcuts enabled
-    !insertmacro _Option_PersistOne shortcuts start_menu
-    !insertmacro _Option_PersistOne shortcuts start_menu_folder
-    !insertmacro _Option_PersistOne shortcuts desktop
+    !insertmacro _Option_PersistOne shortcuts enabled single
+    !insertmacro _Option_PersistOne shortcuts start_menu single
+    !insertmacro _Option_PersistOne shortcuts start_menu_folder single
+    !insertmacro _Option_PersistOne shortcuts desktop single
     Pop $0
 FunctionEnd
 
