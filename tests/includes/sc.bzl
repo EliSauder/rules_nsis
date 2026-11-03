@@ -6,11 +6,14 @@ load(":defs.bzl", "include_api_case")
 
 _OPERATIONS = [
     ("create", "Service_Create", ["in:name", "in:binary", "in:display_name", "in:start_type", "in:dependencies", "out:result"]),
-    ("query", "Service_Query", ["in:name", "out:result"]),
+    ("query", "Service_Query", ["in:name", "out:result", "out:state"]),
     ("update", "Service_Update", ["in:name", "in:binary", "in:display_name", "in:start_type", "in:dependencies", "out:result"]),
     ("start", "Service_Start", ["in:name", "out:result"]),
     ("stop", "Service_Stop", ["in:name", "out:result"]),
+    ("start_and_wait", "Service_StartAndWait", ["in:name", "in:timeout", "out:result"]),
+    ("stop_and_wait", "Service_StopAndWait", ["in:name", "in:timeout", "out:result"]),
     ("delete", "Service_Delete", ["in:name", "out:result"]),
+    ("delete_and_wait", "Service_DeleteAndWait", ["in:name", "in:timeout", "out:result"]),
     ("set_description", "Service_SetDescription", ["in:name", "in:description", "out:result"]),
 ]
 

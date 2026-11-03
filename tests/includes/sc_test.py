@@ -14,10 +14,10 @@ from tests.includes import common
 
 # Cases that are given an invalid service name rather than a missing one.
 _INVALID_NAME = ("service_create", "service_update", "service_delete", "service_set_description")
-_CASES = _INVALID_NAME + ("service_query", "service_start", "service_stop")
+_CASES = _INVALID_NAME + ("service_query", "service_start", "service_stop", "service_start_and_wait", "service_stop_and_wait", "service_delete_and_wait")
 
 # Lifecycle harness arguments, in the order sc.bzl passes them.
-_OPERATIONS = ("create", "query", "update", "start", "stop", "delete", "set_description")
+_OPERATIONS = ("create", "query", "update", "start", "stop", "start_and_wait", "stop_and_wait", "delete", "delete_and_wait", "set_description")
 
 _ERROR_SERVICE_DOES_NOT_EXIST = "1060"
 
@@ -33,7 +33,14 @@ def run_case(case, harness, args):
         params.update(binary=r"C:\Windows\System32\cmd.exe", display_name="Missing", start_type="demand", dependencies="")
     elif base == "service_set_description":
         params["description"] = "Missing service"
-    assert harness.run(**params).outputs["result"] not in ("", "0")
+    elif base in ("service_start_and_wait", "service_stop_and_wait", "service_delete_and_wait"):
+        params["timeout"] = "1000"
+    result = harness.run(**params)
+    if base in ("service_stop_and_wait", "service_delete_and_wait"):
+        # A service that does not exist is already stopped and deleted.
+        result.assert_outputs(result="0")
+    else:
+        assert result.outputs["result"] not in ("", "0")
 
 
 def _sc(*args):
@@ -66,12 +73,12 @@ def lifecycle(stub, harnesses, directory):
     shutil.copyfile(stub, binary)
     run = {operation: harnesses[operation].run for operation in _OPERATIONS}
     try:
-        run["query"](name=name).assert_outputs(result=_ERROR_SERVICE_DOES_NOT_EXIST)
+        run["query"](name=name).assert_outputs(result=_ERROR_SERVICE_DOES_NOT_EXIST, state="")
         run["create"](
             name=name, binary=str(binary), display_name="Rules NSIS stub",
             start_type="demand", dependencies="",
         ).assert_outputs(result="0")
-        run["query"](name=name).assert_outputs(result="0")
+        run["query"](name=name).assert_outputs(result="0", state="1")
         config = _sc("qc", name).stdout
         assert "DEMAND_START" in _field(config, "START_TYPE"), config
         assert _field(config, "DISPLAY_NAME") == "Rules NSIS stub", config
@@ -86,6 +93,15 @@ def lifecycle(stub, harnesses, directory):
         run["stop"](name=name).assert_outputs(result="0")
         _wait_for_state(name, "STOPPED")
 
+        # The wait variants only return once the service reached the state.
+        run["start_and_wait"](name=name, timeout="30000").assert_outputs(result="0")
+        assert "RUNNING" in _field(_sc("query", name).stdout, "STATE")
+        run["query"](name=name).assert_outputs(result="0", state="4")
+        run["start_and_wait"](name=name, timeout="30000").assert_outputs(result="0")
+        run["stop_and_wait"](name=name, timeout="30000").assert_outputs(result="0")
+        assert "STOPPED" in _field(_sc("query", name).stdout, "STATE")
+        run["stop_and_wait"](name=name, timeout="30000").assert_outputs(result="0")
+
         run["update"](
             name=name, binary=str(binary), display_name="Rules NSIS stub updated",
             start_type="auto", dependencies="",
@@ -95,7 +111,20 @@ def lifecycle(stub, harnesses, directory):
         assert _field(config, "DISPLAY_NAME") == "Rules NSIS stub updated", config
 
         run["delete"](name=name).assert_outputs(result="0")
-        run["query"](name=name).assert_outputs(result=_ERROR_SERVICE_DOES_NOT_EXIST)
+        run["query"](name=name).assert_outputs(result=_ERROR_SERVICE_DOES_NOT_EXIST, state="")
+
+        # A running service is only marked for deletion, so the wait times out
+        # until the service is stopped.
+        run["create"](
+            name=name, binary=str(binary), display_name="Rules NSIS stub",
+            start_type="demand", dependencies="",
+        ).assert_outputs(result="0")
+        run["start_and_wait"](name=name, timeout="30000").assert_outputs(result="0")
+        run["delete_and_wait"](name=name, timeout="1000").assert_outputs(result="1")
+        run["stop_and_wait"](name=name, timeout="30000").assert_outputs(result="0")
+        run["delete_and_wait"](name=name, timeout="30000").assert_outputs(result="0")
+        assert str(_sc("query", name).returncode) == _ERROR_SERVICE_DOES_NOT_EXIST
+        run["delete_and_wait"](name=name, timeout="30000").assert_outputs(result="0")
     finally:
         _sc("stop", name)
         _sc("delete", name)
