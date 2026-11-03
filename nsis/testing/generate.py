@@ -379,10 +379,8 @@ def generate(spec, source, include_dirs=(), defines=None, on_init=(), plugin_lin
     ]
     if inputs(spec):
         body += [
+            'StrCpy $_harness_input "$_harness_output.inputs"',
             "ClearErrors",
-            '${GetOptions} $_harness_args "/input=" $_harness_input',
-            "IfErrors harness_bad_arguments",
-            'StrCmp $_harness_input "" harness_bad_arguments',
             'FileOpen $_harness_in "$_harness_input" r',
             "IfErrors harness_bad_arguments",
         ]

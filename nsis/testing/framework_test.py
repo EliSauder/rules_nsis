@@ -134,7 +134,7 @@ class RunnerTest(unittest.TestCase):
             for number, enabled in [(-2147483648, False), (2147483647, True)]:
                 def execute(command):
                     self.assertEqual(
-                        (harness.directory / "inputs.dat").read_text(),
+                        (harness.directory / "outputs.dat.inputs").read_text(),
                         f"number={number}\nenabled={int(enabled)}\n",
                     )
                     (harness.directory / "outputs.dat").write_bytes(
@@ -246,8 +246,8 @@ class RunnerTest(unittest.TestCase):
 
             def execute(command):
                 self.assertFalse(output.exists())
-                self.assertTrue(any(str(c).startswith("/input=") for c in command))
-                self.assertEqual((harness.directory / "inputs.dat").read_text(), "text=hello world\n")
+                self.assertIn("/text=hello world", command)
+                self.assertEqual((harness.directory / "outputs.dat.inputs").read_text(), "text=hello world\n")
                 output.write_bytes(outputs(result="hello world"))
                 return subprocess.CompletedProcess(command, 0, "stdout", "stderr")
 

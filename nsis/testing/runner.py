@@ -231,7 +231,7 @@ class Harness:
         for p in input_parameters(self.spec):
             line = serialize_input(p, inputs[p["name"]])
             input_lines += line if isinstance(line, list) else [line]
-        input_file = self.directory / "inputs.dat"
+        input_file = self.directory / "outputs.dat.inputs"
         input_file.write_bytes("".join(f"{line}\n" for line in input_lines).encode("ascii"))
         output = self.directory / "outputs.dat"
         output.unlink(missing_ok=True)
@@ -253,8 +253,11 @@ class Harness:
         command = [
             str(executable), "/S", f"/output={output}",
         ]
-        if input_parameters(self.spec):
-            command.append(f"/input={input_file}")
+        # The harness reads its inputs from the file next to the output. The
+        # scalars are also passed as options, for APIs that read the command line.
+        for p in input_parameters(self.spec):
+            if p.get("type") != "list":
+                command.append("/" + serialize_input(p, inputs[p["name"]]))
         if self.spec.get("context", "installer") == "uninstaller":
             command.append(f"_?={self.directory}")
         command = [command[0], *map(Raw, command_args), *command[1:], *map(Raw, command_tail)]

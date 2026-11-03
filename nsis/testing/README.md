@@ -204,7 +204,7 @@ missing include of either is not detected.
 `run()` requires exactly the declared input/inout parameters, with their declared
 Python types. String outputs preserve whitespace, quotes, newlines and Unicode.
 String inputs may hold any text except NUL, which NSIS strings cannot contain.
-The runner writes the inputs to a file passed as `/input=` (one `name=value`
+The runner writes the inputs to a file next to the output file, `<output>.inputs` (one `name=value`
 line per scalar, and one per list item). Values are percent-escaped (`%XX`, or
 `%uXXXX` per UTF-16 code unit for non-ASCII) so a line is plain ASCII, and the
 generated harness decodes them before the call, so quotes, CR/LF and characters
@@ -212,6 +212,9 @@ such as the soft hyphen U+00AD arrive unchanged. The harness does not otherwise
 alter them, so an API still sees the decoded value only. Because NSIS strings
 are limited, an escaped scalar or list item line can have at most 1000
 characters; longer values raise `ValueError` before the harness runs.
+Scalar inputs are also passed on the command line as escaped `/name=value`
+options, so APIs that read the command line (`GetOptions`, `TestIdInit`) see them;
+the harness itself reads the file. List items are only in the file.
 `expected_exitcode=N` supports failure tests. A zero exit without an output
 record is an error, including an API that silently calls `Abort` or `Quit`.
 
