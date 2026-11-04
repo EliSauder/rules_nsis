@@ -759,6 +759,7 @@ nsis_installer(
 nsis_installer_test(
     name = "add_to_path_installer_test",
     installer = ":add_to_path_installer",
+    timeout = "moderate",
 )
 
 nsis_eventlog_source(
@@ -956,6 +957,16 @@ nsis_installer_test(
     name = "installer_with_options_test",
     installer = ":installer_with_options",
     must_have_files = ["README.md"],
+    expected_options = {
+        "install_settings.enable_extras": ["1"],
+        "install_settings.extras_name": ["extra"],
+        "install_settings.port": ["8080"],
+        "install_settings.mode": ["fast"],
+        "advanced_settings.level": ["b"],
+        "component_settings.feature": ["0"],
+        "component_settings.tag": ["comp"],
+    },
+    absent_options = ["advanced_settings.token"],
     expected_file_contents = {
         "options_install.txt": "enable_extras=1\nextras_name=extra\nport=8080\nmode=fast\nlevel=b\ntoken=secret\nfeature=0\ntag=comp\n",
     },
@@ -968,6 +979,16 @@ nsis_installer_test(
     name = "installer_with_options_cli_test",
     installer = ":installer_with_options",
     must_have_files = ["README.md"],
+    expected_options = {
+        "install_settings.enable_extras": ["0"],
+        "install_settings.extras_name": ["extra"],
+        "install_settings.port": ["9090"],
+        "install_settings.mode": ["slow"],
+        "advanced_settings.level": ["b"],
+        "component_settings.feature": ["0"],
+        "component_settings.tag": ["zz"],
+    },
+    absent_options = ["advanced_settings.token"],
     installer_args = [
         "/O:install_settings.enable_extras=0",
         "/O:install_settings.port=9090",
@@ -1060,6 +1081,19 @@ nsis_installer_test(
     name = "installer_with_controls_test",
     installer = ":installer_with_controls",
     must_have_files = ["README.md"],
+    expected_options = {
+        "text_controls.note": ["first\r\nsecond"],
+        "text_controls.config_file": [],
+        "text_controls.data_dir": [],
+        "text_controls.host_name": ["alpha"],
+        "list_controls.flavor": ["choc"],
+        "list_controls.toppings": ["sprinkles", "nuts"],
+        "list_controls.extras": [],
+        "value_controls.release_date": ["2024-02-29"],
+        "value_controls.server_ip": ["10.0.0.1"],
+        "value_controls.gateway": ["10.0.0.2:8080"],
+        "value_controls.peer": ["::1"],
+    },
     expected_file_contents = {
         "controls_install.txt": _CONTROLS_DEFAULTS,
     },
@@ -1072,6 +1106,19 @@ nsis_installer_test(
     name = "installer_with_controls_cli_test",
     installer = ":installer_with_controls",
     must_have_files = ["README.md"],
+    expected_options = {
+        "text_controls.note": ["x\\y\r\nz"],
+        "text_controls.config_file": ["C:\\Windows\\notepad.exe"],
+        "text_controls.data_dir": ["C:\\Windows"],
+        "text_controls.host_name": ["gamma"],
+        "list_controls.flavor": ["mint"],
+        "list_controls.toppings": ["sprinkles", "fudge"],
+        "list_controls.extras": ["a", "c"],
+        "value_controls.release_date": ["2030-12-31"],
+        "value_controls.server_ip": ["192.168.1.10"],
+        "value_controls.gateway": ["10.1.2.3:99"],
+        "value_controls.peer": ["2001:db8::1"],
+    },
     installer_args = [
         "/O:value_controls.release_date=2030-12-31",
         "/O:value_controls.server_ip=192.168.001.010",
@@ -1126,6 +1173,9 @@ nsis_component(
 
 nsis_component(
     name = "cli_tools",
+    srcs = [":nsis_files"],
+    directory = "tools",
+    add_to_path = True,
     selection_mode = "default",
     dependencies = [":cli_core"],
     install_categories = ["Full", "Typical"],
@@ -1133,6 +1183,9 @@ nsis_component(
 
 nsis_component(
     name = "cli_docs",
+    srcs = [":nsis_files"],
+    directory = "docs",
+    add_to_path = True,
     selection_mode = "optional",
     dependencies = [":cli_tools"],
     install_categories = ["Full"],
@@ -1140,6 +1193,8 @@ nsis_component(
 
 nsis_component(
     name = "cli_samples",
+    srcs = [":nsis_files"],
+    directory = "samples",
     selection_mode = "optional",
     install_categories = ["Full"],
 )
@@ -1162,6 +1217,8 @@ nsis_installer(
 nsis_installer_test(
     name = "installer_with_cli_defaults_test",
     installer = ":installer_with_cli",
+    unselected_components = ["cli_docs", "cli_samples"],
+    timeout = "moderate",
     expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=0\nsamples=0\n"},
 )
 
@@ -1169,6 +1226,8 @@ nsis_installer_test(
     name = "installer_with_cli_absolute_test",
     installer = ":installer_with_cli",
     installer_args = ["/COMPONENTS=cli_docs"],
+    unselected_components = ["cli_samples"],
+    timeout = "moderate",
     expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=1\nsamples=0\n"},
 )
 
@@ -1176,6 +1235,8 @@ nsis_installer_test(
     name = "installer_with_cli_relative_test",
     installer = ":installer_with_cli",
     installer_args = ["/COMPONENTS=+cli_samples,-cli_tools"],
+    unselected_components = ["cli_tools", "cli_docs"],
+    timeout = "moderate",
     expected_file_contents = {"components.txt": "core=1\ntools=0\ndocs=0\nsamples=1\n"},
 )
 
@@ -1183,6 +1244,7 @@ nsis_installer_test(
     name = "installer_with_cli_group_test",
     installer = ":installer_with_cli",
     installer_args = ["/COMPONENTS=cli_extras"],
+    timeout = "moderate",
     expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=1\nsamples=1\n"},
 )
 
@@ -1190,6 +1252,8 @@ nsis_installer_test(
     name = "installer_with_cli_insttype_test",
     installer = ":installer_with_cli",
     installer_args = ["/INSTTYPE=Full", "/COMPONENTS=-cli_samples"],
+    unselected_components = ["cli_samples"],
+    timeout = "moderate",
     expected_file_contents = {"components.txt": "core=1\ntools=1\ndocs=1\nsamples=0\n"},
 )
 
@@ -1197,6 +1261,8 @@ nsis_installer_test(
     name = "installer_with_cli_minimal_insttype_test",
     installer = ":installer_with_cli",
     installer_args = ["/INSTTYPE=Minimal"],
+    unselected_components = ["cli_tools", "cli_docs", "cli_samples"],
+    timeout = "moderate",
     expected_file_contents = {"components.txt": "core=1\ntools=0\ndocs=0\nsamples=0\n"},
 )
 
@@ -1206,6 +1272,7 @@ nsis_installer_test(
         installer = ":installer_with_cli",
         installer_args = args,
         expected_installer_exitcode = 2,
+        timeout = "moderate",
     )
     for name, args in {
         "unknown_component": ["/COMPONENTS=cli_nope"],
@@ -1313,8 +1380,14 @@ nsis_installer_test(
     name = "installer_with_shortcuts_test",
     installer = ":installer_with_shortcuts",
     must_have_files = ["README.md", "tree/README.md", "tree/test_icon.ico"],
-    # The test framework expects the files of every component.
-    installer_args = ["/COMPONENTS=+shortcut_optional_component"],
+    unselected_components = ["shortcut_optional_component"],
+    shortcut_options = {
+        "enabled": "1",
+        "start_menu": "1",
+        "desktop": "1",
+        "start_menu_folder": "Rules NSIS\\Installer With Shortcuts",
+    },
+    timeout = "moderate",
 )
 
 nsis_installer_test(
@@ -1326,6 +1399,51 @@ nsis_installer_test(
         "/O:shortcuts.desktop=0",
         "/O:shortcuts.start_menu_folder=Custom\\Folder",
     ],
+    shortcut_options = {
+        "enabled": "1",
+        "start_menu": "1",
+        "desktop": "0",
+        "start_menu_folder": "Custom\\Folder",
+    },
+    timeout = "moderate",
+)
+
+[
+    nsis_installer_test(
+        name = "installer_with_shortcuts_{}_test".format(case),
+        installer = ":installer_with_shortcuts",
+        installer_args = [
+            "/COMPONENTS=+shortcut_optional_component",
+            "/O:shortcuts.enabled=" + enabled,
+            "/O:shortcuts.start_menu=0",
+            "/O:shortcuts.desktop=1",
+        ],
+        shortcut_options = {
+            "enabled": enabled,
+            "start_menu": "0",
+            "desktop": "1",
+            "start_menu_folder": "Rules NSIS\\Installer With Shortcuts",
+        },
+        timeout = "moderate",
+    )
+    for case, enabled in [("desktop_only", "1"), ("disabled", "0")]
+]
+
+nsis_installer_test(
+    name = "installer_with_shortcuts_no_locations_test",
+    installer = ":installer_with_shortcuts",
+    installer_args = [
+        "/COMPONENTS=+shortcut_optional_component",
+        "/O:shortcuts.start_menu=0",
+        "/O:shortcuts.desktop=0",
+    ],
+    shortcut_options = {
+        "enabled": "1",
+        "start_menu": "0",
+        "desktop": "0",
+        "start_menu_folder": "Rules NSIS\\Installer With Shortcuts",
+    },
+    timeout = "moderate",
 )
 
 plugin_tests(name = "plugins")

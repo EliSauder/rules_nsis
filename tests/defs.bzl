@@ -49,7 +49,7 @@ signing_env_test = analysistest.make(
     },
 )
 
-def _get_installer_test_details(ctx, inst, target):
+def _get_installer_test_details(ctx, inst, target, unselected_components = []):
     if not inst.testable:
         fail("installer {} must set testable = True to be used by nsis_installer_test".format(inst.name))
 
@@ -66,72 +66,69 @@ def _get_installer_test_details(ctx, inst, target):
     services = dict()
     elsrcs =dict()
     path_dirs = []
-
-    numcomp = 0
+    absent_files = set()
+    absent_path_dirs = []
+    shortcuts = []
+    components = {}
 
     for dep in inst.components:
         if NsisComponentInfo in dep:
-            numcomp = numcomp + 1
-            cmp = dep[NsisComponentInfo]
-            for f in cmp.srcs.to_list():
-                if f.is_directory:
-                    # Directory artifacts (e.g. a signed component's output)
-                    # can't be enumerated at analysis time - Bazel doesn't
-                    # know their contents until the action that produces them
-                    # runs. Callers that need to assert specific files exist
-                    # inside such a directory should list them explicitly via
-                    # `must_have_files` instead.
-                    continue
-                if cmp.directory:
-                    files.add("{}\\{}".format(cmp.directory, f.basename))
-                else:
-                    files.add("{}".format(f.basename))
-            for d in cmp.dirs:
-                ds[d.path] = d
-            if cmp.eventlog != None and NsisEventLogSourceInfo in cmp.eventlog:
-                elg = cmp.eventlog[NsisEventLogSourceInfo]
-                elsrcs["{}/{}".format(elg.key, elg.source)] = elg
-            if cmp.add_to_path:
-                path_dirs.append(cmp.directory)
-            if cmp.service:
-                services[cmp.name] = {
-                    "start_type": cmp.service_start_type,
-                    "display_name": "{}{}{}".format(
-                        inst.vendor + " " if inst.vendor else "",
-                        inst.product + " ",
-                        cmp.display_name,
-                    ),
-                    "description": cmp.description if cmp.description else "",
-                    "executable": "{}{}".format(
-                        (cmp.directory + "\\" if cmp.directory else ""),
-                        cmp.service_executable[DefaultInfo].files.to_list()[0].basename,
-                    ),
-                    "args": cmp.service_args,
-                }
-
+            components[dep[NsisComponentInfo].name] = dep[NsisComponentInfo]
         elif NsisComponentGroupInfo in dep:
-            grp = dep[NsisComponentGroupInfo]
-            for edge in grp.components:
-                chld = edge["child"]
-
-                if NsisComponentInfo not in chld:
-                    continue
-
-                cmp = chld[NsisComponentInfo]
-                numcomp = numcomp + 1
-
-                for f in cmp.srcs.to_list():
-                    if f.is_directory:
-                        continue
-                    if cmp.directory:
-                        files.add("{}\\{}".format(cmp.directory, f.basename))
-                    else:
-                        files.add("{}".format(f.basename))
+            for edge in dep[NsisComponentGroupInfo].components:
+                for node in [edge["parent"], edge["child"]]:
+                    if node != None and NsisComponentInfo in node:
+                        components[node[NsisComponentInfo].name] = node[NsisComponentInfo]
         else:
             fail("not component or group", dep)
 
-    if numcomp == 0:
+    if not components:
         fail("no components defined")
+    for name in unselected_components:
+        if name not in components:
+            fail("unknown unselected component: " + name)
+
+    for cmp in components.values():
+        selected = cmp.name not in unselected_components
+        component_files = files if selected else absent_files
+        for f in cmp.srcs.to_list():
+            # Tree artifacts cannot be enumerated until execution. Use
+            # must_have_files for their contents.
+            if not f.is_directory:
+                component_files.add("{}\\{}".format(cmp.directory, f.basename) if cmp.directory else f.basename)
+        if cmp.add_to_path:
+            (path_dirs if selected else absent_path_dirs).append(cmp.directory)
+        for shortcut in cmp.shortcuts:
+            shortcuts.append({
+                "component": cmp.name,
+                "selected": selected,
+                "link_name": shortcut.link_name,
+                "start_menu": shortcut.start_menu,
+                "desktop": shortcut.desktop,
+                "start_menu_subfolder": shortcut.start_menu_subfolder,
+            })
+        if not selected:
+            continue
+        for d in cmp.dirs:
+            ds[d.path] = d
+        if cmp.eventlog != None and NsisEventLogSourceInfo in cmp.eventlog:
+            elg = cmp.eventlog[NsisEventLogSourceInfo]
+            elsrcs["{}/{}".format(elg.key, elg.source)] = elg
+        if cmp.service:
+            services[cmp.name] = {
+                "start_type": cmp.service_start_type,
+                "display_name": "{}{}{}".format(
+                    inst.vendor + " " if inst.vendor else "",
+                    inst.product + " ",
+                    cmp.display_name,
+                ),
+                "description": cmp.description if cmp.description else "",
+                "executable": "{}{}".format(
+                    (cmp.directory + "\\" if cmp.directory else ""),
+                    cmp.service_executable[DefaultInfo].files.to_list()[0].basename,
+                ),
+                "args": cmp.service_args,
+            }
 
     bitwidth = "64" if inst.arch in ["x86_64", "arm64"] else "32"
 
@@ -143,6 +140,9 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_file_contents": {},
         "expected_uninstall_file_contents": {},
         "expected_files": files,
+        "absent_files": [f for f in absent_files if f not in files],
+        "component_names": list(components),
+        "expected_shortcuts": shortcuts,
         "expected_dirs": ds,
         "expected_installer_name": outfile,
         "expected_uninstaller_name": inst.uninstaller_name,
@@ -159,6 +159,7 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_services": services,
         "expected_eventlog": elsrcs,
         "expected_path_dirs": path_dirs,
+        "absent_path_dirs": [d for d in absent_path_dirs if d not in path_dirs],
         "expected_installer_exitcode": 0,
     }
 
@@ -168,7 +169,7 @@ def _nsis_test_config_impl(ctx):
     must_have_dirs = ctx.attr.must_have_dirs
     install_first_and_remove = ctx.attr.install_first_and_remove
 
-    det = _get_installer_test_details(ctx, inst, ctx.attr.installer)
+    det = _get_installer_test_details(ctx, inst, ctx.attr.installer, ctx.attr.unselected_components)
 
     files = set()
     for p in must_have_files:
@@ -197,6 +198,9 @@ def _nsis_test_config_impl(ctx):
     det["default_install_dir"] = ctx.attr.default_install_dir
     det["expected_file_contents"] = ctx.attr.expected_file_contents
     det["expected_uninstall_file_contents"] = ctx.attr.expected_uninstall_file_contents
+    det["expected_options"] = ctx.attr.expected_options
+    det["absent_options"] = ctx.attr.absent_options
+    det["shortcut_options"] = ctx.attr.shortcut_options
 
     outf = ctx.actions.declare_file(ctx.attr.name + ".json")
 
@@ -240,13 +244,17 @@ _nsis_test_config = rule(
         "default_install_dir": attr.bool(default = False),
         "expected_file_contents": attr.string_dict(default = {}),
         "expected_uninstall_file_contents": attr.string_dict(default = {}),
+        "unselected_components": attr.string_list(default = []),
+        "expected_options": attr.string_list_dict(default = {}),
+        "absent_options": attr.string_list(default = []),
+        "shortcut_options": attr.string_dict(default = {}),
     },
     outputs = {
         "out": "%{name}.json"
     },
 )
 
-def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must_have_dirs, install_first_and_remove, expected_installer_exitcode, installer_args, reinstall_without_dir, default_install_dir, expected_file_contents, expected_uninstall_file_contents, target_compatible_with, **kwargs):
+def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must_have_dirs, install_first_and_remove, expected_installer_exitcode, installer_args, reinstall_without_dir, default_install_dir, expected_file_contents, expected_uninstall_file_contents, unselected_components, expected_options, absent_options, shortcut_options, timeout, target_compatible_with, **kwargs):
     v = []
     if install_first_and_remove != None:
         v.append(install_first_and_remove)
@@ -264,6 +272,10 @@ def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must
         default_install_dir = default_install_dir,
         expected_file_contents = expected_file_contents,
         expected_uninstall_file_contents = expected_uninstall_file_contents,
+        unselected_components = unselected_components,
+        expected_options = expected_options,
+        absent_options = absent_options,
+        shortcut_options = shortcut_options,
     )
 
     f = ":{}_config".format(name)
@@ -283,7 +295,7 @@ def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must
             "$(rlocationpath {})".format(f),
         ],
         target_compatible_with = ["@platforms//os:windows"] + target_compatible_with,
-        timeout = "short",
+        timeout = timeout,
         visibility = visibility,
         tags = tags,
         deps = [
@@ -357,5 +369,22 @@ nsis_installer_test = macro(
             mandatory = False,
             default = [],
         ),
+        "unselected_components": attr.string_list(
+            default = [],
+            doc = "Components expected to be unselected; their unique files and PATH entries must be absent.",
+        ),
+        "expected_options": attr.string_list_dict(
+            default = {},
+            doc = "Persisted <page>.<key> values, each stored as REG_MULTI_SZ.",
+        ),
+        "absent_options": attr.string_list(
+            default = [],
+            doc = "Option values that must not be persisted, such as passwords.",
+        ),
+        "shortcut_options": attr.string_dict(
+            default = {},
+            doc = "Expected enabled, start_menu, desktop and start_menu_folder shortcut options.",
+        ),
+        "timeout": attr.string(default = "short", configurable = False),
     },
 )
