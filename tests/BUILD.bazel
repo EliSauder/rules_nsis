@@ -415,6 +415,59 @@ nsis_installer_test(
     reinstall_without_dir = True,
 )
 
+# Installs without /D= to check the default InstallDir for each execution level.
+nsis_installer(
+    name = "default_dir_user_installer",
+    testable = True,
+    id = "5b0c6f1e-6a43-4d0e-9a51-0d6f2f7c1a01",
+    components = [":minimal_component"],
+    product = "rules_nsis Default Dir User",
+    product_path = "rules_nsis Default Dir User",
+    execution_level = "user",
+)
+
+nsis_installer_test(
+    name = "default_dir_user_installer_test",
+    installer = ":default_dir_user_installer",
+    must_have_files = ["README.md"],
+    default_install_dir = True,
+)
+
+nsis_installer(
+    name = "default_dir_user_install_root_installer",
+    testable = True,
+    id = "5b0c6f1e-6a43-4d0e-9a51-0d6f2f7c1a02",
+    components = [":minimal_component"],
+    product = "rules_nsis Default Dir User Root",
+    product_path = "rules_nsis Default Dir User Root",
+    execution_level = "user",
+    install_root = "$LOCALAPPDATA\\rules_nsis_tests",
+)
+
+nsis_installer_test(
+    name = "default_dir_user_install_root_installer_test",
+    installer = ":default_dir_user_install_root_installer",
+    must_have_files = ["README.md"],
+    default_install_dir = True,
+)
+
+nsis_installer(
+    name = "default_dir_admin_installer",
+    testable = True,
+    id = "5b0c6f1e-6a43-4d0e-9a51-0d6f2f7c1a03",
+    components = [":minimal_component"],
+    product = "rules_nsis Default Dir Admin",
+    product_path = "rules_nsis Default Dir Admin",
+    execution_level = "admin",
+)
+
+nsis_installer_test(
+    name = "default_dir_admin_installer_test",
+    installer = ":default_dir_admin_installer",
+    must_have_files = ["README.md"],
+    default_install_dir = True,
+)
+
 nsis_component(
     name = "ssc_with_group_and_dir_component",
     directory = "Component",
