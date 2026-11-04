@@ -140,7 +140,9 @@ def write_records(path, records):
                 "Pop $_harness_item",
                 "Pop $_harness_item",
                 "StrLen $_harness_length $_harness_item",
-                'FileWriteUTF16LE $_harness_file "$_harness_length:$_harness_item"',
+                'FileWriteUTF16LE $_harness_file "$_harness_length:"',
+                "IfErrors harness_output_error",
+                'FileWriteUTF16LE $_harness_file "$_harness_item"',
                 "IfErrors harness_output_error",
                 "IntOp $_harness_index $_harness_index + 1",
                 f"Goto list_item_{label}",
@@ -150,7 +152,9 @@ def write_records(path, records):
         name, variable = record
         lines += [
             f"StrLen $_harness_length {variable}",
-            f'FileWriteUTF16LE $_harness_file "{name}:$_harness_length:{variable}"',
+            f'FileWriteUTF16LE $_harness_file "{name}:$_harness_length:"',
+            "IfErrors harness_output_error",
+            f'FileWriteUTF16LE $_harness_file "{variable}"',
             "IfErrors harness_output_error",
         ]
     return lines + ["FileClose $_harness_file"]
