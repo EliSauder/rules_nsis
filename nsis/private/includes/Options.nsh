@@ -11,18 +11,18 @@
 ;   ${If} install_page ${Option_IsSet} desktop_icon
 ;
 ; The generated code also defines `__Options_ForEachPersisted CALLBACK`, which
-; invokes `!insertmacro ${CALLBACK} "<page>" "<key>"` for every persisted
+; invokes `!insertmacro ${CALLBACK} "<page>" "<key>" "<kind>"` for every persisted
 ; option, where KIND is the option type (`list`, `multiline` or any other).
 ; It is what Option_Persist and Option_LoadPersisted iterate. It defaults to
 ; nothing so this file compiles on its own.
 ;
-; Persisted values are stored as REG_MULTI_SZ values named `<page>.<key>` under
-; `<product key>\Options`, in the view and shell context the installer uses.
-; A `list` option has one string per item and any other option a single
-; string; a `multiline` option's string keeps its line breaks. The strings are
-; exchanged with Registry.nsh through nsArray arrays. Values written as REG_SZ
-; by older versions are still read (a list was its items joined with `|`) and
-; are rewritten as REG_MULTI_SZ when loaded by the installer.
+; Values named `<page>.<key>` live under `<product key>\Options`, in the
+; installer's view and shell context. bool uses a one-byte REG_BINARY, int
+; (or int32) uses REG_DWORD, int64 uses REG_QWORD, list uses REG_MULTI_SZ,
+; and other kinds use REG_SZ. Resolved file/dir paths are not expanded.
+; Multiline REG_SZ keeps the legacy escaped form so old values are unambiguous.
+; Legacy REG_MULTI_SZ scalars and REG_SZ lists/numbers are read without
+; rewriting. Option_Persist writes the new types after the old uninstall.
 ;
 ; The variable of a `list` option (multi_select) holds the name of an nsArray
 ; array with its items instead of a value; see Option_ListContains.
@@ -312,26 +312,21 @@ Function ${PREFIX}Option_ReadReg
         Pop $1
         Goto done
     legacy:
-    ; Not a REG_MULTI_SZ value: missing, or a REG_SZ one stored by an older
-    ; version in the single-line form the options used. That form is only read
-    ; here: a list was its items joined with `|`.
     ClearErrors
+    StrCmp $4 "list" legacylist
+        Push $4
+        Push $0
+        Call ${PREFIX}Option_ReadScalar
+        Pop $3
+        IfErrors done
+        StrCpy $1 $3
+        Goto done
+    legacylist:
     !insertmacro ${PREFIX}GetRegistrySubKey "$2" "$0" $3
     IfErrors done
-        StrCmp $4 "list" 0 legacysingle
-            ${Array_Reset} $1
-            StrCmp $3 "" promote
-                ${Array_Split} $1 "$3" "|"
-                Goto promote
-        legacysingle:
-        StrCpy $1 $3
-        promote:
-!if "${PREFIX}" == ""
-        Push $4
-        Push $1
-        Push $0
-        Call Option_WriteReg
-!endif
+        ${Array_Reset} $1
+        StrCmp $3 "" done
+            ${Array_Split} $1 "$3" "|"
     done:
     ClearErrors
 
@@ -340,6 +335,120 @@ Function ${PREFIX}Option_ReadReg
     Pop $4
     Pop $0
     Exch $1
+FunctionEnd
+
+; Stack: kind, name (top). Returns a scalar as its NSIS string value.
+; Missing values set errors; malformed or unexpected types are also logged.
+Function ${PREFIX}Option_ReadScalar
+    Exch $0 ; name
+    Exch
+    Exch $1 ; kind
+    Push $2
+    Push $3
+    Push $4
+    Push $5
+    Push $6
+    Push $7
+    Push $8
+    Push $9
+    Push $R0
+    Push $R1
+
+    StrCpy $R1 ""
+    !insertmacro ${PREFIX}SetShellContext
+    !insertmacro ${PREFIX}GetProductKey $2
+    StrCpy $2 "$2\Options"
+    !insertmacro _ApplyRegTestId $2 $3
+    !insertmacro ${PREFIX}GetRegView $3
+    !insertmacro _RegMultiSzAccess "${PREFIX}" $3 1 $4 $5
+    System::Call 'advapi32::RegOpenKeyExW(i r4, w r2, i 0, i r5, *p .r6) i .r7'
+    StrCmp $7 2 missing
+    StrCmp $7 0 0 failed
+    System::Call 'advapi32::RegQueryValueExW(p r6, w r0, p 0, *i .r7, p 0, *i .r8) i .r5'
+    StrCmp $5 2 closemissing
+    StrCmp $5 0 0 closefailed
+    IntOp $9 $8 + 4
+    System::Alloc $9
+    Pop $9
+    StrCmp $9 0 closefailed
+    System::Call '*(i r8) p .r10'
+    System::Call 'advapi32::RegQueryValueExW(p r6, w r0, p 0, p 0, p r9, p r10) i .r5'
+    System::Free $R0
+    StrCmp $5 0 0 freefailed
+    ; REG_SZ also accepts legacy strings for numeric/boolean options.
+    StrCmp $7 1 string
+    StrCmp $1 "bool" boolean
+    StrCmp $1 "int" integer
+    StrCmp $1 "int8" integer
+    StrCmp $1 "uint8" integer
+    StrCmp $1 "int16" integer
+    StrCmp $1 "uint16" integer
+    StrCmp $1 "int32" integer
+    StrCmp $1 "uint32" integer
+    StrCmp $1 "uint64" integer64
+    StrCmp $1 "int64" integer64 freefailed
+    boolean:
+        StrCmp $7 3 0 freefailed
+        StrCmp $8 1 0 freefailed
+        System::Call '*$9(&i1 .r11)'
+        StrCmp $R1 0 success
+        StrCmp $R1 1 success freefailed
+    integer:
+        StrCmp $7 4 0 freefailed
+        StrCmp $8 4 0 freefailed
+        System::Call '*$9(i .r11)'
+        StrCmp $1 "uint32" 0 success
+        IntFmt $R1 "%u" $R1
+        Goto success
+    integer64:
+        StrCmp $7 11 0 freefailed
+        StrCmp $8 8 0 freefailed
+        ; System's signed formatter negates negatives and overflows at INT64_MIN.
+        System::Call '*$9(i .r5, i .r7)'
+        StrCmp $5 0 0 readinteger64
+        StrCmp $7 -2147483648 0 readinteger64
+        StrCpy $R1 "-9223372036854775808"
+        Goto formatinteger64
+    readinteger64:
+        System::Call '*$9(l .r11)'
+    formatinteger64:
+        StrCmp $1 "uint64" 0 success
+        System::Call 'msvcrt::_ui64tow(l r11, w .r11, i 10) p ?c'
+        Goto success
+    string:
+        IntOp $5 ${NSIS_MAX_STRLEN} * 2
+        IntCmp $8 $5 0 0 freefailed
+        System::Call 'kernel32::lstrcpynW(w .r11, p r9, i ${NSIS_MAX_STRLEN})'
+    success:
+        System::Free $9
+        System::Call 'advapi32::RegCloseKey(p r6)'
+        ClearErrors
+        Goto finish
+    freefailed:
+        System::Free $9
+    closefailed:
+        System::Call 'advapi32::RegCloseKey(p r6)'
+    failed:
+        !insertmacro LogWarn "Unable to read option '$0' as $1 (type $7, size $8)."
+        Goto missing
+    closemissing:
+        System::Call 'advapi32::RegCloseKey(p r6)'
+    missing:
+        SetErrors
+    finish:
+    StrCpy $0 $R1
+    Pop $R1
+    Pop $R0
+    Pop $9
+    Pop $8
+    Pop $7
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $1
+    Exch $0
 FunctionEnd
 
 ; Stack: option kind (top). Pushes the value of a non-list option held by the
@@ -363,28 +472,6 @@ Function ${PREFIX}Option_FromArray
     Pop $2
     Exch $0
     Exch
-    Pop $1
-FunctionEnd
-
-; Stack: option kind (top), option value. Fills the `__options_reg` array with
-; the single string to store for a non-list option (the text of a multiline
-; option with its own line breaks).
-Function ${PREFIX}Option_ToArray
-    Exch $1 ; kind
-    Exch
-    Exch $0 ; value
-
-    ${Array_Clear} __options_reg
-    ClearErrors
-    StrCmp $1 "multiline" 0 set
-        Push $0
-        Call ${PREFIX}Option_Unescape
-        Pop $0
-    set:
-    ${Array_Set} __options_reg 0 "$0"
-    ClearErrors
-
-    Pop $0
     Pop $1
 FunctionEnd
 
@@ -617,8 +704,7 @@ Function Option_UiGetIp
     Exch $0
 FunctionEnd
 
-; Stack: option kind, value, name (top). Stores the value as REG_MULTI_SZ. The
-; value of a `list` option is the name of its array.
+; Stack: option kind, value, name (top). A list's value is its array name.
 Function Option_WriteReg
     Exch $0 ; name
     Exch
@@ -627,18 +713,71 @@ Function Option_WriteReg
     Exch $4 ; kind
     Push $2
     Push $3
+    Push $5
+    Push $6
+    Push $7
+    Push $8
+    Push $9
 
-    StrCpy $3 $1
-    StrCmp $4 "list" write
-        Push $1
-        Push $4
-        Call Option_ToArray
-        StrCpy $3 "__options_reg"
-    write:
     !insertmacro GetProductKey $2
     StrCpy $2 "$2\Options"
-    !insertmacro SetRegistrySubKeyMultiStr "$2" "$0" "$3"
+    StrCmp $4 "list" list
+    StrCmp $4 "bool" boolean
+    StrCmp $4 "int" integer
+    StrCmp $4 "int8" integer
+    StrCmp $4 "uint8" integer
+    StrCmp $4 "int16" integer
+    StrCmp $4 "uint16" integer
+    StrCmp $4 "int32" integer
+    StrCmp $4 "uint32" integer
+    StrCmp $4 "uint64" integer64
+    StrCmp $4 "int64" integer64
+        !insertmacro SetRegistrySubKeyStr "$2" "$0" "$1"
+        IfErrors failed
+        Goto done
+    list:
+        !insertmacro SetRegistrySubKeyMultiStr "$2" "$0" "$1"
+        IfErrors failed
+        Goto done
+    integer:
+        !insertmacro SetRegistrySubKeyDWORD "$2" "$0" "$1"
+        IfErrors failed
+        Goto done
+    boolean:
+        StrCpy $5 3 ; REG_BINARY, one byte, not the ASCII character '0'/'1'.
+        StrCpy $6 1
+        System::Call '*(&i1 r1) p .r3'
+        Goto write
+    integer64:
+        StrCpy $5 11 ; REG_QWORD
+        StrCpy $6 8
+        System::Call '*(l r1) p .r3'
+    write:
+        StrCmp $3 0 failed
+        !insertmacro SetShellContext
+        !insertmacro _ApplyRegTestId $2 $7
+        !insertmacro GetRegView $7
+        !insertmacro _RegMultiSzAccess "" $7 2 $8 $9
+        System::Call 'advapi32::RegCreateKeyExW(i r8, w r2, i 0, p 0, i 0, i r9, p 0, *p .r7, p 0) i .r8'
+        StrCmp $8 0 0 freefailed
+        System::Call 'advapi32::RegSetValueExW(p r7, w r0, i 0, i r5, p r3, i r6) i .r8'
+        System::Call 'advapi32::RegCloseKey(p r7)'
+        StrCmp $8 0 0 freefailed
+        System::Free $3
+        ClearErrors
+        Goto done
+    freefailed:
+        System::Free $3
+    failed:
+        !insertmacro LogError "Unable to persist option '$0' as $4."
+        SetErrors
+    done:
 
+    Pop $9
+    Pop $8
+    Pop $7
+    Pop $6
+    Pop $5
     Pop $3
     Pop $2
     Pop $4
@@ -646,11 +785,18 @@ Function Option_WriteReg
     Pop $1
 FunctionEnd
 
-!macro _Option_PersistOne PAGE KEY KIND
+; Writes one persistable option using its backing kind. Passwords must not be
+; passed here; their exclusion is enforced by the generated persistence list.
+!macro Option_PersistOne PAGE KEY KIND
     Push "${KIND}"
     Push `$__opt_${PAGE}_${KEY}`
     Push "${PAGE}.${KEY}"
     Call Option_WriteReg
+!macroend
+!define Option_PersistOne `!insertmacro Option_PersistOne`
+
+!macro _Option_PersistOne PAGE KEY KIND
+    ${Option_PersistOne} ${PAGE} ${KEY} ${KIND}
 !macroend
 
 !macro _Option_LoadOne PAGE KEY KIND

@@ -43,6 +43,20 @@ def run_case(case, harness, args):
             "2147483648", "-2147483649", "3000000000", "99999999999", "2147483650",
         ):
             harness.run(value=value, expect_errors=True).assert_outputs(result="")
+    elif base == "parse_integer":
+        for bits in (8, 16, 32, 64):
+            for unsigned in (False, True):
+                kind = ("uint" if unsigned else "int") + str(bits)
+                low = 0 if unsigned else -(1 << (bits - 1))
+                high = (1 << (bits if unsigned else bits - 1)) - 1
+                for number in {low, low + 1, 0, 1, high - 1, high}:
+                    value = str(number)
+                    for spelling in (value, ("-" if number < 0 else "+") + "000" + str(abs(number))):
+                        harness.run(value=spelling, number_type=kind, expect_errors=False).assert_outputs(result=value)
+                harness.run(value="-000", number_type=kind, expect_errors=False).assert_outputs(result="0")
+                for value in (str(low - 1), str(high + 1), "", "+", "-", "1.5",
+                              " 1", "1 ", "0x10", "1a", "9" * 100):
+                    harness.run(value=value, number_type=kind, expect_errors=True).assert_outputs(result="")
     elif base == "parse_date":
         for value in (
             "2024-01-31", "2023-02-28", "2024-02-29", "2000-02-29", "1601-01-01",

@@ -319,6 +319,165 @@ ${PREFIX}ParseIntDone:
 FunctionEnd
 !macroend
 
+; Compare canonical decimal strings without converting them to machine integers.
+!macro _IntegerFunctions PREFIX
+Function ${PREFIX}CompareInteger
+  Exch $1 ; right
+  Exch
+  Exch $0 ; left, then result (-1, 0, 1)
+  Push $2
+  Push $3
+  Push $4
+  Push $5
+  Push $6
+  StrCpy $2 1
+  StrCpy $3 $0 1
+  StrCpy $4 $1 1
+  StrCmp $3 "-" negative
+  StrCmp $4 "-" greater compare
+  negative:
+    StrCmp $4 "-" 0 less
+    StrCpy $0 $0 "" 1
+    StrCpy $1 $1 "" 1
+    StrCpy $2 -1
+  compare:
+    StrLen $3 $0
+    StrLen $4 $1
+    IntCmp $3 $4 digits less greater
+  digits:
+    StrCpy $5 0
+  loop:
+    IntCmp $5 $3 equal
+    StrCpy $4 $0 1 $5
+    StrCpy $6 $1 1 $5
+    IntCmp $4 $6 next less greater
+  next:
+    IntOp $5 $5 + 1
+    Goto loop
+  less:
+    IntOp $0 0 - $2
+    Goto done
+  greater:
+    StrCpy $0 $2
+    Goto done
+  equal:
+    StrCpy $0 0
+  done:
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
+    Exch
+    Pop $1
+    Exch $0
+FunctionEnd
+
+; Stack: value, kind (top). Validates and canonicalizes [u]int{8,16,32,64}.
+Function ${PREFIX}ParseInteger
+  Exch $1 ; kind
+  Exch
+  Exch $0 ; value, then result
+  Push $2
+  Push $3
+  Push $4
+  Push $5
+  StrCpy $2 ""
+  StrCpy $3 $0 1
+  StrCmp $3 "-" 0 plus
+    StrCpy $2 "-"
+    Goto signed
+  plus:
+    StrCmp $3 "+" signed digits
+  signed:
+    StrCpy $0 $0 "" 1
+  digits:
+    Push $0
+    Call ${PREFIX}ParseDigits
+    Pop $3
+    StrCmp $3 1 0 invalid
+    Push $0
+    Call ${PREFIX}ParseTrimZeros
+    Pop $0
+    StrCmp $0 "0" 0 +2
+      StrCpy $2 ""
+    StrCpy $0 "$2$0"
+    StrCpy $4 "0"
+    StrCmp $1 "uint8" 0 +3
+      StrCpy $5 "255"
+      Goto check
+    StrCmp $1 "uint16" 0 +3
+      StrCpy $5 "65535"
+      Goto check
+    StrCmp $1 "uint32" 0 +3
+      StrCpy $5 "4294967295"
+      Goto check
+    StrCmp $1 "uint64" 0 +3
+      StrCpy $5 "18446744073709551615"
+      Goto check
+    StrCmp $1 "int8" 0 +4
+      StrCpy $4 "-128"
+      StrCpy $5 "127"
+      Goto check
+    StrCmp $1 "int16" 0 +4
+      StrCpy $4 "-32768"
+      StrCpy $5 "32767"
+      Goto check
+    StrCmp $1 "int" int32
+    StrCmp $1 "int32" int32
+    StrCmp $1 "int64" 0 invalid
+      StrCpy $4 "-9223372036854775808"
+      StrCpy $5 "9223372036854775807"
+      Goto check
+  int32:
+    StrCpy $4 "-2147483648"
+    StrCpy $5 "2147483647"
+  check:
+    Push $0
+    Push $4
+    Call ${PREFIX}CompareInteger
+    Pop $3
+    StrCmp $3 -1 invalid
+    Push $0
+    Push $5
+    Call ${PREFIX}CompareInteger
+    Pop $3
+    StrCmp $3 1 invalid
+    ClearErrors
+    Goto done
+  invalid:
+    StrCpy $0 ""
+    SetErrors
+  done:
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
+    Exch
+    Pop $1
+    Exch $0
+FunctionEnd
+!macroend
+
+!insertmacro _IntegerFunctions ""
+!insertmacro _IntegerFunctions "un."
+
+!macro ParseInteger VALUE KIND OUT
+  Push "${VALUE}"
+  Push "${KIND}"
+  Call ParseInteger
+  Pop ${OUT}
+!macroend
+!define ParseInteger `!insertmacro ParseInteger`
+
+!macro un.ParseInteger VALUE KIND OUT
+  Push "${VALUE}"
+  Push "${KIND}"
+  Call un.ParseInteger
+  Pop ${OUT}
+!macroend
+!define un.ParseInteger `!insertmacro un.ParseInteger`
+
 ; ParseDate
 ;
 ; YYYY-MM-DD with years 1601-9999, valid days per month and leap years.

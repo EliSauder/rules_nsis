@@ -86,6 +86,36 @@ options_failure_test(
 )
 
 options_failure_test(
+    name = "number_type_on_text",
+    expected = "attribute 'number_type' is not used by control 'text'",
+    options = [{"name": "a", "number_type": "int64"}],
+)
+
+[
+    options_failure_test(
+        name = "number_{}_{}_out_of_range".format(kind, attribute),
+        expected = "is not a {} integer".format(kind),
+        options = [{
+            "name": "a",
+            "control": "number",
+            "number_type": kind,
+            attribute: value,
+        }],
+    )
+    for kind, value in [
+        ("int8", "-129"),
+        ("uint8", "256"),
+        ("int16", "32768"),
+        ("uint16", "-1"),
+        ("int32", "2147483648"),
+        ("uint32", "4294967296"),
+        ("int64", "-9223372036854775809"),
+        ("uint64", "18446744073709551616"),
+    ]
+    for attribute in ["default", "min", "max"]
+]
+
+options_failure_test(
     name = "bad_default",
     expected = "is not one of choices",
     options = [{"name": "a", "control": "radio", "choices": ["x", "y"], "default": "z"}],

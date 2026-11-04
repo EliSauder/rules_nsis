@@ -12,6 +12,8 @@ import sys
 import unittest
 import winreg
 import logging
+from contextlib import contextmanager, nullcontext
+from ctypes import wintypes
 
 from python.runfiles import Runfiles
 
@@ -102,7 +104,7 @@ def _get_reg_access(bitwidth: str) -> int:
 def _reg_open(root_db: int, path: str, view: int):
     try:
         return winreg.OpenKey(root_db, path, 0, view)
-    except (FileNotFoundError, OSError) as e:
+    except FileNotFoundError as e:
         raise FileNotFoundError(f"error opening key {path}: {e}")
 
 def _reg_value(root: int, path: str, view: int, name: str):
@@ -116,6 +118,9 @@ def _validate_removed_reg(testcase: unittest.TestCase, config: dict, subpath: st
 
     inpath, unpath = _get_reg_paths(subpath, appkey)
     access = _get_reg_access(config["expected_bitwidth"] or "64")
+
+    for path in _state_registry_paths(config, subpath):
+        _assert_registry_absent(testcase, root, path, access)
 
     try:
         with _reg_open(root, inpath, access):
@@ -424,8 +429,7 @@ def _get_installer_cmd(installer, install_root, config):
     return cmd
 
 def _validate_removed_files(testcase: unittest.TestCase, config: dict, install_root: str):
-    expected_files = config.get("expected_files", [])
-    expected_files.append(config["expected_uninstaller_name"])
+    expected_files = [*config.get("expected_files", []), config["expected_uninstaller_name"]]
     dircontent = _print_directory_tree(install_root)
 
     for path in expected_files:
@@ -453,8 +457,7 @@ def _validate_directories(testcase: unittest.TestCase, config):
 
 
 def _validate_files(testcase: unittest.TestCase, config, install_root):
-    expected_files = config.get("expected_files", [])
-    expected_files.append(config["expected_uninstaller_name"])
+    expected_files = [*config.get("expected_files", []), config["expected_uninstaller_name"]]
     for path in expected_files:
         if not os.path.isabs(path):
             path = os.path.join(install_root, path)
@@ -465,6 +468,202 @@ def _validate_files(testcase: unittest.TestCase, config, install_root):
         testcase.assertTrue(os.path.exists(path), f"Expected file missing: {path}. Found: {fs}")
         testcase.assertFalse(os.path.isdir(path), f"Expected file is a directory: {path}. Found: {fs}")
         testcase.assertTrue(os.path.isfile(path), f"Expected file is not a file: {path}. Found: {fs}")
+    for path in config.get("absent_files", []):
+        testcase.assertFalse(os.path.exists(os.path.join(install_root, path)),
+                             f"Unselected component installed {path}")
+
+
+@contextmanager
+def _windows_state_lock():
+    # PATH and shell folders are shared even when registry keys use /TESTID.
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR]
+    kernel32.CreateMutexW.restype = wintypes.HANDLE
+    kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.ReleaseMutex.argtypes = [wintypes.HANDLE]
+    kernel32.ReleaseMutex.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.CreateMutexW(None, False, r"Global\rules_nsis_tests_windows_state")
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    acquired = False
+    try:
+        result = kernel32.WaitForSingleObject(handle, 240000)
+        if result == 0xFFFFFFFF:
+            raise ctypes.WinError(ctypes.get_last_error())
+        if result not in (0, 0x80):  # WAIT_OBJECT_0 or WAIT_ABANDONED
+            raise TimeoutError(f"Waiting for Windows state test mutex failed: {result:#x}")
+        acquired = True
+        yield
+    finally:
+        if acquired:
+            released = kernel32.ReleaseMutex(handle)
+            error = ctypes.get_last_error()
+        closed = kernel32.CloseHandle(handle)
+        if acquired and not released:
+            raise ctypes.WinError(error)
+        if not closed:
+            raise ctypes.WinError(ctypes.get_last_error())
+
+
+def _shell_folder(csidl):
+    buffer = ctypes.create_unicode_buffer(260)
+    result = ctypes.windll.shell32.SHGetFolderPathW(None, csidl, None, 0, buffer)
+    if result:
+        raise OSError(f"SHGetFolderPathW({csidl:#x}) failed: {result:#x}")
+    return pathlib.Path(buffer.value)
+
+
+def _shortcut_paths(config):
+    options = config.get("shortcut_options", {})
+    if not config.get("expected_shortcuts"):
+        return []
+    admin = (config["expected_execution_level"] or "admin") == "admin"
+    programs = _shell_folder(0x17 if admin else 0x02)
+    desktop = _shell_folder(0x19 if admin else 0x10)
+    folder = programs / options["start_menu_folder"]
+    enabled = options["enabled"] == "1"
+    result = []
+    for shortcut in config["expected_shortcuts"]:
+        for location, base in [
+            ("start_menu", folder / shortcut["start_menu_subfolder"]),
+            ("desktop", desktop),
+        ]:
+            if shortcut[location]:
+                result.append((
+                    shortcut["component"], base / (shortcut["link_name"] + ".lnk"),
+                    shortcut["selected"] and enabled and options[location] == "1",
+                    programs if location == "start_menu" else desktop,
+                ))
+    return result
+
+
+def _state_registry_paths(config, subpath):
+    base = f"Software\\{subpath}"
+    _, appkey = _get_app_key_and_subpath(config)
+    paths = [*_get_reg_paths(subpath, appkey), f"{base}\\Options\\{TEST_ID}"]
+    for component in config.get("component_names", []):
+        paths.extend([
+            f"{base}\\Shortcuts\\{component}\\{TEST_ID}",
+            f"{base}\\Components\\{component}\\{TEST_ID}",
+        ])
+    return paths
+
+
+def _assert_registry_absent(testcase, root, path, access):
+    with testcase.assertRaises(FileNotFoundError, msg=f"Registry key still exists: {path}"):
+        with winreg.OpenKey(root, path, 0, access):
+            pass
+
+
+def _registry_values(root, path, access):
+    with winreg.OpenKey(root, path, 0, access) as handle:
+        return {
+            name: (value, kind)
+            for name, value, kind in (
+                winreg.EnumValue(handle, index)
+                for index in range(winreg.QueryInfoKey(handle)[1])
+            )
+        }
+
+
+def _validate_options_and_components(testcase, config, subpath):
+    root = _get_reg_db(config["expected_execution_level"] or "admin")
+    access = _get_reg_access(config["expected_bitwidth"] or "64")
+    base = f"Software\\{subpath}"
+    expected = dict(config.get("expected_options", {}))
+    expected.update({f"shortcuts.{key}": [value]
+                     for key, value in config.get("shortcut_options", {}).items()})
+    kinds = dict(config.get("expected_option_types", {}))
+    kinds.update({f"shortcuts.{key}": "string" if key == "start_menu_folder" else "bool"
+                  for key in config.get("shortcut_options", {})})
+    options_path = f"{base}\\Options\\{TEST_ID}"
+    for name, value in expected.items():
+        kind = kinds.get(name, "string")
+        if kind == "list":
+            stored = value, winreg.REG_MULTI_SZ
+        elif kind == "bool":
+            stored = bytes([int(value[0])]), winreg.REG_BINARY
+        elif kind in ("int8", "uint8", "int16", "uint16", "int32", "uint32"):
+            stored = int(value[0]) & 0xFFFFFFFF, winreg.REG_DWORD
+        elif kind in ("int64", "uint64"):
+            stored = int(value[0]) & 0xFFFFFFFFFFFFFFFF, winreg.REG_QWORD
+        elif kind == "string":
+            stored = value[0], winreg.REG_SZ
+        else:
+            raise ValueError(f"Unknown expected option kind {kind!r} for {name}")
+        testcase.assertEqual(_reg_value(root, options_path, access, name),
+                             stored, name)
+    for name in config.get("absent_options", []):
+        with testcase.assertRaises(FileNotFoundError, msg=f"Option {name} was persisted"):
+            _reg_value(root, options_path, access, name)
+    links_by_component = {}
+    for component, path, wanted, _ in _shortcut_paths(config):
+        links_by_component.setdefault(component, [])
+        if wanted:
+            links_by_component[component].append(str(path))
+    for component in config.get("component_names", []):
+        # Component metadata currently consists of shortcut ownership records;
+        # the generated installer does not write a separate Components subtree.
+        _assert_registry_absent(testcase, root, f"{base}\\Components\\{component}\\{TEST_ID}", access)
+        path = f"{base}\\Shortcuts\\{component}\\{TEST_ID}"
+        links = links_by_component.get(component, [])
+        if not links:
+            _assert_registry_absent(testcase, root, path, access)
+            continue
+        records = _registry_values(root, path, access)
+        testcase.assertEqual(
+            {name: value for name, value in records.items() if name.isdecimal()},
+            {str(index): (link, winreg.REG_SZ) for index, link in enumerate(links)},
+        )
+        folders = {name: value for name, value in records.items() if not name.isdecimal()}
+        count = len(folders) // 2
+        testcase.assertEqual(set(folders),
+                             {f"{prefix}{index}" for prefix in ("d", "s") for index in range(count)})
+        for index in range(count):
+            directory, kind = folders[f"d{index}"]
+            stop, stop_kind = folders[f"s{index}"]
+            testcase.assertEqual((kind, stop_kind), (winreg.REG_SZ, winreg.REG_SZ))
+            directory, stop = pathlib.Path(directory), pathlib.Path(stop)
+            testcase.assertTrue(directory.is_dir(), str(directory))
+            testcase.assertIn(stop, directory.parents)
+            testcase.assertTrue(any(pathlib.Path(link).parent == directory for link in links))
+
+
+def _capture_windows_state(testcase, configs):
+    changes_path = any(c.get("expected_path_dirs") or c.get("absent_path_dirs") for c in configs)
+    testcase.initial_path = {
+        level: _path_entries({"expected_execution_level": level})
+        for level in ("user", "admin") if changes_path
+    }
+    testcase.initial_shortcut_dirs = {}
+    testcase.state_registry_keys = []
+    for config in configs:
+        subpath, _ = _get_app_key_and_subpath(config)
+        root = _get_reg_db(config["expected_execution_level"] or "admin")
+        access = _get_reg_access(config["expected_bitwidth"] or "64")
+        for key in _state_registry_paths(config, subpath):
+            _assert_registry_absent(testcase, root, key, access)
+            testcase.state_registry_keys.append((root, key, access))
+        for _, path, _, boundary in _shortcut_paths(config):
+            testcase.assertFalse(path.exists(), f"Test would overwrite shortcut {path}")
+            directory = path.parent
+            while directory != boundary:
+                testcase.initial_shortcut_dirs[directory] = directory.exists()
+                directory = directory.parent
+
+
+def _validate_restored_windows_state(testcase):
+    for root, key, access in testcase.state_registry_keys:
+        _assert_registry_absent(testcase, root, key, access)
+    for level, before in testcase.initial_path.items():
+        testcase.assertEqual(_path_entries({"expected_execution_level": level}), before,
+                             f"{level} PATH was not restored")
+    for directory, existed in testcase.initial_shortcut_dirs.items():
+        testcase.assertEqual(directory.exists(), existed,
+                             f"Shortcut directory state was not restored: {directory}")
 
 def _path_entries(config):
     if (config["expected_execution_level"] or "admin") == "admin":
@@ -485,14 +684,27 @@ def _expected_path_entry(install_root, directory):
 
 def _validate_path(testcase, config, install_root):
     entries = _path_entries(config)
+    if config.get("expected_path_dirs") or config.get("absent_path_dirs"):
+        level = config["expected_execution_level"] or "admin"
+        added = {_expected_path_entry(install_root, d)
+                 for d in config.get("expected_path_dirs", [])}
+        testcase.assertEqual([entry for entry in entries if entry not in added],
+                             testcase.initial_path[level],
+                             "Installer changed unrelated PATH entries")
+        other_level = "user" if level == "admin" else "admin"
+        testcase.assertEqual(_path_entries({"expected_execution_level": other_level}),
+                             testcase.initial_path[other_level],
+                             "Installer changed PATH in the wrong hive")
     for d in config.get("expected_path_dirs", []):
         expected = _expected_path_entry(install_root, d)
         testcase.assertEqual(1, entries.count(expected), f"Expected exactly one PATH entry {expected}. PATH: {entries}")
+    for d in config.get("absent_path_dirs", []):
+        testcase.assertNotIn(_expected_path_entry(install_root, d), entries)
 
 
 def _validate_removed_path(testcase, config, install_root):
     entries = _path_entries(config)
-    for d in config.get("expected_path_dirs", []):
+    for d in config.get("expected_path_dirs", []) + config.get("absent_path_dirs", []):
         expected = _expected_path_entry(install_root, d)
         testcase.assertNotIn(expected, entries, f"PATH entry {expected} left after uninstall")
 
@@ -582,6 +794,11 @@ def _validate_install(testcase, install_root, subpath, appkey, config, installer
         _validate_file_contents(testcase, config.get("expected_file_contents", {}), install_root)
     with testcase.subTest(msg="Validate Installed Registry Keys"):
         _validate_reg(testcase, config, install_root, subpath, appkey)
+    with testcase.subTest(msg="Validate Persisted Options and Component Registry"):
+        _validate_options_and_components(testcase, config, subpath)
+    with testcase.subTest(msg="Validate Shortcuts"):
+        for _, path, wanted, _ in _shortcut_paths(config):
+            testcase.assertEqual(path.is_file(), wanted, str(path))
     with testcase.subTest(msg="Validate Installed Services"):
         _validate_services(testcase, config, install_root)
     with testcase.subTest(msg="Validate PATH"):
@@ -618,6 +835,9 @@ def _validate_uninstall(testcase, install_root, subpath, appkey, config, runun=T
         _validate_removed_directories(testcase, config)
     with testcase.subTest(msg="Validate Removed Registry Keys"):
         _validate_removed_reg(testcase, config, subpath, appkey)
+    with testcase.subTest(msg="Validate Removed Shortcuts"):
+        for _, path, _, _ in _shortcut_paths(config):
+            testcase.assertFalse(path.exists(), f"Shortcut left after uninstall: {path}")
     with testcase.subTest(msg="Validate Removed Services"):
         _validate_removed_services(testcase, config, install_root)
     with testcase.subTest(msg="Validate Removed PATH"):
@@ -638,6 +858,21 @@ def _install_first_validate_removed(testcase: unittest.TestCase, config):
 
 class NsisInstallerTest(unittest.TestCase):
     def test_installer(self) -> None:
+        configs = [CONFIG, *CONFIG["install_first_and_remove"]]
+        shared_state = any(
+            c.get("expected_path_dirs") or c.get("absent_path_dirs") or c.get("expected_shortcuts")
+            for c in configs
+        )
+        lock = _windows_state_lock() if shared_state else nullcontext()
+        with lock:
+            _capture_windows_state(self, configs)
+            try:
+                self.check_installer()
+            finally:
+                with self.subTest(msg="Validate Restored Windows State"):
+                    _validate_restored_windows_state(self)
+
+    def check_installer(self) -> None:
 
         installer = INSTALLER
         config = CONFIG
@@ -663,11 +898,13 @@ class NsisInstallerTest(unittest.TestCase):
             proc = subprocess.run(first, capture_output=True, text=True, timeout=120, check=False, env=env)
             self.assertEqual(proc.returncode, 0, f"First install failed\ncmd: {first}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
-        res = _validate_install(self, install_root, subpath, appkey, config, installer)
+        try:
+            res = _validate_install(self, install_root, subpath, appkey, config, installer)
+        finally:
+            if os.path.isfile(os.path.join(install_root, config["expected_uninstaller_name"])):
+                _validate_uninstall(self, install_root, subpath, appkey, config)
         if res:
             return
-
-        _validate_uninstall(self, install_root, subpath, appkey, config)
 
         if config.get("default_install_dir") and config["expected_install_root"]:
             try:

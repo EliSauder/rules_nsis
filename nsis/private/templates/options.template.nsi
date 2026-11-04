@@ -83,7 +83,7 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
     ${NSD_CreateNumber} {{.X}} {{.ControlY}}u {{.Width}} {{.ControlHeight}}u "${{ .Var }}"
     {{- end }}
     Pop {{$h}}
-    ${NSD_SetTextLimit} {{$h}} 11
+    ${NSD_SetTextLimit} {{$h}} {{if or (eq .Type "int64") (eq .Type "uint64")}}20{{else}}11{{end}}
 {{- else if or (eq .Control "text") (eq .Control "password") }}
     {{- if eq .Control "password" }}
     ${NSD_CreatePassword} {{.X}} {{.ControlY}}u {{.Width}} {{.ControlHeight}}u "${{ .Var }}"
@@ -261,19 +261,29 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
     ${EndIf}
 {{- else if eq .Control "number" }}
     ClearErrors
-    ${ParseInt} $__opt_chk_val $0
+    ${ParseInteger} $__opt_chk_val "{{.Type}}" $0
     ${If} ${Errors}
         StrCpy $__opt_chk_err "must be a whole number"
-    {{- if .Min }}
-    ${ElseIf} $0 < {{.Min}}
-        StrCpy $__opt_chk_err "must be at least {{.Min}}"
-    {{- end }}
-    {{- if .Max }}
-    ${ElseIf} $0 > {{.Max}}
-        StrCpy $__opt_chk_err "must be at most {{.Max}}"
-    {{- end }}
     ${Else}
         StrCpy $__opt_chk_val $0
+        {{- if .Min }}
+        Push $0
+        Push "{{.Min}}"
+        Call CompareInteger
+        Pop $1
+        ${If} $1 == -1
+            StrCpy $__opt_chk_err "must be at least {{.Min}}"
+        ${EndIf}
+        {{- end }}
+        {{- if .Max }}
+        Push $0
+        Push "{{.Max}}"
+        Call CompareInteger
+        Pop $1
+        ${If} $1 == 1
+            StrCpy $__opt_chk_err "must be at most {{.Max}}"
+        ${EndIf}
+        {{- end }}
     ${EndIf}
 {{- else if or (eq .Control "text") (eq .Control "password") }}
     {{- if .MaxLength }}

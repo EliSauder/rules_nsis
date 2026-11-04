@@ -1,6 +1,7 @@
 Var __opt_test_a
 Var __opt_test_b
 Var __opt_test_c
+Var __opt_typed_value
 
 !macro __Options_ForEachPersisted CALLBACK
     !insertmacro ${CALLBACK} test a single
@@ -103,4 +104,36 @@ Var __opt_test_c
     ${Option_LoadPersisted}
     !insertmacro _HarnessListOut ${COUNT} ${ITEMS}
     ${Option_Get} test c ${TEXT}
+!macroend
+
+!macro HarnessOptionTypedPersist KIND VALUE OUT
+    ${Option_Set} typed value `${VALUE}`
+    ${Option_PersistOne} typed value "${KIND}"
+    Push "${KIND}"
+    Push "clobbered"
+    Push "typed.value"
+    Call Option_ReadReg
+    Pop ${OUT}
+!macroend
+
+!macro _HarnessOptionTypedRead PREFIX KIND DEFAULT OUT
+    Push "${KIND}"
+    Push `${DEFAULT}`
+    Push "typed.value"
+    Call ${PREFIX}Option_ReadReg
+    Pop ${OUT}
+!macroend
+
+!macro HarnessOptionTypedRead KIND DEFAULT OUT
+    !insertmacro _HarnessOptionTypedRead "" "${KIND}" `${DEFAULT}` ${OUT}
+!macroend
+
+!macro HarnessOptionUpgrade KIND DEFAULT OUT
+    !insertmacro HarnessOptionTypedRead "${KIND}" `${DEFAULT}` ${OUT}
+    ${Option_Set} typed value ${OUT}
+    ${Option_PersistOne} typed value "${KIND}"
+!macroend
+
+!macro un.HarnessOptionTypedRead KIND DEFAULT OUT
+    !insertmacro _HarnessOptionTypedRead "un." "${KIND}" `${DEFAULT}` ${OUT}
 !macroend

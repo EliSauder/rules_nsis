@@ -9,6 +9,11 @@
     ${EndWhile}
 !macroend
 
+!macro _ControlsDumpNumber PAGE KEY
+    ${Option_Get} ${PAGE} ${KEY} $1
+    FileWrite $0 "${KEY}=$1$\n"
+!macroend
+
 !macro _ControlsDump FILE PREFIX
     Push $0
     Push $1
@@ -37,6 +42,16 @@
     FileWrite $0 "data_dir=$1$\n"
     ${Option_Get} text_controls host_name $1
     FileWrite $0 "host_name=$1$\n"
+    !insertmacro _ControlsDumpNumber signed_numbers number_int8
+    !insertmacro _ControlsDumpNumber unsigned_numbers number_uint8
+    !insertmacro _ControlsDumpNumber signed_numbers number_int16
+    !insertmacro _ControlsDumpNumber unsigned_numbers number_uint16
+    !insertmacro _ControlsDumpNumber signed_numbers number_int32
+    !insertmacro _ControlsDumpNumber unsigned_numbers number_uint32
+    !insertmacro _ControlsDumpNumber signed_numbers number_int64
+    !insertmacro _ControlsDumpNumber unsigned_numbers number_uint64
+    !insertmacro _ControlsDumpNumber bounded_numbers bounded_int64
+    !insertmacro _ControlsDumpNumber bounded_numbers bounded_uint64
     FileClose $0
     Pop $3
     Pop $2

@@ -34,6 +34,27 @@ def outputs(errors=False, **values):
 
 
 class DescriptionValidationTest(unittest.TestCase):
+    def test_output_payload_is_written_separately_from_its_length_prefix(self):
+        source = generate(ECHO, "example.nsh")
+        self.assertIn(
+            'FileWriteUTF16LE $_harness_file "result:$_harness_length:"\n'
+            'IfErrors harness_output_error\n'
+            'FileWriteUTF16LE $_harness_file "$_harness_param_result"',
+            source,
+        )
+        self.assertNotIn('"result:$_harness_length:$_harness_param_result"', source)
+
+        spec = dict(ECHO, parameters=[
+            {"name": "result", "direction": "out", "type": "list"},
+        ])
+        source = generate(spec, "example.nsh")
+        self.assertIn(
+            'FileWriteUTF16LE $_harness_file "$_harness_length:"\n'
+            'IfErrors harness_output_error\n'
+            'FileWriteUTF16LE $_harness_file "$_harness_item"',
+            source,
+        )
+
     def test_invalid_descriptions(self):
         for change in [
             {"kind": "unknown"}, {"symbol": 'Bad"\nQuit'}, {"extra": True},

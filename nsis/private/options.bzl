@@ -63,8 +63,6 @@ _GROUP_INDENT = 6
 _DROPDOWN_HEIGHT = 60
 _DEFAULT_LINES = 4
 
-_INT_MAX = 2147483647
-
 NsisOptionInfo = provider(
     doc = "A single installer option, rendered as one control on an options page.",
     fields = {
@@ -140,8 +138,8 @@ def _parse_bool(value):
         return "0"
     return None
 
-def _parse_int(value):
-    """Returns the canonical decimal form, or None when value is no 32-bit int."""
+def _parse_int(value, number_type = "int32"):
+    """Returns canonical decimal text, or None outside the selected integer type."""
     digits = value
     negative = False
     if value.startswith("+") or value.startswith("-"):
@@ -150,7 +148,10 @@ def _parse_int(value):
     if not digits or not digits.isdigit():
         return None
     n = int(digits.lstrip("0") or "0")
-    if n > _INT_MAX + (1 if negative else 0):
+    unsigned = number_type.startswith("uint")
+    bits = int(number_type[4:] if unsigned else number_type[3:])
+    limit = (1 << bits) - 1 if unsigned else (1 << (bits - 1)) - (0 if negative else 1)
+    if n > limit or (unsigned and negative and n != 0):
         return None
     return str(-n if negative else n)
 
@@ -245,9 +246,9 @@ def _default_number(label, a):
         if hi and v > int(hi):
             v = int(hi)
         return str(v)
-    v = _parse_int(a.default)
+    v = _parse_int(a.default, a.number_type)
     if v == None:
-        _fail(label, "default '{}' is not a 32-bit integer".format(a.default))
+        _fail(label, "default '{}' is not a {} integer".format(a.default, a.number_type))
     if (lo and int(v) < int(lo)) or (hi and int(v) > int(hi)):
         _fail(label, "default {} is outside of min/max [{}, {}]".format(v, lo, hi))
     return v
@@ -386,7 +387,7 @@ _CONTROLS = {
     },
     "number": {
         "type": "int",
-        "uses": ["min", "max"],
+        "uses": ["min", "max", "number_type"],
         "required": False,
         "default": _default_number,
         "layout": _layout_edit,
@@ -515,6 +516,7 @@ def _net_flags(label, types):
 
 # Attr name -> value that means "not set".
 _CONTROL_ATTRS = {
+    "number_type": "int32",
     "choices": [],
     "multi_select": False,
     "defaults": [],
@@ -531,6 +533,7 @@ _CONTROL_ATTRS = {
 def _option_attrs(ctx):
     return struct(
         control = ctx.attr.control,
+        number_type = ctx.attr.number_type,
         default = ctx.attr.default,
         required = ctx.attr.required,
         choices = list(ctx.attr.choices),
@@ -594,13 +597,13 @@ def _nsis_option_impl(ctx):
         _fail(label, "attribute 'required' is only used by control '{}' with multi_select".format(control))
     if control == "number":
         if a.min:
-            lo = _parse_int(a.min)
+            lo = _parse_int(a.min, a.number_type)
             if lo == None:
-                _fail(label, "min '{}' is not a 32-bit integer".format(a.min))
+                _fail(label, "min '{}' is not a {} integer".format(a.min, a.number_type))
         if a.max:
-            hi = _parse_int(a.max)
+            hi = _parse_int(a.max, a.number_type)
             if hi == None:
-                _fail(label, "max '{}' is not a 32-bit integer".format(a.max))
+                _fail(label, "max '{}' is not a {} integer".format(a.max, a.number_type))
         if lo and hi and int(lo) > int(hi):
             _fail(label, "min ({}) is greater than max ({})".format(lo, hi))
     elif control == "date":
@@ -631,7 +634,7 @@ def _nsis_option_impl(ctx):
         name = ctx.label.name,
         key = key,
         control = control,
-        type = "list" if a.multi_select else spec["type"],
+        type = a.number_type if control == "number" else ("list" if a.multi_select else spec["type"]),
         text = ctx.attr.label_text or _title_case(ctx.label.name),
         description = ctx.attr.description,
         default = default,
@@ -714,6 +717,11 @@ number closest to 0 within min/max, an empty string, or the first choice.
             doc = "The valid values of radio, droplist, listbox and sorted_listbox controls; the suggestions of combobox.",
         ),
         "multi_select": attr.bool(default = False, doc = "List controls: select several values."),
+        "number_type": attr.string(
+            default = "int32",
+            values = ["int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64"],
+            doc = "Integer type of a number control. Defaults to signed int32.",
+        ),
         "defaults": attr.string_list(default = [], doc = "Listbox and sorted_listbox with multi_select: the initially selected choices (instead of `default`)."),
         "min": attr.string(default = "", doc = "Lower bound of number (integer) and date (YYYY-MM-DD) controls."),
         "max": attr.string(default = "", doc = "Upper bound of number (integer) and date (YYYY-MM-DD) controls."),
@@ -784,7 +792,7 @@ def _option_ds(page, opt, x, width, y, in_group):
         "MultiSelect": opt.multi_select,
         "Min": opt.min,
         "Max": opt.max,
-        "AllowNegative": opt.control != "number" or (not opt.min) or int(opt.min) < 0,
+        "AllowNegative": opt.control != "number" or (not opt.type.startswith("uint") and ((not opt.min) or int(opt.min) < 0)),
         "MaxLength": opt.max_length,
         "Lines": opt.lines,
         "Filter": opt.filter,

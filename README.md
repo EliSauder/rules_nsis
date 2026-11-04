@@ -159,7 +159,7 @@ only with `position = "after_components"`).
 | `control` | Backing type | Value / `default` form | Control-specific attrs |
 |---|---|---|---|
 | `checkbox` | bool | `1` or `0` | |
-| `number` | int | signed 32-bit integer | `min`, `max` |
+| `number` | `number_type` | decimal integer, signed 32-bit by default | `number_type`, `min`, `max` |
 | `text` | string | any text | `max_length` |
 | `password` | secret string | any text; never persisted | `max_length` |
 | `radio` | enum | one of `choices` | `choices` |
@@ -180,6 +180,13 @@ defaults may reference NSIS variables such as `$DOCUMENTS`. Without a
 empty string, or the first choice. `required` demands a non-empty value (not
 for `number`, `checkbox`, `radio`, `droplist` and `date`).
 
+`number_type` supports `int8`, `uint8`, `int16`, `uint16`, `int32` (default),
+`uint32`, `int64`, and `uint64`. Defaults, `min`/`max`, UI input and CLI values
+are validated against that type's range without truncation. For example,
+`control = "number", number_type = "int64"` accepts signed 64-bit decimal values.
+Leading zeros and an optional sign are normalized; unsigned types reject
+negative values other than negative zero.
+
 ### Layout
 
 `position` is one of `after_welcome`, `after_license`, `after_directory` and
@@ -195,13 +202,22 @@ allowed, cycles are not.
 ### Persistence
 
 `persist` is `auto` (default: persisted, except passwords), `yes` or `no`
-(`password` with `yes` is an error). Persisted values are written as
-`REG_MULTI_SZ` values named `<page>.<key>` under `Software\...\<product>\Options`
-(one string per list item, a single string otherwise; multiline text keeps its
-line breaks) and
-are loaded again by the uninstaller and by the next install (as the defaults
-of an upgrade). `REG_SZ` values stored by older versions (lists as `a|b`) are still read and are
-rewritten as `REG_MULTI_SZ` on upgrade.
+(`password` with `yes` is an error). Persisted values named `<page>.<key>` live
+under `Software\...\<product>\Options`: booleans use one-byte `REG_BINARY`
+(`00` or `01`), 8/16/32-bit numbers use `REG_DWORD`, and strings use `REG_SZ`.
+Lists use `REG_MULTI_SZ`, one string per item. Both `int64` and `uint64` use
+`REG_QWORD`. Signed numbers use their two's-complement representation.
+
+File and directory options use `REG_SZ` because their paths are already resolved;
+`%VARIABLE%` references are not expanded. Multiline strings retain the escaped
+`\n` and `\\` representation in `REG_SZ` for compatibility with older values.
+Empty strings remain explicit empty `REG_SZ` values, distinct from missing values.
+
+Values are loaded again by the uninstaller and the next install (as upgrade
+defaults). Legacy `REG_MULTI_SZ` scalars and `REG_SZ` numbers/booleans/lists
+(lists as `a|b`) are still read. Loading does not rewrite these values, so the
+previous uninstaller can consume its original registry format. The new installer
+writes the appropriate types during installation, after uninstalling the old version.
 
 ### Reading values in hooks
 
@@ -233,6 +249,12 @@ command line and in `/OPTIONS` files, repeat the option for each item
 `Option_ListCount` and `Option_ListGet` work
 unchanged in uninstall hooks; use `${un.Option_GetMultiline}` there. Passwords
 are not persisted, so uninstall hooks see their default.
+
+Installer hooks can save one persistable option after changing it with
+`${Option_PersistOne} <page> <key> <kind>`, without rewriting other options.
+Use its backing kind (`bool`, `int`/`int32`, any supported `number_type`, `list`, or a string-backed
+kind such as `string`, `multiline`, `file` or `dir`). This explicit API is for
+persistable options only; do not use it for passwords or `persist = "no"`.
 
 ## Command Line
 
