@@ -379,7 +379,13 @@ Function ${PREFIX}Option_ReadScalar
     StrCmp $7 1 string
     StrCmp $1 "bool" boolean
     StrCmp $1 "int" integer
+    StrCmp $1 "int8" integer
+    StrCmp $1 "uint8" integer
+    StrCmp $1 "int16" integer
+    StrCmp $1 "uint16" integer
     StrCmp $1 "int32" integer
+    StrCmp $1 "uint32" integer
+    StrCmp $1 "uint64" integer64
     StrCmp $1 "int64" integer64 freefailed
     boolean:
         StrCmp $7 3 0 freefailed
@@ -391,6 +397,8 @@ Function ${PREFIX}Option_ReadScalar
         StrCmp $7 4 0 freefailed
         StrCmp $8 4 0 freefailed
         System::Call '*$9(i .r11)'
+        StrCmp $1 "uint32" 0 success
+        IntFmt $R1 "%u" $R1
         Goto success
     integer64:
         StrCmp $7 11 0 freefailed
@@ -400,9 +408,12 @@ Function ${PREFIX}Option_ReadScalar
         StrCmp $5 0 0 readinteger64
         StrCmp $7 -2147483648 0 readinteger64
         StrCpy $R1 "-9223372036854775808"
-        Goto success
+        Goto formatinteger64
     readinteger64:
         System::Call '*$9(l .r11)'
+    formatinteger64:
+        StrCmp $1 "uint64" 0 success
+        System::Call 'msvcrt::_ui64tow(l r11, w .r11, i 10) p ?c'
         Goto success
     string:
         IntOp $5 ${NSIS_MAX_STRLEN} * 2
@@ -713,7 +724,13 @@ Function Option_WriteReg
     StrCmp $4 "list" list
     StrCmp $4 "bool" boolean
     StrCmp $4 "int" integer
+    StrCmp $4 "int8" integer
+    StrCmp $4 "uint8" integer
+    StrCmp $4 "int16" integer
+    StrCmp $4 "uint16" integer
     StrCmp $4 "int32" integer
+    StrCmp $4 "uint32" integer
+    StrCmp $4 "uint64" integer64
     StrCmp $4 "int64" integer64
         !insertmacro SetRegistrySubKeyStr "$2" "$0" "$1"
         IfErrors failed

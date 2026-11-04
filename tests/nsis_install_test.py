@@ -586,9 +586,9 @@ def _validate_options_and_components(testcase, config, subpath):
             stored = value, winreg.REG_MULTI_SZ
         elif kind == "bool":
             stored = bytes([int(value[0])]), winreg.REG_BINARY
-        elif kind == "int32":
+        elif kind in ("int8", "uint8", "int16", "uint16", "int32", "uint32"):
             stored = int(value[0]) & 0xFFFFFFFF, winreg.REG_DWORD
-        elif kind == "int64":
+        elif kind in ("int64", "uint64"):
             stored = int(value[0]) & 0xFFFFFFFFFFFFFFFF, winreg.REG_QWORD
         elif kind == "string":
             stored = value[0], winreg.REG_SZ

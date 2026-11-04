@@ -9,6 +9,7 @@ def formatting_cases():
         ("hex_to_bin", "Hex2Bin", ["in:value", "out:binary"]),
         ("parse_bool", "ParseBool", ["in:value", "out:result"]),
         ("parse_int", "ParseInt", ["in:value", "out:result"]),
+        ("parse_integer", "ParseInteger", ["in:value", "in:number_type", "out:result"]),
         ("parse_date", "ParseDate", ["in:value", "out:result"]),
         ("parse_ipv4", "ParseIPv4", ["in:value", "out:result"]),
         ("parse_net_address", "ParseNetAddress", ["in:value", "in:flags:int", "out:result"]),

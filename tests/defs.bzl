@@ -382,7 +382,7 @@ nsis_installer_test = macro(
         ),
         "expected_option_types": attr.string_dict(
             default = {},
-            doc = "Registry backing kinds: bool, int32, int64, list or string (default).",
+            doc = "Registry backing kinds: bool, [u]int{8,16,32,64}, list or string (default).",
         ),
         "absent_options": attr.string_list(
             default = [],

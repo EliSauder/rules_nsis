@@ -11,9 +11,9 @@ _OPTIONS_KEY = "SOFTWARE\\rules_nsis_tests\\Options"
 def stored_scalar(winreg, kind, value):
     if kind == "bool":
         return bytes([int(value)]), winreg.REG_BINARY
-    if kind in ("int", "int32"):
+    if kind in ("int", "int8", "uint8", "int16", "uint16", "int32", "uint32"):
         return int(value) & 0xFFFFFFFF, winreg.REG_DWORD
-    if kind == "int64":
+    if kind in ("int64", "uint64"):
         return int(value) & 0xFFFFFFFFFFFFFFFF, winreg.REG_QWORD
     return value, winreg.REG_SZ
 
@@ -28,6 +28,13 @@ def run_case(case, harness, args):
             for kind, values in [
                 ("bool", ["0", "1"]),
                 ("int", ["-2147483648", "-1", "0", "2147483647"]),
+                ("int8", ["-128", "-1", "0", "1", "127"]),
+                ("uint8", ["0", "1", "254", "255"]),
+                ("int16", ["-32768", "-1", "0", "1", "32767"]),
+                ("uint16", ["0", "1", "65534", "65535"]),
+                ("uint32", ["0", "1", "2147483648", "4294967295"]),
+                ("uint64", ["0", "1", "9223372036854775807", "9223372036854775808",
+                            "18446744073709551614", "18446744073709551615"]),
                 ("int32", ["-2147483648", "-2147483647", "-1", "0", "1", "2147483646", "2147483647"]),
                 ("int64", ["-9223372036854775808", "-9223372036854775807",
                            "-4294967296", "-2147483649", "-1", "0", "1",
@@ -79,7 +86,8 @@ def run_case(case, harness, args):
 
         key = common.scoped(harness, _OPTIONS_KEY)
         try:
-            for kind in ("bool", "int", "int32", "int64", "string", "multiline",
+            for kind in ("bool", "int", "int8", "uint8", "int16", "uint16",
+                         "int32", "uint32", "int64", "uint64", "string", "multiline",
                          "file", "dir", "enum", "date", "ipv4", "net"):
                 common.delete_registry_tree(winreg, key)
                 harness.run(kind=kind, default="kept").assert_outputs(result="kept")
@@ -93,6 +101,7 @@ def run_case(case, harness, args):
                 ("bool", "0"), ("bool", "1"), ("int32", "-2147483648"),
                 ("int32", "2147483647"), ("int64", "-9223372036854775808"),
                 ("int64", "9223372036854775807"), ("string", ""),
+                ("uint32", "4294967295"), ("uint64", "18446744073709551615"),
                 ("file", r"%TEMP%\literal.txt"), ("multiline", "a\\nb\\\\c"),
             ]:
                 expected, expected_type = stored_scalar(winreg, kind, value)
@@ -191,6 +200,9 @@ def run_case(case, harness, args):
                 assert winreg.QueryValueEx(handle, "test.b") == ("x|y", winreg.REG_SZ)
                 assert winreg.QueryValueEx(handle, "test.c") == ("m1\\nm2", winreg.REG_SZ)
             harness.run().assert_outputs(count="2", items=["x", "y"], text="m1\\nm2")
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key) as handle:
+                winreg.SetValueEx(handle, "test.b", 0, winreg.REG_MULTI_SZ, ["x" * 1023, "tail"])
+            harness.run().assert_outputs(count="2", items=["x" * 1023, "tail"], text="m1\\nm2")
         finally:
             common.delete_registry_tree(winreg, _OPTIONS_KEY + "\\" + harness.test_id)
     elif base == "option_load_missing":
