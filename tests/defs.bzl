@@ -151,6 +151,7 @@ def _get_installer_test_details(ctx, inst, target):
         "expected_vendor_path": inst.vendor_path or "",
         "expected_vendor": inst.vendor or "",
         "expected_install_path": inst.install_path or "",
+        "expected_install_root": inst.install_root or "",
         "expected_id": inst.id or "",
         "expected_bitwidth": bitwidth,
         "expected_icon": inst.icon != None,
@@ -193,6 +194,7 @@ def _nsis_test_config_impl(ctx):
     det["expected_installer_exitcode"] = int(ctx.attr.expected_installer_exitcode)
     det["installer_args"] = ctx.attr.installer_args
     det["reinstall_without_dir"] = ctx.attr.reinstall_without_dir
+    det["default_install_dir"] = ctx.attr.default_install_dir
     det["expected_file_contents"] = ctx.attr.expected_file_contents
     det["expected_uninstall_file_contents"] = ctx.attr.expected_uninstall_file_contents
 
@@ -235,6 +237,7 @@ _nsis_test_config = rule(
         ),
         "installer_args": attr.string_list(default = []),
         "reinstall_without_dir": attr.bool(default = False),
+        "default_install_dir": attr.bool(default = False),
         "expected_file_contents": attr.string_dict(default = {}),
         "expected_uninstall_file_contents": attr.string_dict(default = {}),
     },
@@ -243,7 +246,7 @@ _nsis_test_config = rule(
     },
 )
 
-def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must_have_dirs, install_first_and_remove, expected_installer_exitcode, installer_args, reinstall_without_dir, expected_file_contents, expected_uninstall_file_contents, target_compatible_with, **kwargs):
+def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must_have_dirs, install_first_and_remove, expected_installer_exitcode, installer_args, reinstall_without_dir, default_install_dir, expected_file_contents, expected_uninstall_file_contents, target_compatible_with, **kwargs):
     v = []
     if install_first_and_remove != None:
         v.append(install_first_and_remove)
@@ -258,6 +261,7 @@ def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must
         expected_installer_exitcode = expected_installer_exitcode,
         installer_args = installer_args,
         reinstall_without_dir = reinstall_without_dir,
+        default_install_dir = default_install_dir,
         expected_file_contents = expected_file_contents,
         expected_uninstall_file_contents = expected_uninstall_file_contents,
     )
@@ -332,6 +336,12 @@ nsis_installer_test = macro(
             default = False,
             configurable = False,
             doc = "Install into the install root first, then run the tested install without /D= so it must reuse the stored install directory.",
+        ),
+        "default_install_dir": attr.bool(
+            mandatory = False,
+            default = False,
+            configurable = False,
+            doc = "Install without /D= and expect the installer's default InstallDir, derived from install_root, execution_level, arch and the product paths.",
         ),
         "expected_file_contents": attr.string_dict(
             mandatory = False,

@@ -1,3 +1,4 @@
+import ctypes
 import os
 import uuid
 import hashlib
@@ -331,6 +332,59 @@ def _get_install_root():
 
     return install_root
 
+_CSIDL_LOCAL_APPDATA = 0x1C
+
+def _local_appdata() -> str:
+    # Same API NSIS uses for $LOCALAPPDATA; the test env may not carry the variable.
+    buf = ctypes.create_unicode_buffer(260)
+    hr = ctypes.windll.shell32.SHGetFolderPathW(None, _CSIDL_LOCAL_APPDATA, None, 0, buf)
+    if hr != 0:
+        raise OSError(f"SHGetFolderPathW(CSIDL_LOCAL_APPDATA) failed: {hr:#x}")
+    return buf.value
+
+def _program_files(bitwidth: str) -> str:
+    # NSIS reads $PROGRAMFILES/$PROGRAMFILES64 from this value in the 32/64-bit registry view.
+    access = winreg.KEY_READ | _get_reg_view(bitwidth)
+    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion", 0, access) as key:
+        return winreg.QueryValueEx(key, "ProgramFilesDir")[0]
+
+def _expand_nsis_vars(path: str) -> str:
+    for var, value in [
+        ("$LOCALAPPDATA", _local_appdata),
+        ("$PROGRAMFILES64", lambda: _program_files("64")),
+        ("$PROGRAMFILES", lambda: _program_files("32")),
+    ]:
+        if var in path:
+            path = path.replace(var, value())
+    if "$" in path:
+        raise ValueError(f"unsupported NSIS variable in install root {path!r}")
+    return path
+
+def _get_default_install_dir(config: dict) -> str:
+    """The InstallDir an installer uses when run without /D=."""
+    root = config["expected_install_root"]
+    if not root:
+        if (config["expected_execution_level"] or "admin") == "user":
+            root = "$LOCALAPPDATA\\Programs"
+        elif config["expected_bitwidth"] == "64":
+            root = "$PROGRAMFILES64"
+        else:
+            root = "$PROGRAMFILES"
+
+    subpath = config["expected_install_path"]
+    if not subpath:
+        subpath = config["expected_product_path"]
+        if config["expected_vendor_path"]:
+            subpath = f"{config['expected_vendor_path']}\\{subpath}"
+
+    install_dir = f"{_expand_nsis_vars(root)}\\{subpath}"
+
+    # Leftovers from an aborted earlier run would mask a wrong default.
+    if os.path.exists(install_dir):
+        shutil.rmtree(install_dir)
+
+    return install_dir
+
 def _get_app_key_and_subpath(config: dict) -> str:
     subpath = _get_sub_path(
         config["expected_product"] or None,
@@ -359,7 +413,7 @@ def _get_installer_cmd(installer, install_root, config):
         "/S",
         f"/TESTID={TEST_ID}",
     ] + installer_args
-    if not config.get("reinstall_without_dir"):
+    if not (config.get("reinstall_without_dir") or config.get("default_install_dir")):
         cmd.append(f"/D={install_root}")
     return cmd
 
@@ -592,7 +646,10 @@ class NsisInstallerTest(unittest.TestCase):
         for c in config["install_first_and_remove"]:
             _install_first(self, c)
 
-        install_root = _get_install_root()
+        if config.get("default_install_dir"):
+            install_root = _get_default_install_dir(config)
+        else:
+            install_root = _get_install_root()
         subpath, appkey = _get_app_key_and_subpath(config)
 
         if config.get("reinstall_without_dir"):
@@ -605,6 +662,12 @@ class NsisInstallerTest(unittest.TestCase):
             return
 
         _validate_uninstall(self, install_root, subpath, appkey, config)
+
+        if config.get("default_install_dir") and config["expected_install_root"]:
+            try:
+                os.rmdir(os.path.dirname(install_root))
+            except OSError:
+                pass
 
         for c in config["install_first_and_remove"]:
             _install_first_validate_removed(self, c)
