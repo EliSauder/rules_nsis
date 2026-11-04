@@ -395,6 +395,13 @@ Function ${PREFIX}Option_ReadScalar
     integer64:
         StrCmp $7 11 0 freefailed
         StrCmp $8 8 0 freefailed
+        ; System's signed formatter negates negatives and overflows at INT64_MIN.
+        System::Call '*$9(i .r5, i .r7)'
+        StrCmp $5 0 0 readinteger64
+        StrCmp $7 -2147483648 0 readinteger64
+        StrCpy $R1 "-9223372036854775808"
+        Goto success
+    readinteger64:
         System::Call '*$9(l .r11)'
         Goto success
     string:
