@@ -262,36 +262,28 @@ Var __hnd_{{$p.Name}}_grp{{.Index}}
 {{- else if eq .Control "number" }}
     ClearErrors
     ${ParseInteger} $__opt_chk_val "{{.Type}}" $0
-    StrCpy $1 0
-    StrCpy $2 0
-    {{- if .Min }}
-    ${IfNot} ${Errors}
+    ${If} ${Errors}
+        StrCpy $__opt_chk_err "must be a whole number"
+    ${Else}
+        StrCpy $__opt_chk_val $0
+        {{- if .Min }}
         Push $0
         Push "{{.Min}}"
         Call CompareInteger
         Pop $1
-    ${EndIf}
-    {{- end }}
-    {{- if .Max }}
-    ${IfNot} ${Errors}
+        ${If} $1 == -1
+            StrCpy $__opt_chk_err "must be at least {{.Min}}"
+        ${EndIf}
+        {{- end }}
+        {{- if .Max }}
         Push $0
         Push "{{.Max}}"
         Call CompareInteger
-        Pop $2
-    ${EndIf}
-    {{- end }}
-    ${If} ${Errors}
-        StrCpy $__opt_chk_err "must be a whole number"
-    {{- if .Min }}
-    ${ElseIf} $1 == -1
-        StrCpy $__opt_chk_err "must be at least {{.Min}}"
-    {{- end }}
-    {{- if .Max }}
-    ${ElseIf} $2 == 1
-        StrCpy $__opt_chk_err "must be at most {{.Max}}"
-    {{- end }}
-    ${Else}
-        StrCpy $__opt_chk_val $0
+        Pop $1
+        ${If} $1 == 1
+            StrCpy $__opt_chk_err "must be at most {{.Max}}"
+        ${EndIf}
+        {{- end }}
     ${EndIf}
 {{- else if or (eq .Control "text") (eq .Control "password") }}
     {{- if .MaxLength }}

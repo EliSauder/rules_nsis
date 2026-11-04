@@ -1207,10 +1207,10 @@ nsis_installer_test(
         "value_controls.gateway": ["10.1.2.3:99"],
         "value_controls.peer": ["2001:db8::1"],
     } | {
-        ("unsigned_numbers." if kind.startswith("uint") else "signed_numbers.") + "number_" + kind: [bounds[1]]
+        ("unsigned_numbers." if kind.startswith("uint") else "signed_numbers.") + "number_" + kind: [bounds[0]]
         for kind, bounds in _NUMBER_LIMITS.items()
     } | {
-        "bounded_numbers.bounded_" + kind: [str(int(bounds[0]) + 1)]
+        "bounded_numbers.bounded_" + kind: [bounds[1] if kind == "int64" else bounds[0]]
         for kind, bounds in _BOUNDED_NUMBERS.items()
     },
     installer_args = [
@@ -1227,15 +1227,9 @@ nsis_installer_test(
         "/O:text_controls.config_file=C:\\Windows\\notepad.exe",
         "/O:text_controls.data_dir=C:\\Windows",
         "/O:text_controls.host_name=gamma",
-    ] + [
-        "/O:" + ("unsigned_numbers." if kind.startswith("uint") else "signed_numbers.") + "number_" + kind + "=+000" + bounds[1]
-        for kind, bounds in _NUMBER_LIMITS.items()
-    ] + [
-        "/O:bounded_numbers.bounded_" + kind + "=" + str(int(bounds[0]) + 1)
-        for kind, bounds in _BOUNDED_NUMBERS.items()
     ],
     expected_file_contents = {
-        "controls_install.txt": _CONTROLS_CLI + _NUMBER_CLI,
+        "controls_install.txt": _CONTROLS_CLI + _NUMBER_DEFAULTS,
     },
     expected_option_types = {
         "list_controls.toppings": "list",
@@ -1248,7 +1242,41 @@ nsis_installer_test(
         for kind in _BOUNDED_NUMBERS
     },
     expected_uninstall_file_contents = {
-        "controls_uninstall.txt": _CONTROLS_CLI + _NUMBER_CLI,
+        "controls_uninstall.txt": _CONTROLS_CLI + _NUMBER_DEFAULTS,
+    },
+)
+
+# Keep /D= within NSIS's command-line limit by testing numeric overrides separately.
+nsis_installer_test(
+    name = "numbers_cli_test",
+    installer = ":installer_with_controls",
+    must_have_files = ["README.md"],
+    expected_options = {
+        ("unsigned_numbers." if kind.startswith("uint") else "signed_numbers.") + "number_" + kind: [bounds[1]]
+        for kind, bounds in _NUMBER_LIMITS.items()
+    } | {
+        "bounded_numbers.bounded_" + kind: [str(int(bounds[0]) + 1)]
+        for kind, bounds in _BOUNDED_NUMBERS.items()
+    },
+    installer_args = [
+        "/O:" + ("unsigned_numbers." if kind.startswith("uint") else "signed_numbers.") + "number_" + kind + "=+000" + bounds[1]
+        for kind, bounds in _NUMBER_LIMITS.items()
+    ] + [
+        "/O:bounded_numbers.bounded_" + kind + "=" + str(int(bounds[0]) + 1)
+        for kind, bounds in _BOUNDED_NUMBERS.items()
+    ],
+    expected_file_contents = {
+        "controls_install.txt": _CONTROLS_DEFAULTS + _NUMBER_CLI,
+    },
+    expected_option_types = {
+        ("unsigned_numbers." if kind.startswith("uint") else "signed_numbers.") + "number_" + kind: kind
+        for kind in _NUMBER_LIMITS
+    } | {
+        "bounded_numbers.bounded_" + kind: kind
+        for kind in _BOUNDED_NUMBERS
+    },
+    expected_uninstall_file_contents = {
+        "controls_uninstall.txt": _CONTROLS_DEFAULTS + _NUMBER_CLI,
     },
 )
 

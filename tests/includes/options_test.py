@@ -128,9 +128,10 @@ def run_case(case, harness, args):
             ]:
                 with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key) as handle:
                     winreg.SetValueEx(handle, "typed.value", 0, registry_type, data)
+                    before = winreg.QueryValueEx(handle, "typed.value")
                 harness.run(kind=kind, default="kept").assert_outputs(result="kept")
                 with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
-                    assert winreg.QueryValueEx(handle, "typed.value") == (data, registry_type)
+                    assert winreg.QueryValueEx(handle, "typed.value") == before, (kind, data, registry_type)
         finally:
             common.delete_registry_tree(winreg, key)
     elif base == "option_round_trip":
