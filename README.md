@@ -244,6 +244,12 @@ command line and in `/OPTIONS` files, repeat the option for each item
 unchanged in uninstall hooks; use `${un.Option_GetMultiline}` there. Passwords
 are not persisted, so uninstall hooks see their default.
 
+Installer hooks can save one persistable option after changing it with
+`${Option_PersistOne} <page> <key> <kind>`, without rewriting other options.
+Use its backing kind (`bool`, `int`/`int32`, `int64`, `list`, or a string-backed
+kind such as `string`, `multiline`, `file` or `dir`). This explicit API is for
+persistable options only; do not use it for passwords or `persist = "no"`.
+
 ## Command Line
 
 Installers built by this ruleset understand the following switches, besides the

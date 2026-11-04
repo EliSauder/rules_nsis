@@ -768,11 +768,18 @@ Function Option_WriteReg
     Pop $1
 FunctionEnd
 
-!macro _Option_PersistOne PAGE KEY KIND
+; Writes one persistable option using its backing kind. Passwords must not be
+; passed here; their exclusion is enforced by the generated persistence list.
+!macro Option_PersistOne PAGE KEY KIND
     Push "${KIND}"
     Push `$__opt_${PAGE}_${KEY}`
     Push "${PAGE}.${KEY}"
     Call Option_WriteReg
+!macroend
+!define Option_PersistOne `!insertmacro Option_PersistOne`
+
+!macro _Option_PersistOne PAGE KEY KIND
+    ${Option_PersistOne} ${PAGE} ${KEY} ${KIND}
 !macroend
 
 !macro _Option_LoadOne PAGE KEY KIND

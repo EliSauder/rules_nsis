@@ -1,6 +1,7 @@
 Var __opt_test_a
 Var __opt_test_b
 Var __opt_test_c
+Var __opt_typed_value
 
 !macro __Options_ForEachPersisted CALLBACK
     !insertmacro ${CALLBACK} test a single
@@ -106,10 +107,8 @@ Var __opt_test_c
 !macroend
 
 !macro HarnessOptionTypedPersist KIND VALUE OUT
-    Push "${KIND}"
-    Push `${VALUE}`
-    Push "typed.value"
-    Call Option_WriteReg
+    ${Option_Set} typed value `${VALUE}`
+    ${Option_PersistOne} typed value "${KIND}"
     Push "${KIND}"
     Push "clobbered"
     Push "typed.value"
@@ -131,10 +130,8 @@ Var __opt_test_c
 
 !macro HarnessOptionUpgrade KIND DEFAULT OUT
     !insertmacro HarnessOptionTypedRead "${KIND}" `${DEFAULT}` ${OUT}
-    Push "${KIND}"
-    Push ${OUT}
-    Push "typed.value"
-    Call Option_WriteReg
+    ${Option_Set} typed value ${OUT}
+    ${Option_PersistOne} typed value "${KIND}"
 !macroend
 
 !macro un.HarnessOptionTypedRead KIND DEFAULT OUT

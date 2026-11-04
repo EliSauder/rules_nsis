@@ -28,17 +28,32 @@ def run_case(case, harness, args):
             for kind, values in [
                 ("bool", ["0", "1"]),
                 ("int", ["-2147483648", "-1", "0", "2147483647"]),
-                ("int32", ["-2147483648", "2147483647"]),
-                ("int64", ["-9223372036854775808", "-1", "0", "4294967296", "9223372036854775807"]),
-                ("string", ["", *_TRICKY]),
-                ("multiline", ["", "first\\nsecond", "literal\\\\n"]),
-                ("file", ["", r"C:\with spaces\file.txt", r"%TEMP%\file.txt"]),
-                ("dir", ["", r"C:\with spaces", r"%TEMP%\data"]),
+                ("int32", ["-2147483648", "-2147483647", "-1", "0", "1", "2147483646", "2147483647"]),
+                ("int64", ["-9223372036854775808", "-9223372036854775807",
+                           "-4294967296", "-2147483649", "-1", "0", "1",
+                           "2147483648", "4294967296", "9223372036854775806",
+                           "9223372036854775807"]),
+                ("string", ["", "x", "x" * 900, "\u03bb" * 150, *_TRICKY]),
+                ("multiline", ["", "\\n", "\\\\", "first\\nsecond", "literal\\\\n",
+                               "x\\n" * 200]),
+                ("file", ["", "C:\\", r"C:\with spaces\file.txt", r"%TEMP%\file.txt",
+                          "C:\\" + "x" * 240 + ".txt"]),
+                ("dir", ["", "C:\\", r"\\server\share", r"C:\with spaces",
+                         r"%TEMP%\data", "C:\\" + "x" * 240]),
+                ("enum", ["", "first", "last", "value|with,delimiters"]),
+                ("date", ["0001-01-01", "2000-02-29", "9999-12-31"]),
+                ("ipv4", ["0.0.0.0", "255.255.255.255"]),
+                ("net", ["0.0.0.0/0", "255.255.255.255:65535", "::",
+                         "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
+                         "[::1]:65535", "a" * 63 + ".example"]),
             ]:
                 for value in values:
+                    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key) as handle:
+                        winreg.SetValueEx(handle, "unrelated", 0, winreg.REG_SZ, "keep")
                     harness.run(kind=kind, value=value).assert_outputs(result=value)
                     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
                         assert winreg.QueryValueEx(handle, "typed.value") == stored_scalar(winreg, kind, value)
+                        assert winreg.QueryValueEx(handle, "unrelated") == ("keep", winreg.REG_SZ)
         finally:
             common.delete_registry_tree(winreg, key)
     elif base == "option_persist_upgrade":
@@ -64,6 +79,16 @@ def run_case(case, harness, args):
 
         key = common.scoped(harness, _OPTIONS_KEY)
         try:
+            for kind in ("bool", "int", "int32", "int64", "string", "multiline",
+                         "file", "dir", "enum", "date", "ipv4", "net"):
+                common.delete_registry_tree(winreg, key)
+                harness.run(kind=kind, default="kept").assert_outputs(result="kept")
+            # Seed the registry directly to reach NSIS's 1023-character limit,
+            # beyond the harness input-file transport's 1000-character ceiling.
+            for kind in ("string", "multiline", "file", "dir", "enum", "date", "ipv4", "net"):
+                with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key) as handle:
+                    winreg.SetValueEx(handle, "typed.value", 0, winreg.REG_SZ, "x" * 1023)
+                harness.run(kind=kind, default="kept").assert_outputs(result="x" * 1023)
             for kind, value in [
                 ("bool", "0"), ("bool", "1"), ("int32", "-2147483648"),
                 ("int32", "2147483647"), ("int64", "-9223372036854775808"),
@@ -84,11 +109,13 @@ def run_case(case, harness, args):
                         stored = winreg.QueryValueEx(handle, "typed.value")
                     assert stored == (data, registry_type)
             for kind, data, registry_type in [
+                ("bool", b"", winreg.REG_BINARY),
                 ("bool", b"\x02", winreg.REG_BINARY),
                 ("bool", b"\x01\x00", winreg.REG_BINARY),
                 ("int32", b"\x01", winreg.REG_BINARY),
                 ("int64", 1, winreg.REG_DWORD),
                 ("string", 1, winreg.REG_DWORD),
+                ("string", "x" * 1024, winreg.REG_SZ),
             ]:
                 with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key) as handle:
                     winreg.SetValueEx(handle, "typed.value", 0, registry_type, data)
@@ -133,7 +160,10 @@ def run_case(case, harness, args):
 
         key = common.scoped(harness, _OPTIONS_KEY)
         text = "l1\\n\\\\x\\n"
-        for items in [["a", "b"], _TRICKY, [f"item{i:03}" for i in range(500)]]:
+        for items in [
+            ["only"], ["x" * 900], ["same", "same"], ["a", "b"],
+            _TRICKY, [f"item{i:03}" for i in range(500)],
+        ]:
             try:
                 harness.run(items=items, text=text).assert_outputs(count=str(len(items)), items_out=items, text_out=text)
                 with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
