@@ -1083,8 +1083,8 @@ nsis_installer_test(
     must_have_files = ["README.md"],
     expected_options = {
         "text_controls.note": ["first\r\nsecond"],
-        "text_controls.config_file": [],
-        "text_controls.data_dir": [],
+        "text_controls.config_file": [""],
+        "text_controls.data_dir": [""],
         "text_controls.host_name": ["alpha"],
         "list_controls.flavor": ["choc"],
         "list_controls.toppings": ["sprinkles", "nuts"],
