@@ -394,17 +394,23 @@ def _get_app_key_and_subpath(config: dict) -> str:
     return subpath, (config["expected_id"] or "").replace("\\", " ")
 
 
+def _nsis_cmdline(args, path_arg):
+    """Joins args, appending path_arg (/D= or _?=) last and unquoted.
+
+    NSIS only recognises /D= and _?= unquoted, even with spaces in the path.
+    A quoted _?= makes the uninstaller re-launch itself from %TEMP% and exit
+    0 before it has uninstalled anything.
+    """
+    return f"{subprocess.list2cmdline(args)} {path_arg}"
+
 def _get_uninstaller_cmd(install_root, config):
     base_uninstaller = os.path.join(install_root, config["expected_uninstaller_name"])
     new_uninstaller_path = os.path.join(TEST_TMPDIR, "Uninstall.exe")
     shutil.copy(base_uninstaller, new_uninstaller_path)
-    cmd = [
-        new_uninstaller_path,
-        "/S",
-        f"/TESTID={TEST_ID}",
-        f"_?={install_root}"
-    ]
-    return cmd
+    return _nsis_cmdline(
+        [new_uninstaller_path, "/S", f"/TESTID={TEST_ID}"],
+        f"_?={install_root}",
+    )
 
 def _get_installer_cmd(installer, install_root, config):
     installer_args = list(config.get("installer_args", []))
@@ -414,7 +420,7 @@ def _get_installer_cmd(installer, install_root, config):
         f"/TESTID={TEST_ID}",
     ] + installer_args
     if not (config.get("reinstall_without_dir") or config.get("default_install_dir")):
-        cmd.append(f"/D={install_root}")
+        return _nsis_cmdline(cmd, f"/D={install_root}")
     return cmd
 
 def _validate_removed_files(testcase: unittest.TestCase, config: dict, install_root: str):
@@ -653,7 +659,7 @@ class NsisInstallerTest(unittest.TestCase):
         subpath, appkey = _get_app_key_and_subpath(config)
 
         if config.get("reinstall_without_dir"):
-            first = [str(installer), "/S", f"/TESTID={TEST_ID}", f"/D={install_root}"]
+            first = _nsis_cmdline([str(installer), "/S", f"/TESTID={TEST_ID}"], f"/D={install_root}")
             proc = subprocess.run(first, capture_output=True, text=True, timeout=120, check=False, env=env)
             self.assertEqual(proc.returncode, 0, f"First install failed\ncmd: {first}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n")
 
