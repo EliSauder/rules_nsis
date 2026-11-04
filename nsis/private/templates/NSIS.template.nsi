@@ -1188,10 +1188,10 @@ Function __Shortcuts_CreateAll
     ${EndIf}
     {{- end }}
 
-    !insertmacro _Option_PersistOne shortcuts enabled single
-    !insertmacro _Option_PersistOne shortcuts start_menu single
+    !insertmacro _Option_PersistOne shortcuts enabled bool
+    !insertmacro _Option_PersistOne shortcuts start_menu bool
     !insertmacro _Option_PersistOne shortcuts start_menu_folder single
-    !insertmacro _Option_PersistOne shortcuts desktop single
+    !insertmacro _Option_PersistOne shortcuts desktop bool
     Pop $0
 FunctionEnd
 

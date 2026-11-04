@@ -129,6 +129,14 @@ Var __opt_test_c
     !insertmacro _HarnessOptionTypedRead "" "${KIND}" `${DEFAULT}` ${OUT}
 !macroend
 
+!macro HarnessOptionUpgrade KIND DEFAULT OUT
+    !insertmacro HarnessOptionTypedRead "${KIND}" `${DEFAULT}` ${OUT}
+    Push "${KIND}"
+    Push ${OUT}
+    Push "typed.value"
+    Call Option_WriteReg
+!macroend
+
 !macro un.HarnessOptionTypedRead KIND DEFAULT OUT
     !insertmacro _HarnessOptionTypedRead "un." "${KIND}" `${DEFAULT}` ${OUT}
 !macroend

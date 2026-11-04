@@ -21,8 +21,8 @@
 ; (or int32) uses REG_DWORD, int64 uses REG_QWORD, list uses REG_MULTI_SZ,
 ; and other kinds use REG_SZ. Resolved file/dir paths are not expanded.
 ; Multiline REG_SZ keeps the legacy escaped form so old values are unambiguous.
-; Legacy REG_MULTI_SZ scalars and REG_SZ lists/numbers are read and migrated
-; by the installer; the uninstaller only reads.
+; Legacy REG_MULTI_SZ scalars and REG_SZ lists/numbers are read without
+; rewriting. Option_Persist writes the new types after the old uninstall.
 ;
 ; The variable of a `list` option (multi_select) holds the name of an nsArray
 ; array with its items instead of a value; see Option_ListContains.
@@ -310,7 +310,7 @@ Function ${PREFIX}Option_ReadReg
         Push $4
         Call ${PREFIX}Option_FromArray
         Pop $1
-        Goto promote
+        Goto done
     legacy:
     ClearErrors
     StrCmp $4 "list" legacylist
@@ -320,20 +320,13 @@ Function ${PREFIX}Option_ReadReg
         Pop $3
         IfErrors done
         StrCpy $1 $3
-        Goto promote
+        Goto done
     legacylist:
     !insertmacro ${PREFIX}GetRegistrySubKey "$2" "$0" $3
     IfErrors done
         ${Array_Reset} $1
-        StrCmp $3 "" promote
+        StrCmp $3 "" done
             ${Array_Split} $1 "$3" "|"
-        promote:
-!if "${PREFIX}" == ""
-        Push $4
-        Push $1
-        Push $0
-        Call Option_WriteReg
-!endif
     done:
     ClearErrors
 

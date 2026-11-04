@@ -14,6 +14,8 @@ def options_cases():
          ["in:kind", "in:value", "out:result"], ["installer"]),
         ("option_load_typed", "HarnessOptionTypedRead",
          ["in:kind", "in:default", "out:result"], ["installer", "uninstaller"]),
+        ("option_persist_upgrade", "HarnessOptionUpgrade",
+         ["in:kind", "in:default", "out:result"], ["installer"]),
     ]:
         cases += include_api_case(
             name = name,

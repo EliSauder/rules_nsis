@@ -209,8 +209,9 @@ Empty strings remain explicit empty `REG_SZ` values, distinct from missing value
 
 Values are loaded again by the uninstaller and the next install (as upgrade
 defaults). Legacy `REG_MULTI_SZ` scalars and `REG_SZ` numbers/booleans/lists
-(lists as `a|b`) are still read and migrated to the appropriate types by the
-installer. The uninstaller reads them without rewriting.
+(lists as `a|b`) are still read. Loading does not rewrite these values, so the
+previous uninstaller can consume its original registry format. The new installer
+writes the appropriate types during installation, after uninstalling the old version.
 
 ### Reading values in hooks
 

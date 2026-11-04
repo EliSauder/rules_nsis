@@ -41,6 +41,24 @@ def run_case(case, harness, args):
                         assert winreg.QueryValueEx(handle, "typed.value") == stored_scalar(winreg, kind, value)
         finally:
             common.delete_registry_tree(winreg, key)
+    elif base == "option_persist_upgrade":
+        import winreg
+
+        key = common.scoped(harness, _OPTIONS_KEY)
+        try:
+            for kind, value in [
+                ("bool", "0"), ("bool", "1"), ("int32", "-2147483648"),
+                ("int64", "9223372036854775807"), ("string", ""),
+                ("string", "kept from old install"), ("multiline", "a\\nb\\\\c"),
+            ]:
+                data = ["a\r\nb\\c"] if kind == "multiline" else [value]
+                with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key) as handle:
+                    winreg.SetValueEx(handle, "typed.value", 0, winreg.REG_MULTI_SZ, data)
+                harness.run(kind=kind, default="not the stored value").assert_outputs(result=value)
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
+                    assert winreg.QueryValueEx(handle, "typed.value") == stored_scalar(winreg, kind, value)
+        finally:
+            common.delete_registry_tree(winreg, key)
     elif base == "option_load_typed":
         import winreg
 
@@ -64,7 +82,7 @@ def run_case(case, harness, args):
                     harness.run(kind=kind, default="not the stored value").assert_outputs(result=value)
                     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
                         stored = winreg.QueryValueEx(handle, "typed.value")
-                    assert stored == ((data, registry_type) if case.startswith("un_") else (expected, expected_type))
+                    assert stored == (data, registry_type)
             for kind, data, registry_type in [
                 ("bool", b"\x02", winreg.REG_BINARY),
                 ("bool", b"\x01\x00", winreg.REG_BINARY),
@@ -134,13 +152,13 @@ def run_case(case, harness, args):
 
         key = common.scoped(harness, _OPTIONS_KEY)
         try:
-            # Legacy list strings are promoted; scalar REG_SZ stays REG_SZ.
+            # Loading must not rewrite values needed by the previous uninstaller.
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key) as handle:
                 winreg.SetValueEx(handle, "test.b", 0, winreg.REG_SZ, "x|y")
                 winreg.SetValueEx(handle, "test.c", 0, winreg.REG_SZ, "m1\\nm2")
             harness.run().assert_outputs(count="2", items=["x", "y"], text="m1\\nm2")
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as handle:
-                assert winreg.QueryValueEx(handle, "test.b") == (["x", "y"], winreg.REG_MULTI_SZ)
+                assert winreg.QueryValueEx(handle, "test.b") == ("x|y", winreg.REG_SZ)
                 assert winreg.QueryValueEx(handle, "test.c") == ("m1\\nm2", winreg.REG_SZ)
             harness.run().assert_outputs(count="2", items=["x", "y"], text="m1\\nm2")
         finally:
