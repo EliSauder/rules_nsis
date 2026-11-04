@@ -967,6 +967,11 @@ nsis_installer_test(
         "component_settings.tag": ["comp"],
     },
     absent_options = ["advanced_settings.token"],
+    expected_option_types = {
+        "install_settings.enable_extras": "bool",
+        "install_settings.port": "int32",
+        "component_settings.feature": "bool",
+    },
     expected_file_contents = {
         "options_install.txt": "enable_extras=1\nextras_name=extra\nport=8080\nmode=fast\nlevel=b\ntoken=secret\nfeature=0\ntag=comp\n",
     },
@@ -989,6 +994,11 @@ nsis_installer_test(
         "component_settings.tag": ["zz"],
     },
     absent_options = ["advanced_settings.token"],
+    expected_option_types = {
+        "install_settings.enable_extras": "bool",
+        "install_settings.port": "int32",
+        "component_settings.feature": "bool",
+    },
     installer_args = [
         "/O:install_settings.enable_extras=0",
         "/O:install_settings.port=9090",
@@ -1082,7 +1092,7 @@ nsis_installer_test(
     installer = ":installer_with_controls",
     must_have_files = ["README.md"],
     expected_options = {
-        "text_controls.note": ["first\r\nsecond"],
+        "text_controls.note": ["first\\nsecond"],
         "text_controls.config_file": [""],
         "text_controls.data_dir": [""],
         "text_controls.host_name": ["alpha"],
@@ -1097,6 +1107,10 @@ nsis_installer_test(
     expected_file_contents = {
         "controls_install.txt": _CONTROLS_DEFAULTS,
     },
+    expected_option_types = {
+        "list_controls.toppings": "list",
+        "list_controls.extras": "list",
+    },
     expected_uninstall_file_contents = {
         "controls_uninstall.txt": _CONTROLS_DEFAULTS,
     },
@@ -1107,7 +1121,7 @@ nsis_installer_test(
     installer = ":installer_with_controls",
     must_have_files = ["README.md"],
     expected_options = {
-        "text_controls.note": ["x\\y\r\nz"],
+        "text_controls.note": ["x\\\\y\\nz"],
         "text_controls.config_file": ["C:\\Windows\\notepad.exe"],
         "text_controls.data_dir": ["C:\\Windows"],
         "text_controls.host_name": ["gamma"],
@@ -1136,6 +1150,10 @@ nsis_installer_test(
     ],
     expected_file_contents = {
         "controls_install.txt": _CONTROLS_CLI,
+    },
+    expected_option_types = {
+        "list_controls.toppings": "list",
+        "list_controls.extras": "list",
     },
     expected_uninstall_file_contents = {
         "controls_uninstall.txt": _CONTROLS_CLI,

@@ -199,6 +199,7 @@ def _nsis_test_config_impl(ctx):
     det["expected_file_contents"] = ctx.attr.expected_file_contents
     det["expected_uninstall_file_contents"] = ctx.attr.expected_uninstall_file_contents
     det["expected_options"] = ctx.attr.expected_options
+    det["expected_option_types"] = ctx.attr.expected_option_types
     det["absent_options"] = ctx.attr.absent_options
     det["shortcut_options"] = ctx.attr.shortcut_options
 
@@ -246,6 +247,7 @@ _nsis_test_config = rule(
         "expected_uninstall_file_contents": attr.string_dict(default = {}),
         "unselected_components": attr.string_list(default = []),
         "expected_options": attr.string_list_dict(default = {}),
+        "expected_option_types": attr.string_dict(default = {}),
         "absent_options": attr.string_list(default = []),
         "shortcut_options": attr.string_dict(default = {}),
     },
@@ -254,7 +256,7 @@ _nsis_test_config = rule(
     },
 )
 
-def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must_have_dirs, install_first_and_remove, expected_installer_exitcode, installer_args, reinstall_without_dir, default_install_dir, expected_file_contents, expected_uninstall_file_contents, unselected_components, expected_options, absent_options, shortcut_options, timeout, target_compatible_with, **kwargs):
+def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must_have_dirs, install_first_and_remove, expected_installer_exitcode, installer_args, reinstall_without_dir, default_install_dir, expected_file_contents, expected_uninstall_file_contents, unselected_components, expected_options, expected_option_types, absent_options, shortcut_options, timeout, target_compatible_with, **kwargs):
     v = []
     if install_first_and_remove != None:
         v.append(install_first_and_remove)
@@ -274,6 +276,7 @@ def _nsis_installer_test_impl(name, visibility, installer, must_have_files, must
         expected_uninstall_file_contents = expected_uninstall_file_contents,
         unselected_components = unselected_components,
         expected_options = expected_options,
+        expected_option_types = expected_option_types,
         absent_options = absent_options,
         shortcut_options = shortcut_options,
     )
@@ -375,7 +378,11 @@ nsis_installer_test = macro(
         ),
         "expected_options": attr.string_list_dict(
             default = {},
-            doc = "Persisted <page>.<key> values, each stored as REG_MULTI_SZ.",
+            doc = "Persisted <page>.<key> values (single item for scalars).",
+        ),
+        "expected_option_types": attr.string_dict(
+            default = {},
+            doc = "Registry backing kinds: bool, int32, int64, list or string (default).",
         ),
         "absent_options": attr.string_list(
             default = [],

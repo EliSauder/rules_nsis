@@ -195,13 +195,22 @@ allowed, cycles are not.
 ### Persistence
 
 `persist` is `auto` (default: persisted, except passwords), `yes` or `no`
-(`password` with `yes` is an error). Persisted values are written as
-`REG_MULTI_SZ` values named `<page>.<key>` under `Software\...\<product>\Options`
-(one string per list item, a single string otherwise; multiline text keeps its
-line breaks) and
-are loaded again by the uninstaller and by the next install (as the defaults
-of an upgrade). `REG_SZ` values stored by older versions (lists as `a|b`) are still read and are
-rewritten as `REG_MULTI_SZ` on upgrade.
+(`password` with `yes` is an error). Persisted values named `<page>.<key>` live
+under `Software\...\<product>\Options`: booleans use one-byte `REG_BINARY`
+(`00` or `01`), signed 32-bit numbers use `REG_DWORD`, and strings use `REG_SZ`.
+Lists use `REG_MULTI_SZ`, one string per item. The persistence API also supports
+`int64` as `REG_QWORD`; there is no 64-bit number control yet. Signed numbers use
+their two's-complement representation.
+
+File and directory options use `REG_SZ` because their paths are already resolved;
+`%VARIABLE%` references are not expanded. Multiline strings retain the escaped
+`\n` and `\\` representation in `REG_SZ` for compatibility with older values.
+Empty strings remain explicit empty `REG_SZ` values, distinct from missing values.
+
+Values are loaded again by the uninstaller and the next install (as upgrade
+defaults). Legacy `REG_MULTI_SZ` scalars and `REG_SZ` numbers/booleans/lists
+(lists as `a|b`) are still read and migrated to the appropriate types by the
+installer. The uninstaller reads them without rewriting.
 
 ### Reading values in hooks
 

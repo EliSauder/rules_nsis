@@ -576,10 +576,26 @@ def _validate_options_and_components(testcase, config, subpath):
     expected = dict(config.get("expected_options", {}))
     expected.update({f"shortcuts.{key}": [value]
                      for key, value in config.get("shortcut_options", {}).items()})
+    kinds = dict(config.get("expected_option_types", {}))
+    kinds.update({f"shortcuts.{key}": "string" if key == "start_menu_folder" else "bool"
+                  for key in config.get("shortcut_options", {})})
     options_path = f"{base}\\Options\\{TEST_ID}"
     for name, value in expected.items():
+        kind = kinds.get(name, "string")
+        if kind == "list":
+            stored = value, winreg.REG_MULTI_SZ
+        elif kind == "bool":
+            stored = bytes([int(value[0])]), winreg.REG_BINARY
+        elif kind == "int32":
+            stored = int(value[0]) & 0xFFFFFFFF, winreg.REG_DWORD
+        elif kind == "int64":
+            stored = int(value[0]) & 0xFFFFFFFFFFFFFFFF, winreg.REG_QWORD
+        elif kind == "string":
+            stored = value[0], winreg.REG_SZ
+        else:
+            raise ValueError(f"Unknown expected option kind {kind!r} for {name}")
         testcase.assertEqual(_reg_value(root, options_path, access, name),
-                             (value, winreg.REG_MULTI_SZ), name)
+                             stored, name)
     for name in config.get("absent_options", []):
         with testcase.assertRaises(FileNotFoundError, msg=f"Option {name} was persisted"):
             _reg_value(root, options_path, access, name)

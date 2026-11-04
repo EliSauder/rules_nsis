@@ -9,6 +9,22 @@ _PRODUCT_KEY = {
 
 def options_cases():
     cases = []
+    for name, symbol, parameters, contexts in [
+        ("option_persist_typed", "HarnessOptionTypedPersist",
+         ["in:kind", "in:value", "out:result"], ["installer"]),
+        ("option_load_typed", "HarnessOptionTypedRead",
+         ["in:kind", "in:default", "out:result"], ["installer", "uninstaller"]),
+    ]:
+        cases += include_api_case(
+            name = name,
+            api = "options",
+            include = "Options.nsh",
+            src = "options_adapters.nsh",
+            symbol = symbol,
+            parameters = parameters,
+            contexts = contexts,
+            on_init = _PRODUCT_KEY,
+        )
     for name, symbol, parameters in [
         ("option_round_trip", "HarnessOptionRoundTrip", ["in:value", "out:result"]),
         ("option_is_set", "HarnessOptionIsSet", ["in:value", "out:set:bool"]),

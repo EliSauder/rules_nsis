@@ -104,3 +104,31 @@ Var __opt_test_c
     !insertmacro _HarnessListOut ${COUNT} ${ITEMS}
     ${Option_Get} test c ${TEXT}
 !macroend
+
+!macro HarnessOptionTypedPersist KIND VALUE OUT
+    Push "${KIND}"
+    Push `${VALUE}`
+    Push "typed.value"
+    Call Option_WriteReg
+    Push "${KIND}"
+    Push "clobbered"
+    Push "typed.value"
+    Call Option_ReadReg
+    Pop ${OUT}
+!macroend
+
+!macro _HarnessOptionTypedRead PREFIX KIND DEFAULT OUT
+    Push "${KIND}"
+    Push `${DEFAULT}`
+    Push "typed.value"
+    Call ${PREFIX}Option_ReadReg
+    Pop ${OUT}
+!macroend
+
+!macro HarnessOptionTypedRead KIND DEFAULT OUT
+    !insertmacro _HarnessOptionTypedRead "" "${KIND}" `${DEFAULT}` ${OUT}
+!macroend
+
+!macro un.HarnessOptionTypedRead KIND DEFAULT OUT
+    !insertmacro _HarnessOptionTypedRead "un." "${KIND}" `${DEFAULT}` ${OUT}
+!macroend
