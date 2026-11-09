@@ -19,7 +19,49 @@ on:
         required: true
         type: string
 jobs:
+  verify-release:
+    strategy:
+      fail-fast: false
+      matrix:
+        bazel_version: ["8.x", "9.x"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    env:
+      USE_BAZEL_VERSION: ${{ matrix.bazel_version }}
+      RELEASE_TAG: ${{ inputs.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.19.0
+      - name: Download released source
+        run: |
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "rules_nsis-$RELEASE_TAG.tar.gz"
+          mkdir release-source
+          tar --extract --gzip --file "rules_nsis-$RELEASE_TAG.tar.gz" \
+            --directory release-source --strip-components=1
+      - name: Build using uploaded plugin assets
+        run: |
+          verification_dir="$(mktemp -d)"
+          # Verify this release's assets, not an earlier mirror or SourceForge fallback.
+          cat > "$verification_dir/downloader.cfg" <<EOF
+          rewrite github.com/EliSauder/rules_nsis/releases/download/v0[.]1[.]0/(NsArray[.]zip|EnVar_plugin[.]zip) github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/\$1
+          block nsis.sourceforge.io
+          EOF
+          cd release-source/tests/usagetests
+          bazel --output_user_root="$verification_dir/bazel" build //... \
+            --repository_cache="$verification_dir/repository-cache" \
+            --disk_cache= \
+            --remote_cache= \
+            --experimental_downloader_config="$verification_dir/downloader.cfg" \
+            --verbose_failures
   publish:
+    needs: verify-release
     uses: bazel-contrib/publish-to-bcr/.github/workflows/publish.yaml@v1.2.0
     with:
       tag_name: ${{ inputs.tag_name }}

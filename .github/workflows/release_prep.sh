@@ -11,6 +11,8 @@ git archive --format=tar "--prefix=$PREFIX/" "$TAG" > "$ARCHIVE_TMP"
 
 gzip < "$ARCHIVE_TMP" > "$ARCHIVE"
 
+bash .github/workflows/release_plugins.sh >&2
+
 # Add generated API docs to the release, see https://github.com/bazelbuild/bazel-central-registry/issues/5593
 docs="$(mktemp -d)"; targets="$(mktemp)"
 bazel --output_base="$docs" query --output=label --output_file="$targets" 'kind("starlark_doc_extract rule", //...)'
