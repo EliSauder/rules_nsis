@@ -47,12 +47,12 @@ jobs:
             --directory release-source --strip-components=1
       - name: Build using uploaded plugin assets
         run: |
+          if ! grep --fixed-strings --line-regexp "_PLUGIN_RELEASE_TAG = \"$RELEASE_TAG\"" release-source/MODULE.bazel; then
+            echo "Released module must use plugin assets from $RELEASE_TAG." >&2
+            exit 1
+          fi
           verification_dir="$(mktemp -d)"
-          # Verify this release's assets, not an earlier mirror or SourceForge fallback.
-          cat > "$verification_dir/downloader.cfg" <<EOF
-          rewrite github.com/EliSauder/rules_nsis/releases/download/v0[.]1[.]0/(NsArray[.]zip|EnVar_plugin[.]zip) github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/\$1
-          block nsis.sourceforge.io
-          EOF
+          echo "block nsis.sourceforge.io" > "$verification_dir/downloader.cfg"
           cd release-source/tests/usagetests
           bazel --output_user_root="$verification_dir/bazel" build //... \
             --repository_cache="$verification_dir/repository-cache" \

@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -o errexit -o nounset -o pipefail
 
+TAG=${1:?Usage: release_plugins.sh RELEASE_TAG}
+
 download_plugin() {
     local filename=$1
     local sourceforge_path=$2
     local sha256=$3
-    local mirror="https://github.com/EliSauder/rules_nsis/releases/download/v0.1.0"
+    local mirror="https://github.com/EliSauder/rules_nsis/releases/download/$TAG"
 
     if ! curl --fail --location --retry 3 --output "$filename" "$mirror/$filename"; then
         echo "GitHub mirror unavailable for $filename; downloading from SourceForge." >&2

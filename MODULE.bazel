@@ -93,6 +93,9 @@ filegroup(
 ############################
 # DEFAULT NSIS PLUGINS
 ############################
+# Stamped with the release tag when the source archive is packaged.
+_PLUGIN_RELEASE_TAG = "v0.1.0"
+
 # nsArray (zlib-style license) is used by the bundled includes. It is built
 # from source with a patch that fixes a heap overflow in nsArray::Split, and
 # with nsArray::Copy and ToString enabled (upstream leaves it commented out in Array.h).
@@ -101,7 +104,7 @@ nsis_plugin_archive(
     name = "nsis_plugin_nsarray",
     plugin_name = "nsArray",
     urls = [
-        "https://github.com/EliSauder/rules_nsis/releases/download/v0.1.0/NsArray.zip",
+        "https://github.com/EliSauder/rules_nsis/releases/download/" + _PLUGIN_RELEASE_TAG + "/NsArray.zip",
         "https://nsis.sourceforge.io/mediawiki/images/9/97/NsArray.zip",
     ],
     sha256 = "56cef303f97de3a6e26ccfe9a8a860bbb539a08c520d312e7774cce310013723",
@@ -118,7 +121,7 @@ nsis_plugin_archive(
     name = "nsis_plugin_envar",
     plugin_name = "EnVar",
     urls = [
-        "https://github.com/EliSauder/rules_nsis/releases/download/v0.1.0/EnVar_plugin.zip",
+        "https://github.com/EliSauder/rules_nsis/releases/download/" + _PLUGIN_RELEASE_TAG + "/EnVar_plugin.zip",
         "https://nsis.sourceforge.io/mediawiki/images/7/7f/EnVar_plugin.zip",
     ],
     sha256 = "e9aa92de351345ed82795251d838f1ae9041ba35af9d381a5780c7843b01f56a",

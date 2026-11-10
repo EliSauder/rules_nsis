@@ -5,13 +5,16 @@ TAG=$1
 
 PREFIX="rules_nsis-${TAG:1}"
 ARCHIVE="rules_nsis-$TAG.tar.gz"
-ARCHIVE_TMP=$(mktemp)
+ARCHIVE_TMP=$(mktemp -d)
+trap 'rm -r -- "$ARCHIVE_TMP"' EXIT
 
-git archive --format=tar "--prefix=$PREFIX/" "$TAG" > "$ARCHIVE_TMP"
+git archive --format=tar "--prefix=$PREFIX/" "$TAG" | tar --extract --directory="$ARCHIVE_TMP"
+sed -i "s|^_PLUGIN_RELEASE_TAG = .*|_PLUGIN_RELEASE_TAG = \"$TAG\"|" \
+    "$ARCHIVE_TMP/$PREFIX/MODULE.bazel"
 
-gzip < "$ARCHIVE_TMP" > "$ARCHIVE"
+tar --create --gzip --directory="$ARCHIVE_TMP" --file="$ARCHIVE" "$PREFIX"
 
-bash .github/workflows/release_plugins.sh >&2
+bash .github/workflows/release_plugins.sh "$TAG" >&2
 
 # Add generated API docs to the release, see https://github.com/bazelbuild/bazel-central-registry/issues/5593
 docs="$(mktemp -d)"; targets="$(mktemp)"
