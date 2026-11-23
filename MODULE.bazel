@@ -22,7 +22,7 @@ bazel_dep(name = "platforms", version = "1.1.0")
 ############################
 # SETUP SIGNING
 ############################
-bazel_dep(name = "rules_signing", version = "0.3.1")
+bazel_dep(name = "rules_signing", version = "0.3.4")
 signing_tools = use_extension("@rules_signing//signing:extensions.bzl", "signing_tools", dev_dependency=True)
 signing_tools.openssl(path = "openssl")
 use_repo(
