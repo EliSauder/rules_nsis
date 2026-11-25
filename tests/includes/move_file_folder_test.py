@@ -1,8 +1,11 @@
+import contextlib
 import os
 import stat
 import subprocess
+import sys
 import tempfile
 import time
+import unittest
 from pathlib import Path
 
 from tests.includes import common
@@ -223,6 +226,8 @@ def _move_file_invalid(harness, directory):
         (str(source), str(directory / "a_file" / "file.txt")),
         (str(source), str(directory / "invalid<name>.txt")),
         (str(directory / "*.txt"), str(destination)),
+        (str(directory / "*" / ".." / source.name), str(destination)),
+        (str(source), str(directory / "?" / ".." / destination.name)),
     ]:
         harness.run(source=invalid_source, destination=invalid_destination, expect_errors=True)
         assert source.read_text(encoding="utf-8") == "source"
@@ -301,6 +306,8 @@ def _move_folder_invalid(harness, directory):
         (str(source), str(source / "nested")),
         (str(source), str(source) + "\\child\\..\\nested"),
         (str(source.anchor), str(destination)),
+        (str(directory / "*" / ".." / source.name), str(destination)),
+        (str(source), str(directory / "?" / ".." / destination.name)),
     ]:
         harness.run(source=invalid_source, destination=invalid_destination, mask="*", expect_errors=True)
         assert (source / "keep.txt").read_text(encoding="utf-8") == "source"
@@ -429,6 +436,144 @@ def _move_folder_aliases(harness, directory):
         assert not (source / "new").exists()
         assert not (source / "child" / "new").exists()
 
+    source = directory / "escaping_source"
+    outside = directory / "outside"
+    _write(source / "keep.txt", "source")
+    _write(outside / "keep.txt", "outside")
+    _junction(source / "link", outside)
+    harness.run(source=str(source), destination=str(source / "link" / "out"), mask="*", expect_errors=True)
+    assert not (outside / "out").exists()
+    assert (source / "keep.txt").read_text(encoding="utf-8") == "source"
+    assert (outside / "keep.txt").read_text(encoding="utf-8") == "outside"
+
+    source = directory / "mapped_source"
+    destination = directory / "mapped_destination"
+    _write(source / "child" / "item.txt", "first")
+    _write(source / "other" / "item.txt", "second", _DAY)
+    destination.mkdir()
+    _junction(destination / "child", source / "other")
+    harness.run(source=str(source), destination=str(destination), mask="*", expect_errors=True)
+    assert (source / "child" / "item.txt").read_text(encoding="utf-8") == "first"
+    assert (source / "other" / "item.txt").read_text(encoding="utf-8") == "second"
+
+    source = directory / "cyclic_source"
+    _write(source / "keep.txt", "cycle")
+    _junction(source / "loop", source)
+    destination = directory / "cyclic_destination"
+    harness.run(source=str(source), destination=str(destination), mask="*", expect_errors=True)
+    assert not destination.exists()
+    assert (source / "keep.txt").read_text(encoding="utf-8") == "cycle"
+
+    source = directory / "junction_source"
+    outside = directory / "external_source"
+    _write(outside / "payload.txt", "external")
+    source.mkdir()
+    _junction(source / "link", outside)
+    destination = directory / "junction_destination"
+    harness.run(source=str(source), destination=str(destination), mask="*", expect_errors=False)
+    assert not source.exists()
+    assert outside.is_dir()
+    assert (destination / "link" / "payload.txt").read_text(encoding="utf-8") == "external"
+
+
+def _move_folder_enumeration(harness, directory):
+    import ctypes
+    from ctypes import wintypes
+
+    source = directory / "probe"
+    source.mkdir()
+    harness.run(source=str(source), destination=str(source), mask="*", expect_errors=False)
+    source = directory / "source"
+    restricted = source / "restricted"
+    _write(source / "before.txt", "not moved")
+    _write(restricted / "file.txt", "restricted")
+    destination = directory / "destination"
+    command = ["icacls", str(restricted)]
+    subprocess.run([*command, "/deny", "*S-1-1-0:(RD)"], check=True, capture_output=True)
+    try:
+        kernel = _windows_kernel()
+        kernel.FindFirstFileW.argtypes = [wintypes.LPCWSTR, ctypes.c_void_p]
+        kernel.FindFirstFileW.restype = wintypes.HANDLE
+        kernel.FindClose.argtypes = [wintypes.HANDLE]
+        buffer = ctypes.create_string_buffer(592)
+        handle = kernel.FindFirstFileW(str(restricted / "*"), buffer)
+        error = ctypes.get_last_error()
+        if handle != ctypes.c_void_p(-1).value:
+            kernel.FindClose(handle)
+            raise AssertionError("Enumeration-denied fixture remained listable")
+        assert error == 5, error
+        harness.run(source=str(source), destination=str(destination), mask="*.txt", expect_errors=True)
+        assert not destination.exists()
+        assert (source / "before.txt").read_text(encoding="utf-8") == "not moved"
+    finally:
+        subprocess.run([*command, "/remove:d", "*S-1-1-0"], check=True, capture_output=True)
+    assert (restricted / "file.txt").read_text(encoding="utf-8") == "restricted"
+
+
+def _move_folder_drive_root(harness, directory):
+    source = directory / "probe"
+    source.mkdir()
+    harness.run(source=str(source), destination=str(source), working=str(directory), expect_errors=False)
+    drives = _windows_kernel().GetLogicalDrives()
+    drive = next(f"{chr(65 + index)}:" for index in range(25, 6, -1) if not drives & (1 << index))
+    volume = directory / "volume"
+    volume.mkdir()
+    subprocess.run(["subst", drive, str(volume)], check=True, capture_output=True)
+    try:
+        root = Path(drive + "\\")
+        for index in (0, 1):
+            source = root / f"source_{index}"
+            working = source if index == 0 else source / "child"
+            working.mkdir(parents=True)
+            name = f"payload_{index}.txt"
+            _write(source / name, "drive root")
+            # The current directory may block cleanup, but not payload placement.
+            harness.run(source=str(source), destination=str(root), working=str(working), expect_errors=None)
+            assert (root / name).read_text(encoding="utf-8") == "drive root"
+            assert not (source / name).exists()
+    finally:
+        subprocess.run(["subst", drive, "/d"], check=True, capture_output=True)
+
+
+def _move_folder_limits(harness, directory):
+    source = directory / "probe"
+    source.mkdir()
+    harness.run(source=str(source), parent=str(directory), leaf=source.name, expect_errors=False)
+    assert os.name == "nt", "Extended-length boundary fixtures require Windows"
+    path = str(directory)
+    extended = Path("\\\\?\\UNC\\" + path[2:] if path.startswith("\\\\") else "\\\\?\\" + path)
+    for folder in (False, True):
+        for length in (1023, 1024):
+            source = directory / f"source_{folder}_{length}"
+            parent = extended / f"destination_{folder}_{length}"
+            while 1001 - len(str(parent)) - 1 > 200:
+                parent /= "p" * 100
+            destination = parent / ("d" * (1001 - len(str(parent)) - 1))
+            destination.mkdir(parents=True)
+            assert len(str(destination)) == 1001
+            name = "x" * (length - 1002)
+            entry = source / name
+            if folder:
+                entry.mkdir(parents=True)
+            else:
+                _write(entry, "source")
+            if length == 1024:
+                sentinel = destination / name[:-1]
+                _write(sentinel / "keep.txt" if folder else sentinel, "sentinel", _DAY)
+            harness.run(
+                source=str(source), parent=str(destination.parent), leaf=destination.name,
+                expect_errors=length == 1024,
+            )
+            if length == 1024:
+                assert entry.exists()
+                assert (sentinel / "keep.txt" if folder else sentinel).read_text(encoding="utf-8") == "sentinel"
+                if not folder:
+                    assert entry.read_text(encoding="utf-8") == "source"
+            else:
+                assert not source.exists()
+                if not folder:
+                    assert (destination / name).read_text(encoding="utf-8") == "source"
+
 
 def _move_file_case_sensitive(harness, directory):
     source = directory / "file.txt"
@@ -469,12 +614,21 @@ def _move_folder_case_sensitive(harness, directory):
     assert (destination / "nested" / "nested.txt").read_text(encoding="utf-8") == "distinct sibling"
 
 
+@contextlib.contextmanager
+def _second_volume(directory):
+    parent = os.environ.get("NSIS_TEST_SECOND_VOLUME") or str(Path(os.environ["SystemRoot"]) / "Temp")
+    with tempfile.TemporaryDirectory(prefix="nsis-move-", dir=parent) as other:
+        other = Path(other)
+        if directory.stat().st_dev == other.stat().st_dev:
+            raise unittest.SkipTest("No second volume; configure NSIS_TEST_SECOND_VOLUME to exercise cross-volume moves")
+        yield other
+
+
 def _move_file_cross_volume(harness, directory):
     probe = directory / "probe.txt"
     _write(probe, "probe")
     harness.run(source=str(probe), destination=str(probe), locked=str(probe), expect_errors=False)
-    with tempfile.TemporaryDirectory(prefix="nsis-move-", dir=Path(os.environ["SystemRoot"]) / "Temp") as other:
-        assert directory.stat().st_dev != Path(other).stat().st_dev, "Cross-volume fixture requires distinct volumes"
+    with _second_volume(directory) as other:
         source = directory / "success.txt"
         destination = Path(other) / "success.txt"
         _write(source, "moved across volumes")
@@ -501,8 +655,7 @@ def _move_folder_cross_volume(harness, directory):
     _write(locked, "retained source")
     _write(source / "child" / "later.txt", "not reached")
     harness.run(source=str(source), destination=str(source), locked=str(locked), expect_errors=False)
-    with tempfile.TemporaryDirectory(prefix="nsis-move-", dir=Path(os.environ["SystemRoot"]) / "Temp") as other:
-        assert directory.stat().st_dev != Path(other).stat().st_dev, "Cross-volume fixture requires distinct volumes"
+    with _second_volume(directory) as other:
         destination = Path(other) / "destination"
         harness.run(source=str(source), destination=str(destination), locked=str(locked), expect_errors=True)
         assert locked.read_text(encoding="utf-8") == "retained source"
@@ -549,6 +702,9 @@ def run_case(case, harness, args):
         "move_folder_aliases": _move_folder_aliases,
         "move_file_case_sensitive": _move_file_case_sensitive,
         "move_folder_case_sensitive": _move_folder_case_sensitive,
+        "move_folder_enumeration": _move_folder_enumeration,
+        "move_folder_drive_root": _move_folder_drive_root,
+        "move_folder_limits": _move_folder_limits,
         "move_file_cross_volume": _move_file_cross_volume,
         "move_folder_cross_volume": _move_folder_cross_volume,
         "move_file_copy_only": _move_file_copy_only,
@@ -601,4 +757,5 @@ def run_case(case, harness, args):
 
 
 if __name__ == "__main__":
-    common.main(run_case)
+    result = unittest.TextTestRunner().run(unittest.FunctionTestCase(lambda: common.main(run_case)))
+    sys.exit(0 if result.wasSuccessful() else 1)

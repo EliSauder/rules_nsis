@@ -555,6 +555,12 @@ case-sensitive names. Moves fail conservatively when identity/resolved-path
 queries are unavailable. A failed cross-volume move can leave a copied
 destination alongside the retained source; it is reported as an error, and
 folder processing stops rather than continuing to later files.
+Folder traversal checks Win32 enumeration failures and rejects cycles/repeated
+directory identities before creating output. Both logical and resolved destination
+ancestors, including mapped child directories, are checked against the source
+tree. Combined paths are length-checked before construction. Literal source and
+destination paths reject wildcards before normalization; folder masks still
+support wildcards.
 
 ### Stamping
 - Stamp values will be substituted with their workspace avlues when built with

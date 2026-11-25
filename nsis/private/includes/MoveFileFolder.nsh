@@ -6,6 +6,9 @@
 
 ; Set to 1 to overwrite existing destination files without an 'ifnewer' check.
 Var /GLOBAL switch_overwrite
+Var /GLOBAL _MoveFolderSources
+Var /GLOBAL _MoveFolderSeen
+!define /math _MOVE_FOLDER_SEARCH_BYTES ${NSIS_MAX_STRLEN} * 4
 
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ; MoveFile and MoveFolder macros
@@ -22,8 +25,32 @@ Var /GLOBAL switch_overwrite
 !macroend
 !endif
 
-; Return the volume/file identity and resolved path, preserving all registers.
 !macro _MovePathInfoFunction PREFIX
+Function ${PREFIX}_MoveCheckLiteralPath
+    Exch $0
+    Push $1
+    Push $2
+    StrCpy $2 0
+    StrCpy $1 "$0" 4
+    StrCmpS $1 "\\?\" 0 move_literal_next
+    StrCpy $2 4
+move_literal_next:
+    StrCpy $1 "$0" 1 $2
+    StrCmp $1 "" move_literal_done
+    StrCmp $1 "*" move_literal_invalid
+    StrCmp $1 "?" move_literal_invalid
+    IntOp $2 $2 + 1
+    Goto move_literal_next
+move_literal_invalid:
+    DetailPrint "Wildcard in literal move/backup path: $0"
+    SetErrors
+move_literal_done:
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+
+; Return the volume/file identity and resolved path, preserving all registers.
 Function ${PREFIX}_MovePathInfo
     Exch $0
     Push $1
@@ -123,6 +150,12 @@ Function ${PREFIX}_MoveFile
     ClearErrors
     StrCmp $0 "" move_file_failed
     StrCmp $1 "" move_file_failed
+    Push "$0"
+    Call ${PREFIX}_MoveCheckLiteralPath
+    IfErrors move_file_failed
+    Push "$1"
+    Call ${PREFIX}_MoveCheckLiteralPath
+    IfErrors move_file_failed
     System::Call 'kernel32::GetFullPathNameW(w r0, i ${NSIS_MAX_STRLEN}, w .r0, p 0) i.r2'
     IntCmp $2 0 move_file_failed
     IntCmp $2 ${NSIS_MAX_STRLEN} move_file_failed 0 move_file_failed
@@ -232,6 +265,314 @@ FunctionEnd
 !macroend
 !define un.MoveFile `!insertmacro un.MoveFile`
 
+!macro _MoveFolderSupport PREFIX
+Function ${PREFIX}_MoveFolderFreeList
+    Exch $0
+    Push $1
+move_list_free:
+    StrCmp $0 0 move_list_freed
+    System::Call '*$0(p.r1)'
+    System::Free $0
+    StrCpy $0 $1
+    Goto move_list_free
+move_list_freed:
+    Pop $1
+    Pop $0
+FunctionEnd
+
+Function ${PREFIX}_MoveFolderRemember
+    Exch $0
+    Push $1
+    Push $2
+    Push $3
+    Push $4
+    Push "$0"
+    Call ${PREFIX}_MovePathInfo
+    Pop $1
+    Pop $2
+    IfErrors move_remember_failed
+    StrCpy $2 $_MoveFolderSeen
+move_remember_find:
+    StrCmp $2 0 move_remember_add
+    System::Call '*$2(p.r3, &w49.r4)'
+    StrCmpS $1 $4 move_remember_failed
+    StrCpy $2 $3
+    Goto move_remember_find
+move_remember_add:
+    StrCpy $2 $_MoveFolderSeen
+    System::Call '*(p r2, &w49 r1) p.r3'
+    StrCmp $3 0 move_remember_failed
+    StrCpy $_MoveFolderSeen $3
+    Goto move_remember_done
+move_remember_failed:
+    DetailPrint "Cannot traverse move directory (identity query, cycle, or repeated alias): $0"
+    SetErrors
+move_remember_done:
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+
+Function ${PREFIX}_MoveFolderDestination
+    Exch $0
+    Push $1
+    Push $2
+    StrLen $1 "$R0"
+    StrCpy $0 "$0" "" $1
+    StrCpy $1 "$R1" 1 -1
+    StrCmp $1 "\" 0 +2
+    StrCpy $0 "$0" "" 1
+    StrLen $1 "$R1"
+    StrLen $2 "$0"
+    IntOp $1 $1 + $2
+    IntCmp $1 ${NSIS_MAX_STRLEN} move_destination_long 0 move_destination_long
+    StrCpy $0 "$R1$0"
+    Goto move_destination_done
+move_destination_long:
+    DetailPrint "Mapped move destination exceeds the NSIS string limit"
+    StrCpy $0 ""
+    SetErrors
+move_destination_done:
+    Pop $2
+    Pop $1
+    Exch $0
+FunctionEnd
+
+Function ${PREFIX}_MoveFolderCheckDestination
+    Exch $0
+    Push $1
+    Push $2
+    Push $3
+    Push $4
+    Push $5
+    Push $6
+    Push $7
+move_destination_parent:
+    ${${PREFIX}GetRoot} "$0" $1
+    StrCmpS $0 $1 0 +2
+    StrCpy $0 "$0\"
+    System::Call 'kernel32::GetFileAttributesW(w r0) i.r1 ?e'
+    Pop $2
+    IntCmp $1 -1 0 move_destination_found move_destination_found
+    StrCmp $2 2 move_destination_missing
+    StrCmp $2 3 0 move_destination_unsafe
+move_destination_missing:
+    ${${PREFIX}GetRoot} "$0" $1
+    StrCmpS $0 "$1\" move_destination_unsafe
+    ${${PREFIX}GetParent} "$0" $0
+    Goto move_destination_parent
+move_destination_found:
+    IntOp $1 $1 & 0x10
+    StrCmp $1 0 move_destination_unsafe
+    StrCpy $7 0
+move_destination_identity:
+    Push "$0"
+    Call ${PREFIX}_MovePathInfo
+    Pop $1
+    Pop $2
+    IfErrors move_destination_unsafe
+    StrCmp $7 0 0 +2
+    StrCpy $6 "$2"
+    StrCpy $3 $_MoveFolderSources
+move_destination_source:
+    StrCmp $3 0 move_destination_ancestor
+    System::Call '*$3(p.r4, &w49.r5)'
+    StrCmpS $1 $5 move_destination_unsafe
+    StrCpy $3 $4
+    Goto move_destination_source
+move_destination_ancestor:
+    ; Check both logical parents and canonical parents: a junction can leave
+    ; the source tree, or enter it through a destination child.
+    ${${PREFIX}GetRoot} "$0" $1
+    StrCmpS $0 "$1\" move_destination_chain_done
+    StrCmpS $0 $1 move_destination_chain_done
+    ${${PREFIX}GetParent} "$0" $0
+    ${${PREFIX}GetRoot} "$0" $1
+    StrCmpS $0 $1 0 +2
+    StrCpy $0 "$0\"
+    StrCmp $7 2 +2
+    StrCpy $7 1
+    Goto move_destination_identity
+move_destination_chain_done:
+    StrCmp $7 2 move_destination_safe
+    StrCpy $0 "$6"
+    StrCpy $7 2
+    Goto move_destination_identity
+move_destination_unsafe:
+    DetailPrint "Unsafe or inaccessible move destination ancestor: $0"
+    SetErrors
+move_destination_safe:
+    Pop $7
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $1
+    Pop $0
+FunctionEnd
+
+Function ${PREFIX}_MoveFolderWalk
+    Exch $1
+    Exch
+    Exch $0
+    Push $2
+    Push $3
+    Push $4
+    Push $5
+    Push $6
+    Push $7
+    Push $8
+    Push $9
+    Push $R6
+    Push $R9
+    Push $R7
+    StrCpy $2 0
+    StrCpy $R7 0
+    StrCpy $3 -1
+    StrCpy $9 0
+    Push "$0"
+    Call ${PREFIX}_MoveFolderRemember
+    IfErrors move_walk_failed
+    StrCmp $1 "create" 0 move_walk_allocate
+    StrCpy $R9 "$0"
+    StrCpy $R6 ""
+    Call ${PREFIX}_MoveFolder_Locate_createDir
+    Pop $6
+    IfErrors move_walk_failed
+move_walk_allocate:
+    System::Alloc 592
+    Pop $2
+    StrCmp $2 0 move_walk_failed
+    System::Alloc ${_MOVE_FOLDER_SEARCH_BYTES}
+    Pop $R7
+    StrCmp $R7 0 move_walk_failed
+    StrCpy $8 0
+    StrCmp $1 "move" 0 move_walk_open
+    StrCpy $8 1
+move_walk_open:
+    StrCpy $5 "*"
+    StrCmp $8 1 0 +2
+    StrCpy $5 "$R2"
+    ; A search suffix must not truncate an otherwise exact-fit directory path.
+    System::Call 'kernel32::lstrcpyW(p R7, w r0)'
+    System::Call 'kernel32::lstrcatW(p R7, w "\")'
+    System::Call 'kernel32::lstrcatW(p R7, w r5)'
+    System::Call 'kernel32::FindFirstFileW(p R7, p r2) p.r3 ?e'
+    Pop $7
+    StrCmp $3 -1 0 move_walk_entry
+    StrCmp $7 2 move_walk_empty_search move_walk_failed
+move_walk_empty_search:
+    System::Call 'kernel32::GetFileAttributesW(w r0) i.r4'
+    IntCmp $4 -1 move_walk_failed
+    IntOp $4 $4 & 0x10
+    StrCmp $4 0 move_walk_failed move_walk_search_done
+move_walk_entry:
+    System::Call '*$2(i.r4, i, i, i, i, i, i, i, i, i, i, &w260.r5)'
+    StrCmp $5 "." move_walk_next
+    StrCmp $5 ".." move_walk_next
+    StrLen $6 "$0"
+    StrLen $7 "$5"
+    IntOp $6 $6 + $7
+    IntOp $6 $6 + 1
+    IntCmp $6 ${NSIS_MAX_STRLEN} move_walk_failed 0 move_walk_failed
+    StrCpy $R9 "$0\$5"
+    IntOp $4 $4 & 0x10
+    StrCmp $4 0 move_walk_file
+    StrCmp $8 1 move_walk_next
+    Push "$R9"
+    Push "$1"
+    Call ${PREFIX}_MoveFolderWalk
+    IfErrors move_walk_failed
+    StrCmp $1 "clean" 0 move_walk_next
+    System::Call 'kernel32::GetFileAttributesW(w R9) i.r4 ?e'
+    Pop $7
+    IntCmp $4 -1 0 move_walk_not_empty move_walk_not_empty
+    StrCmp $7 2 move_walk_next
+    StrCmp $7 3 move_walk_next move_walk_failed
+move_walk_file:
+    StrCmp $8 1 0 move_walk_not_empty
+    StrCpy $R6 0
+    Call ${PREFIX}_MoveFolder_Locate_moveFile
+    Pop $6
+    IfErrors move_walk_failed
+    Goto move_walk_next
+move_walk_not_empty:
+    StrCpy $9 1
+move_walk_next:
+    System::Call 'kernel32::FindNextFileW(p r3, p r2) i.r4 ?e'
+    Pop $7
+    StrCmp $4 0 0 move_walk_entry
+    StrCmp $7 18 0 move_walk_failed
+    System::Call 'kernel32::FindClose(p r3) i.r4'
+    StrCpy $3 -1
+    StrCmp $4 0 move_walk_failed
+move_walk_search_done:
+    StrCmp $8 1 0 move_walk_finish
+    StrCpy $8 0
+    Goto move_walk_open
+move_walk_finish:
+    StrCmp $1 "clean" 0 move_walk_done
+    StrCmp $9 0 0 move_walk_done
+    StrCmpS $0 $R1 move_walk_done
+    StrCpy $R9 "$0"
+    StrCpy $R6 ""
+    Call ${PREFIX}_MoveFolder_Locate_deleteDir
+    Pop $6
+    IfErrors move_walk_failed
+move_walk_done:
+    StrCpy $6 0
+    Goto move_walk_release
+move_walk_failed:
+    DetailPrint "Cannot enumerate/process move directory: $0 (phase: $1)"
+    StrCpy $6 1
+move_walk_release:
+    StrCmp $3 -1 move_walk_free
+    System::Call 'kernel32::FindClose(p r3) i.r7'
+    StrCmp $7 0 0 move_walk_free
+    DetailPrint "Cannot close move directory search: $0"
+    StrCpy $6 1
+move_walk_free:
+    StrCmp $R7 0 +2
+    System::Free $R7
+    StrCmp $2 0 +2
+    System::Free $2
+    StrCmp $6 0 0 +3
+    ClearErrors
+    Goto move_walk_restore
+    SetErrors
+move_walk_restore:
+    Pop $R7
+    Pop $R9
+    Pop $R6
+    Pop $9
+    Pop $8
+    Pop $7
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $0
+    Pop $1
+FunctionEnd
+!macroend
+
+!insertmacro _MoveFolderSupport ""
+!insertmacro _MoveFolderSupport "un."
+
+!macro _MoveFolderRun PREFIX PATH PHASE
+    Push "${PATH}"
+    Push "${PHASE}"
+    Call ${PREFIX}_MoveFolderWalk
+    IfErrors move_folder_failed
+    Push $_MoveFolderSeen
+    Call ${PREFIX}_MoveFolderFreeList
+    StrCpy $_MoveFolderSeen 0
+!macroend
+
 !macro _MoveFolderFunction PREFIX
 Function ${PREFIX}_MoveFolder
     Exch $R2
@@ -247,10 +588,20 @@ Function ${PREFIX}_MoveFolder
     Push $4
     Push $5
     Push $6
+    Push $_MoveFolderSources
+    Push $_MoveFolderSeen
+    StrCpy $_MoveFolderSources 0
+    StrCpy $_MoveFolderSeen 0
 
     ClearErrors
     StrCmp $R0 "" move_folder_failed
     StrCmp $R1 "" move_folder_failed
+    Push "$R0"
+    Call ${PREFIX}_MoveCheckLiteralPath
+    IfErrors move_folder_failed
+    Push "$R1"
+    Call ${PREFIX}_MoveCheckLiteralPath
+    IfErrors move_folder_failed
     System::Call 'kernel32::GetFullPathNameW(w R0, i ${NSIS_MAX_STRLEN}, w .R0, p 0) i.r0'
     IntCmp $0 0 move_folder_failed
     IntCmp $0 ${NSIS_MAX_STRLEN} move_folder_failed 0 move_folder_failed
@@ -268,6 +619,9 @@ Function ${PREFIX}_MoveFolder
     StrCpy $0 "$R1" 1 -1
     StrCmp $0 "\" 0 +2
     StrCpy $R1 "$R1" -1
+    ${${PREFIX}GetRoot} "$R1" $0
+    StrCmpS $R1 $0 0 +2
+    StrCpy $R1 "$R1\"
     ${${PREFIX}GetRoot} "$R0" $0
     StrCmp $R0 $0 move_folder_failed
     Push "$R0"
@@ -279,89 +633,51 @@ Function ${PREFIX}_MoveFolder
     StrCmpS $3 $0 move_folder_failed
     StrCmpS $3 "$0\" move_folder_failed
 
-    ; Resolve the nearest existing destination ancestor before creating anything.
-    StrCpy $4 "$R1"
-    StrCpy $6 1
-move_folder_find_parent:
-    System::Call 'kernel32::GetFileAttributesW(w r4) i.r0 ?e'
+    System::Call 'kernel32::GetFileAttributesW(w R1) i.r0 ?e'
     Pop $1
-    IntCmp $0 -1 0 move_folder_parent_found move_folder_parent_found
-    StrCmp $1 2 move_folder_parent_missing
+    IntCmp $0 -1 0 move_folder_existing move_folder_existing
+    StrCmp $1 2 move_folder_scan
     StrCmp $1 3 0 move_folder_failed
-move_folder_parent_missing:
-    StrCpy $6 0
-    ${${PREFIX}GetRoot} "$4" $0
-    StrCmpS $4 $0 move_folder_failed
-    StrCmpS $4 "$0\" move_folder_failed
-    ${${PREFIX}GetParent} "$4" $4
-    ${${PREFIX}GetRoot} "$4" $0
-    ; A bare drive (C:) resolves to its current directory, not its root.
-    StrCmpS $4 $0 0 +2
-    StrCpy $4 "$4\"
-    Goto move_folder_find_parent
-move_folder_parent_found:
+    Goto move_folder_scan
+move_folder_existing:
     IntOp $0 $0 & 0x10
     StrCmp $0 0 move_folder_failed
-    Push "$4"
+    Push "$R1"
     Call ${PREFIX}_MovePathInfo
     Pop $5
     Pop $4
     IfErrors move_folder_failed
-    StrCmpS $2 $5 0 move_folder_check_ancestor
-    StrCmp $6 1 move_folder_done move_folder_failed
-move_folder_check_ancestor:
-    StrCmpS $2 $5 move_folder_failed
-    ${${PREFIX}GetRoot} "$4" $0
-    StrCmpS $4 $0 move_folder_destination_safe
-    StrCmpS $4 "$0\" move_folder_destination_safe
-    ${${PREFIX}GetParent} "$4" $4
-    ${${PREFIX}GetRoot} "$4" $0
-    StrCmpS $4 $0 move_folder_destination_safe
-    Push "$4"
-    Call ${PREFIX}_MovePathInfo
-    Pop $5
-    Pop $4
+    StrCmpS $2 $5 move_folder_done
+move_folder_scan:
+    Push "$R0"
+    Push "scan"
+    Call ${PREFIX}_MoveFolderWalk
     IfErrors move_folder_failed
-    Goto move_folder_check_ancestor
-move_folder_destination_safe:
-
-    CreateDirectory "$R1\"
-    IfErrors move_folder_failed
-    DetailPrint "Moving files: $R0\$R2 to $R1\"
-    ${${PREFIX}Locate} "$R0" "/L=D" "${PREFIX}_MoveFolder_Locate_createDir"
-    IfErrors move_folder_failed
-    ${${PREFIX}Locate} "$R0" "/L=F /M=$R2 /S= /G=1" "${PREFIX}_MoveFolder_Locate_moveFile"
-    IfErrors move_folder_failed
-
-    ; Only clean up after every matching file was handled successfully.
-move_folder_delete_source:
+    StrCpy $_MoveFolderSources $_MoveFolderSeen
+    StrCpy $_MoveFolderSeen 0
+    !insertmacro _MoveFolderRun "${PREFIX}" "$R0" "create"
+    !insertmacro _MoveFolderRun "${PREFIX}" "$R0" "move"
     StrCpy $R3 0
-    ${${PREFIX}Locate} "$R0" "/L=DE" "${PREFIX}_MoveFolder_Locate_deleteDir"
-    IfErrors move_folder_failed
-    StrCmp $R3 0 0 move_folder_delete_source
-
-    ; Nonmatching files deliberately remain in the source and are not errors.
-    ${${PREFIX}DirState} "$R0" $0
-    StrCmp $0 -1 move_folder_failed
-    ; DirState uses FindNext's error flag to signal an empty directory.
-    ClearErrors
-    StrCmp $0 0 0 move_folder_delete_destination
-    RMDir "$R0"
-    IfErrors move_folder_failed
-
-    ; Remove the source first: when moving into an ancestor, destination cleanup
-    ; can also visit and remove the now-empty source directory.
-move_folder_delete_destination:
-    StrCpy $R3 0
-    ${${PREFIX}Locate} "$R1" "/L=DE" "${PREFIX}_MoveFolder_Locate_deleteDir"
-    IfErrors move_folder_failed
-    StrCmp $R3 0 0 move_folder_delete_destination
+    !insertmacro _MoveFolderRun "${PREFIX}" "$R0" "clean"
+    !insertmacro _MoveFolderRun "${PREFIX}" "$R1" "clean"
     Goto move_folder_done
 
 move_folder_failed:
     DetailPrint "Failed to move folder: $R0 to $R1 (mask: $R2)"
-    SetErrors
+    StrCpy $6 1
+    Goto move_folder_release
 move_folder_done:
+    StrCpy $6 0
+move_folder_release:
+    Push $_MoveFolderSeen
+    Call ${PREFIX}_MoveFolderFreeList
+    Push $_MoveFolderSources
+    Call ${PREFIX}_MoveFolderFreeList
+    Pop $_MoveFolderSeen
+    Pop $_MoveFolderSources
+    ClearErrors
+    StrCmp $6 0 +2
+    SetErrors
     Pop $6
     Pop $5
     Pop $4
@@ -399,9 +715,18 @@ FunctionEnd
 Function ${PREFIX}_MoveFolder_Locate_createDir
     ${If} $R6 == ""
         Push $R4
-        StrLen $R4 "$R0"
-        StrCpy $R4 "$R9" "" $R4
-        CreateDirectory "$R1$R4"
+        Push "$R9"
+        Call ${PREFIX}_MoveFolderDestination
+        Pop $R4
+        IfErrors move_create_failed
+        Push "$R4"
+        Call ${PREFIX}_MoveFolderCheckDestination
+        IfErrors move_create_failed
+        CreateDirectory "$R4"
+        Goto move_create_done
+move_create_failed:
+        SetErrors
+move_create_done:
         Pop $R4
     ${EndIf}
     Push ""
@@ -409,10 +734,21 @@ FunctionEnd
 
 Function ${PREFIX}_MoveFolder_Locate_moveFile
     Push $R4
-    StrLen $R4 "$R0"
-    StrCpy $R4 "$R9" "" $R4
-    StrCpy $R4 "$R1$R4"
+    Push $0
+    Push "$R9"
+    Call ${PREFIX}_MoveFolderDestination
+    Pop $R4
+    IfErrors move_mapped_failed
+    ${${PREFIX}GetParent} "$R4" $0
+    Push "$0"
+    Call ${PREFIX}_MoveFolderCheckDestination
+    IfErrors move_mapped_failed
     ${${PREFIX}MoveFile} "$R9" "$R4"
+    Goto move_mapped_done
+move_mapped_failed:
+    SetErrors
+move_mapped_done:
+    Pop $0
     Pop $R4
     Push ""
 FunctionEnd

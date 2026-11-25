@@ -17,6 +17,9 @@ def move_file_folder_cases():
         ("move_folder_aliases", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
         ("move_file_case_sensitive", "MoveFile", ["in:source", "in:destination"]),
         ("move_folder_case_sensitive", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
+        ("move_folder_enumeration", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
+        ("move_folder_drive_root", "HarnessMoveFolderDriveRoot", ["in:source", "in:destination", "in:working"]),
+        ("move_folder_limits", "HarnessMoveFolderLimits", ["in:source", "in:parent", "in:leaf"]),
     ]:
         # $switch_overwrite replaces existing destinations regardless of age.
         for suffix, on_init in [("", []), ("_overwrite", ["StrCpy $switch_overwrite 1"])]:
@@ -27,7 +30,7 @@ def move_file_folder_cases():
                 symbol = symbol,
                 parameters = parameters,
                 on_init = on_init,
-                src = "move_file_folder_adapters.nsh" if name == "move_file_locked" else None,
+                src = "move_file_folder_adapters.nsh" if symbol.startswith("Harness") else None,
             )
 
     # Repeated expansions in one function must still compile and run.

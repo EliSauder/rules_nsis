@@ -1,5 +1,62 @@
 !include "MoveFileFolder.nsh"
 
+!macro _HarnessMoveFolderLimits PREFIX SOURCE PARENT LEAF
+    Push $0
+    StrCpy $0 "${PARENT}\${LEAF}"
+    ${${PREFIX}MoveFolder} "${SOURCE}" "$0" "*"
+    Pop $0
+!macroend
+
+!macro HarnessMoveFolderLimits SOURCE PARENT LEAF
+    !insertmacro _HarnessMoveFolderLimits "" "${SOURCE}" "${PARENT}" "${LEAF}"
+!macroend
+
+!macro un.HarnessMoveFolderLimits SOURCE PARENT LEAF
+    !insertmacro _HarnessMoveFolderLimits "un." "${SOURCE}" "${PARENT}" "${LEAF}"
+!macroend
+
+!macro _HarnessMoveFolderDriveRoot PREFIX SOURCE DESTINATION WORKING
+    Push $0
+    Push $1
+    Push $2
+    System::Call 'kernel32::GetCurrentDirectoryW(i ${NSIS_MAX_STRLEN}, w .r0) i.r1'
+    ${If} $1 == 0
+        SetErrorLevel 71
+        SetErrors
+    ${Else}
+        System::Call 'kernel32::SetCurrentDirectoryW(w "${WORKING}") i.r1'
+        ${If} $1 == 0
+            SetErrorLevel 71
+            SetErrors
+        ${Else}
+            ${${PREFIX}MoveFolder} "${SOURCE}" "${DESTINATION}" "*"
+            StrCpy $2 0
+            IfErrors 0 +2
+            StrCpy $2 1
+            System::Call 'kernel32::SetCurrentDirectoryW(w r0) i.r1'
+            ${If} $1 == 0
+                SetErrorLevel 72
+                SetErrors
+            ${ElseIf} $2 == 1
+                SetErrors
+            ${Else}
+                ClearErrors
+            ${EndIf}
+        ${EndIf}
+    ${EndIf}
+    Pop $2
+    Pop $1
+    Pop $0
+!macroend
+
+!macro HarnessMoveFolderDriveRoot SOURCE DESTINATION WORKING
+    !insertmacro _HarnessMoveFolderDriveRoot "" "${SOURCE}" "${DESTINATION}" "${WORKING}"
+!macroend
+
+!macro un.HarnessMoveFolderDriveRoot SOURCE DESTINATION WORKING
+    !insertmacro _HarnessMoveFolderDriveRoot "un." "${SOURCE}" "${DESTINATION}" "${WORKING}"
+!macroend
+
 ; Repeated expansions in one function must still compile and run.
 !macro HarnessMoveFileTwice FIRST_SOURCE FIRST_DESTINATION SECOND_SOURCE SECOND_DESTINATION
     ${MoveFile} "${FIRST_SOURCE}" "${FIRST_DESTINATION}"
