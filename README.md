@@ -530,6 +530,22 @@ is included in the `plugin_licenses` output group.
   fails the build. Message file paths are stored as
   `REG_EXPAND_SZ`, so environment variables such as `%SystemRoot%` expand.
 
+### Moving files and folders
+
+`MoveFileFolder.nsh` provides `${MoveFile} source destination` and
+`${MoveFolder} source destination mask`, plus their `un.` variants.
+By default, an existing destination file is replaced only when the source is
+newer; otherwise the redundant source is removed. Set `$switch_overwrite` to
+`1` to replace regardless of age. Replacements use Windows `MoveFileExW` without
+deleting the destination first, and failed moves retain the source and report
+the NSIS error flag with a detail-log message.
+
+Folder moves retain their merge/mask behavior: nonmatching files stay in the
+source. Processing stops on the first failure and skips subsequent empty-folder
+cleanup; files already moved are not rolled back. Failed empty-folder removals
+are reported instead of retried indefinitely. Moving onto the same normalized
+path is a no-op; moving a folder into its own descendant is rejected.
+
 ### Stamping
 - Stamp values will be substituted with their workspace avlues when built with
   stamping.

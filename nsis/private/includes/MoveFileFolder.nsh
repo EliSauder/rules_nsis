@@ -15,271 +15,254 @@ Var /GLOBAL switch_overwrite
 ; Source: https://nsis.sourceforge.io/MoveFileFolder
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-;==================
-; MoveFile macro
-;==================
+!macro _MoveFileFunction PREFIX
+Function ${PREFIX}_MoveFile
+    Exch $1
+    Exch
+    Exch $0
+    Push $2
+    Push $3
+    Push $4
+    Push $5
+    Push $6
+    Push $7
+
+    ClearErrors
+    StrCmp $0 "" move_file_failed
+    StrCmp $1 "" move_file_failed
+    System::Call 'kernel32::GetFullPathNameW(w r0, i ${NSIS_MAX_STRLEN}, w .r0, p 0) i.r2'
+    IntCmp $2 0 move_file_failed
+    IntCmp $2 ${NSIS_MAX_STRLEN} move_file_failed 0 move_file_failed
+    System::Call 'kernel32::GetFullPathNameW(w r1, i ${NSIS_MAX_STRLEN}, w .r1, p 0) i.r2'
+    IntCmp $2 0 move_file_failed
+    IntCmp $2 ${NSIS_MAX_STRLEN} move_file_failed 0 move_file_failed
+    System::Call 'kernel32::GetFileAttributesW(w r0) i.r2'
+    IntCmp $2 -1 move_file_failed
+    IntOp $2 $2 & 0x10
+    StrCmp $2 0 0 move_file_failed
+
+    ; The old timestamp branch could delete a file moved onto itself.
+    StrCmp $0 $1 move_file_done
+    DetailPrint "Moving/renaming file: $0 to $1"
+
+move_file_destination:
+    System::Call 'kernel32::GetFileAttributesW(w r1) i.r2 ?e'
+    Pop $7
+    IntCmp $2 -1 move_file_missing
+    IntOp $2 $2 & 0x10
+    StrCmp $2 0 0 move_file_failed
+    StrCpy $6 3
+    StrCmp $switch_overwrite 1 move_file_rename
+
+    GetFileTime "$0" $2 $3
+    IfErrors move_file_failed
+    GetFileTime "$1" $4 $5
+    IfErrors move_file_failed
+    ; FILETIME consists of two unsigned DWORDs, high word first.
+    IntCmpU $2 $4 0 move_file_discard move_file_rename
+    IntCmpU $3 $5 move_file_discard move_file_discard move_file_rename
+
+move_file_discard:
+    Delete "$0"
+    IfErrors move_file_failed
+    Goto move_file_done
+
+move_file_missing:
+    StrCmp $7 2 move_file_new
+    StrCmp $7 3 0 move_file_failed
+move_file_new:
+    StrCpy $6 2
+
+move_file_rename:
+    ; COPY_ALLOWED retains cross-volume file moves; REPLACE_EXISTING replaces
+    ; in place without first deleting the destination. Never delete on failure.
+    System::Call 'kernel32::MoveFileExW(w r0, w r1, i r6) i.r2 ?e'
+    Pop $7
+    StrCmp $2 0 0 move_file_done
+    StrCmp $6 2 0 move_file_windows_error
+    ; If a destination appeared after our check, apply the timestamp policy.
+    StrCmp $7 80 move_file_destination
+    StrCmp $7 183 move_file_destination
+move_file_windows_error:
+    DetailPrint "Windows move error: $7"
+move_file_failed:
+    DetailPrint "Failed to move file: $0 to $1"
+    SetErrors
+
+move_file_done:
+    Pop $7
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $0
+    Pop $1
+FunctionEnd
+!macroend
+
+!insertmacro _MoveFileFunction ""
+!insertmacro _MoveFileFunction "un."
 
 !macro MoveFile sourceFile destinationFile
-
-!define _MOVEFILE_JUMP ${__LINE__}
-
-; Check source actually exists
-
-    IfFileExists "${sourceFile}" +3 0
-    SetErrors
-    goto done_${_MOVEFILE_JUMP}
-
-; Add message to details-view/install-log
-
-    DetailPrint "Moving/renaming file: ${sourceFile} to ${destinationFile}"
-
-; If destination does not already exists simply move file
-
-    IfFileExists "${destinationFile}" +3 0
-    rename "${sourceFile}" "${destinationFile}"
-    goto done_${_MOVEFILE_JUMP}
-
-; If overwriting without 'ifnewer' check
-
-    ${If} $switch_overwrite == 1
-	delete "${destinationFile}"
-	rename "${sourceFile}" "${destinationFile}"
-	delete "${sourceFile}"
-	goto done_${_MOVEFILE_JUMP}
-    ${EndIf}
-
-; If destination already exists
-
-    Push $R0
-    Push $R1
-    Push $R2
-    push $R3
-
-    GetFileTime "${sourceFile}" $R0 $R1
-    GetFileTime "${destinationFile}" $R2 $R3
-
-    IntCmp $R0 $R2 0 older_${_MOVEFILE_JUMP} newer_${_MOVEFILE_JUMP}
-    IntCmp $R1 $R3 older_${_MOVEFILE_JUMP} older_${_MOVEFILE_JUMP} newer_${_MOVEFILE_JUMP}
-
-older_${_MOVEFILE_JUMP}:
-    delete "${sourceFile}"
-    goto time_check_done_${_MOVEFILE_JUMP}
-
-newer_${_MOVEFILE_JUMP}:
-    delete "${destinationFile}"
-    rename "${sourceFile}" "${destinationFile}"
-    delete "${sourceFile}" ;in case above failed!
-
-time_check_done_${_MOVEFILE_JUMP}:
-
-    Pop $R3
-    Pop $R2
-    Pop $R1
-    Pop $R0
-
-done_${_MOVEFILE_JUMP}:
-
-!undef _MOVEFILE_JUMP
-
+    Push "${sourceFile}"
+    Push "${destinationFile}"
+    Call _MoveFile
 !macroend
 !define MoveFile `!insertmacro MoveFile`
 
 !macro un.MoveFile sourceFile destinationFile
-    !insertmacro MoveFile `${sourceFile}` `${destinationFile}`
+    Push "${sourceFile}"
+    Push "${destinationFile}"
+    Call un._MoveFile
 !macroend
 !define un.MoveFile `!insertmacro un.MoveFile`
 
-;==================
-; MoveFolder macro
-;==================
-
-!macro _MoveFolder PREFIX source destination mask
-
-    !define _MOVEFOLDER_JUMP ${__LINE__}
-
-    Push $R0
-    Push $R1
-
-; Move path parameters into registers so they can be altered if necessary
-
-    StrCpy $R0 "${source}"
-    StrCpy $R1 "${destination}"
-
-; Sort out paths - remove final backslash if supplied
-
+!macro _MoveFolderFunction PREFIX
+Function ${PREFIX}_MoveFolder
+    Exch $R2
+    Exch
+    Exch $R1
+    Exch 2
+    Exch $R0
+    Push $R3
     Push $0
+    Push $1
 
-    ; Source
+    ClearErrors
+    StrCmp $R0 "" move_folder_failed
+    StrCmp $R1 "" move_folder_failed
+    System::Call 'kernel32::GetFullPathNameW(w R0, i ${NSIS_MAX_STRLEN}, w .R0, p 0) i.r0'
+    IntCmp $0 0 move_folder_failed
+    IntCmp $0 ${NSIS_MAX_STRLEN} move_folder_failed 0 move_folder_failed
+    System::Call 'kernel32::GetFullPathNameW(w R1, i ${NSIS_MAX_STRLEN}, w .R1, p 0) i.r0'
+    IntCmp $0 0 move_folder_failed
+    IntCmp $0 ${NSIS_MAX_STRLEN} move_folder_failed 0 move_folder_failed
+    System::Call 'kernel32::GetFileAttributesW(w R0) i.r0'
+    IntCmp $0 -1 move_folder_failed
+    IntOp $0 $0 & 0x10
+    StrCmp $0 0 move_folder_failed
+
     StrCpy $0 "$R0" 1 -1
-    StrCmp $0 '\' 0 +2
+    StrCmp $0 "\" 0 +2
     StrCpy $R0 "$R0" -1
-
-    ; Destination
     StrCpy $0 "$R1" 1 -1
-    StrCmp $0 '\' 0 +2
+    StrCmp $0 "\" 0 +2
     StrCpy $R1 "$R1" -1
+    ${${PREFIX}GetRoot} "$R0" $0
+    StrCmp $R0 $0 move_folder_failed
+    StrCmp $R0 $R1 move_folder_done
 
-    Pop $0
-
-; Create destination dir
+    ; A destination inside the source would be traversed and moved recursively.
+    StrLen $0 "$R0"
+    IntOp $0 $0 + 1
+    StrCpy $1 "$R1" $0
+    StrCmp $1 "$R0\" move_folder_failed
 
     CreateDirectory "$R1\"
-
-; Add message to details-view/install-log
-
-    DetailPrint "Moving files: $R0\${mask} to $R1\"
-
-; Push registers used by ${Locate} onto stack
-
-    Push $R6
-    Push $R7
-    Push $R8
-    Push $R9
-
-; Duplicate dir structure (to preserve empty folders and such)
-
+    IfErrors move_folder_failed
+    DetailPrint "Moving files: $R0\$R2 to $R1\"
     ${${PREFIX}Locate} "$R0" "/L=D" "${PREFIX}_MoveFolder_Locate_createDir"
+    IfErrors move_folder_failed
+    ${${PREFIX}Locate} "$R0" "/L=F /M=$R2 /S= /G=1" "${PREFIX}_MoveFolder_Locate_moveFile"
+    IfErrors move_folder_failed
 
-; Locate files and move (via callback function)
-
-    ${${PREFIX}Locate} "$R0" "/L=F /M=${mask} /S= /G=1" "${PREFIX}_MoveFolder_Locate_moveFile"
-
-; Delete subfolders left over after move
-
-    Push $R2
-deldir_loop_${_MOVEFOLDER_JUMP}:
-    StrCpy $R2 0
+    ; Only clean up after every matching file was handled successfully.
+move_folder_delete_source:
+    StrCpy $R3 0
     ${${PREFIX}Locate} "$R0" "/L=DE" "${PREFIX}_MoveFolder_Locate_deleteDir"
-    StrCmp $R2 0 0 deldir_loop_${_MOVEFOLDER_JUMP}
-    Pop $R2
+    IfErrors move_folder_failed
+    StrCmp $R3 0 0 move_folder_delete_source
 
-; Delete empty subfolders moved - say the user just wanted to move *.apm files, they now also have a load of empty dir's from dir structure duplication!
-
-    Push $R2
-delnewdir_loop_${_MOVEFOLDER_JUMP}:
-    StrCpy $R2 0
+move_folder_delete_destination:
+    StrCpy $R3 0
     ${${PREFIX}Locate} "$R1" "/L=DE" "${PREFIX}_MoveFolder_Locate_deleteDir"
-    StrCmp $R2 0 0 delnewdir_loop_${_MOVEFOLDER_JUMP}
+    IfErrors move_folder_failed
+    StrCmp $R3 0 0 move_folder_delete_destination
+
+    ; Nonmatching files deliberately remain in the source and are not errors.
+    ${${PREFIX}DirState} "$R0" $0
+    StrCmp $0 -1 move_folder_failed
+    ; DirState uses FindNext's error flag to signal an empty directory.
+    ClearErrors
+    StrCmp $0 0 0 move_folder_done
+    RMDir "$R0"
+    IfErrors move_folder_failed
+    Goto move_folder_done
+
+move_folder_failed:
+    DetailPrint "Failed to move folder: $R0 to $R1 (mask: $R2)"
+    SetErrors
+move_folder_done:
+    Pop $1
+    Pop $0
+    Pop $R3
+    Pop $R0
     Pop $R2
-
-; Pop registers used by ${Locate} off the stack again
-
-    Pop $R9
-    Pop $R8
-    Pop $R7
-    Pop $R6
-
-; Delete source folder if empty
-
-    rmdir "$R0"
-
-Pop $R1
-Pop $R0
-
-!undef _MOVEFOLDER_JUMP
-
+    Pop $R1
+FunctionEnd
 !macroend
 
+!insertmacro _MoveFolderFunction ""
+!insertmacro _MoveFolderFunction "un."
+
 !macro MoveFolder source destination mask
-    !insertmacro _MoveFolder "" `${source}` `${destination}` `${mask}`
+    Push "${source}"
+    Push "${destination}"
+    Push "${mask}"
+    Call _MoveFolder
 !macroend
 !define MoveFolder `!insertmacro MoveFolder`
 
 !macro un.MoveFolder source destination mask
-    !insertmacro _MoveFolder "un." `${source}` `${destination}` `${mask}`
+    Push "${source}"
+    Push "${destination}"
+    Push "${mask}"
+    Call un._MoveFolder
 !macroend
 !define un.MoveFolder `!insertmacro un.MoveFolder`
 
-;==================
-; MoveFolder macro's ${Locate} callback functions
-;==================
-
 !macro _MoveFolderCallbacks PREFIX
 Function ${PREFIX}_MoveFolder_Locate_createDir
-
     ${If} $R6 == ""
-	Push $R2
-	StrLen $R2 "$R0"
-	StrCpy $R2 $R9 '' $R2
-	CreateDirectory "$R1$R2"
-	Pop $R2
+        Push $R4
+        StrLen $R4 "$R0"
+        StrCpy $R4 "$R9" "" $R4
+        CreateDirectory "$R1$R4"
+        Pop $R4
     ${EndIf}
-
-    Push $R1
-
+    Push ""
 FunctionEnd
 
 Function ${PREFIX}_MoveFolder_Locate_moveFile
-
-    Push $R2
-
-    ; Get path to file
-
-	StrLen $R2 "$R0"
-	StrCpy $R2 $R9 '' $R2
-	StrCpy $R2 "$R1$R2"
-
-    ; If destination does not already exists simply move file
-
-	IfFileExists "$R2" +3 0
-	rename "$R9" "$R2"
-	goto done
-
-    ; If overwriting without 'ifnewer' check
-
-	${If} $switch_overwrite == 1
-	    delete "$R2"
-	    rename "$R9" "$R2"
-	    delete "$R9"
-	    goto done
-	${EndIf}
-
-    ; If destination already exists
-
-	Push $0
-	Push $1
-	Push $2
-	push $3
-
-	GetFileTime "$R9" $0 $1
-	GetFileTime "$R2" $2 $3
-
-	IntCmp $0 $2 0 older newer
-	IntCmp $1 $3 older older newer
-
-	older:
-	delete "$R9"
-	goto time_check_done
-
-	newer:
-	delete "$R2"
-	rename "$R9" "$R2"
-	delete "$R9" ;in case above failed!
-
-	time_check_done:
-
-	Pop $3
-	Pop $2
-	Pop $1
-	Pop $0
-
-    done:
-
-    Pop $R2
-
-    Push $R1
-
+    Push $R4
+    StrLen $R4 "$R0"
+    StrCpy $R4 "$R9" "" $R4
+    StrCpy $R4 "$R1$R4"
+    ${${PREFIX}MoveFile} "$R9" "$R4"
+    Pop $R4
+    Push ""
 FunctionEnd
 
 Function ${PREFIX}_MoveFolder_Locate_deleteDir
-
     ${If} $R6 == ""
-	RMDir $R9
-	IntOp $R2 $R2 + 1
+        Push $0
+        RMDir "$R9"
+        IfErrors move_folder_delete_failed
+        ; Deletion can remain pending on an open handle. Do not count it as
+        ; progress and repeatedly rediscover the same directory forever.
+        System::Call 'kernel32::GetFileAttributesW(w R9) i.r0'
+        IntCmp $0 -1 0 move_folder_delete_failed move_folder_delete_failed
+        Pop $0
+        IntOp $R3 $R3 + 1
     ${EndIf}
-
-    Push $R1
-
+    Push ""
+    Return
+move_folder_delete_failed:
+    Pop $0
+    DetailPrint "Failed to remove empty directory: $R9"
+    SetErrors
+    Push ""
 FunctionEnd
 !macroend
 
