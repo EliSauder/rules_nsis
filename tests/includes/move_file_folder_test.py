@@ -487,15 +487,12 @@ def _move_file_cross_volume(harness, directory):
             _write(source, "retained source")
             if existing:
                 _write(destination, "older destination", _DAY)
-            os.chmod(source, stat.S_IREAD)
-            try:
-                harness.run(source=str(source), destination=str(destination), locked=str(probe), expect_errors=True)
-                assert source.read_text(encoding="utf-8") == "retained source"
-                assert destination.read_text(encoding="utf-8") == "retained source"
-            finally:
-                os.chmod(source, stat.S_IREAD | stat.S_IWRITE)
-                if destination.exists():
-                    os.chmod(destination, stat.S_IREAD | stat.S_IWRITE)
+            harness.run(source=str(source), destination=str(destination), locked=str(source), expect_errors=True)
+            assert source.read_text(encoding="utf-8") == "retained source"
+            if existing:
+                assert destination.read_text(encoding="utf-8") == "older destination"
+            else:
+                assert not destination.exists()
 
 
 def _move_folder_cross_volume(harness, directory):
@@ -504,23 +501,38 @@ def _move_folder_cross_volume(harness, directory):
     _write(locked, "retained source")
     _write(source / "child" / "later.txt", "not reached")
     harness.run(source=str(source), destination=str(source), locked=str(locked), expect_errors=False)
-    probe = directory / "probe.txt"
-    _write(probe, "probe")
     with tempfile.TemporaryDirectory(prefix="nsis-move-", dir=Path(os.environ["SystemRoot"]) / "Temp") as other:
         assert directory.stat().st_dev != Path(other).stat().st_dev, "Cross-volume fixture requires distinct volumes"
         destination = Path(other) / "destination"
-        os.chmod(locked, stat.S_IREAD)
-        try:
-            harness.run(source=str(source), destination=str(destination), locked=str(probe), expect_errors=True)
-            assert locked.read_text(encoding="utf-8") == "retained source"
-            assert (destination / "first.txt").read_text(encoding="utf-8") == "retained source"
-            assert (source / "child" / "later.txt").read_text(encoding="utf-8") == "not reached"
-            assert not (destination / "child" / "later.txt").exists()
-        finally:
-            os.chmod(locked, stat.S_IREAD | stat.S_IWRITE)
-            copied = destination / "first.txt"
-            if copied.exists():
-                os.chmod(copied, stat.S_IREAD | stat.S_IWRITE)
+        harness.run(source=str(source), destination=str(destination), locked=str(locked), expect_errors=True)
+        assert locked.read_text(encoding="utf-8") == "retained source"
+        assert not (destination / "first.txt").exists()
+        assert (source / "child" / "later.txt").read_text(encoding="utf-8") == "not reached"
+        assert not (destination / "child" / "later.txt").exists()
+
+
+def _move_file_copy_only(harness, directory):
+    for existing in (False, True):
+        source = directory / f"source_{existing}.txt"
+        destination = directory / f"destination_{existing}.txt"
+        _write(source, "retained source")
+        if existing:
+            _write(destination, "older destination", _DAY)
+        harness.run(source=str(source), destination=str(destination), expect_errors=True)
+        assert source.read_text(encoding="utf-8") == "retained source"
+        assert destination.read_text(encoding="utf-8") == "retained source"
+
+
+def _move_folder_copy_only(harness, directory):
+    source = directory / "source"
+    destination = directory / "destination"
+    _write(source / "first.txt", "retained source")
+    _write(source / "child" / "later.txt", "not reached")
+    harness.run(source=str(source), destination=str(destination), mask="*", expect_errors=True)
+    assert (source / "first.txt").read_text(encoding="utf-8") == "retained source"
+    assert (destination / "first.txt").read_text(encoding="utf-8") == "retained source"
+    assert (source / "child" / "later.txt").read_text(encoding="utf-8") == "not reached"
+    assert not (destination / "child" / "later.txt").exists()
 
 
 def run_case(case, harness, args):
@@ -539,6 +551,8 @@ def run_case(case, harness, args):
         "move_folder_case_sensitive": _move_folder_case_sensitive,
         "move_file_cross_volume": _move_file_cross_volume,
         "move_folder_cross_volume": _move_folder_cross_volume,
+        "move_file_copy_only": _move_file_copy_only,
+        "move_folder_copy_only": _move_folder_copy_only,
     }
     if base.removesuffix("_overwrite") in edge_cases:
         edge_cases[base.removesuffix("_overwrite")](harness, directory)

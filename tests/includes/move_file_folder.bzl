@@ -78,4 +78,12 @@ def move_file_folder_cases():
             symbol = "HarnessMove" + kind + "Locked",
             parameters = ["in:source", "in:destination", "in:locked"],
         )
+        cases += include_api_case(
+            name = "move_" + kind.lower() + "_copy_only",
+            api = "move_file_folder",
+            include = "MoveFileFolder.nsh",
+            src = "move_file_folder_copy_only_adapters.nsh",
+            symbol = "Move" + kind,
+            parameters = ["in:source", "in:destination"] + (["in:mask"] if kind == "Folder" else []),
+        )
     return cases

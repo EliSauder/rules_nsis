@@ -15,6 +15,13 @@ Var /GLOBAL switch_overwrite
 ; Source: https://nsis.sourceforge.io/MoveFileFolder
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+!ifmacrondef _MoveFileFolderRename
+!macro _MoveFileFolderRename SOURCE DESTINATION FLAGS RESULT LAST_ERROR
+    System::Call 'kernel32::MoveFileExW(w ${SOURCE}, w ${DESTINATION}, i ${FLAGS}) i.${RESULT} ?e'
+    Pop ${LAST_ERROR}
+!macroend
+!endif
+
 ; Return the volume/file identity and resolved path, preserving all registers.
 !macro _MovePathInfoFunction PREFIX
 Function ${PREFIX}_MovePathInfo
@@ -172,8 +179,7 @@ move_file_new:
 move_file_rename:
     ; COPY_ALLOWED retains cross-volume file moves; REPLACE_EXISTING replaces
     ; in place without first deleting the destination. Never delete on failure.
-    System::Call 'kernel32::MoveFileExW(w r0, w r1, i r6) i.r2 ?e'
-    Pop $7
+    !insertmacro _MoveFileFolderRename r0 r1 r6 r2 $7
     StrCmp $2 0 0 move_file_verify_removed
     StrCmp $6 2 0 move_file_windows_error
     ; If a destination appeared after our check, apply the timestamp policy.
