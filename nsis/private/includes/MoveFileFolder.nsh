@@ -9,6 +9,9 @@ Var /GLOBAL switch_overwrite
 Var /GLOBAL _MoveFolderSources
 Var /GLOBAL _MoveFolderSeen
 !define /math _MOVE_FOLDER_SEARCH_BYTES ${NSIS_MAX_STRLEN} * 4
+!define /math _MOVE_PATH_BUFFER_CHARS ${NSIS_MAX_STRLEN} + 8
+!define /math _MOVE_PATH_BUFFER_BYTES ${_MOVE_PATH_BUFFER_CHARS} * 2
+!define /redef /math _MOVE_PATH_BUFFER_BYTES ${_MOVE_PATH_BUFFER_BYTES} + 24
 
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ; MoveFile and MoveFolder macros
@@ -66,29 +69,54 @@ Function ${PREFIX}_MovePathInfo
     StrCpy $1 ""
     StrCpy $2 -1
     StrCpy $3 0
-    ; Metadata access only, sharing read/write/delete, also follows junctions.
-    System::Call 'kernel32::CreateFileW(w r0, i 0, i 7, p 0, i 3, i 0x02000000, p 0) p.r2'
-    StrCmp $2 -1 move_path_info_failed
-    System::Alloc 24
+    ; Reserve prefix headroom outside NSIS strings, after FILE_ID_INFO.
+    System::Alloc ${_MOVE_PATH_BUFFER_BYTES}
     Pop $3
     StrCmp $3 0 move_path_info_failed
+    IntOp $4 $3 + 24
+    StrCpy $5 "$0" 4
+    StrCmpS $5 "\\?\" move_path_info_extended
+    StrCpy $5 "$0" 2
+    StrCmpS $5 "\\" move_path_info_network
+    System::Call 'kernel32::lstrcpyW(p r4, w "\\?\")'
+    System::Call 'kernel32::lstrcatW(p r4, w r0)'
+    Goto move_path_info_open
+move_path_info_network:
+    StrCpy $5 "$0" "" 2
+    System::Call 'kernel32::lstrcpyW(p r4, w "\\?\UNC\")'
+    System::Call 'kernel32::lstrcatW(p r4, w r5)'
+    Goto move_path_info_open
+move_path_info_extended:
+    System::Call 'kernel32::lstrcpyW(p r4, w r0)'
+move_path_info_open:
+    ; Metadata access only, sharing read/write/delete, also follows junctions.
+    System::Call 'kernel32::CreateFileW(p r4, i 0, i 7, p 0, i 3, i 0x02000000, p 0) p.r2'
+    StrCmp $2 -1 move_path_info_failed
     ; FILE_ID_INFO includes a 64-bit volume serial and 128-bit file identity.
     System::Call 'kernel32::GetFileInformationByHandleEx(p r2, i 18, p r3, i 24) i.r4'
     StrCmp $4 0 move_path_info_failed
-    System::Call 'kernel32::GetFinalPathNameByHandleW(p r2, w .r1, i ${NSIS_MAX_STRLEN}, i 0) i.r4'
+    IntOp $5 $3 + 24
+    System::Call 'kernel32::GetFinalPathNameByHandleW(p r2, p r5, i ${_MOVE_PATH_BUFFER_CHARS}, i 0) i.r4'
     IntCmp $4 0 move_path_info_failed
-    IntCmp $4 ${NSIS_MAX_STRLEN} move_path_info_failed 0 move_path_info_failed
+    IntCmp $4 ${_MOVE_PATH_BUFFER_CHARS} move_path_info_failed 0 move_path_info_failed
     ; Keep DOS/UNC spelling usable by FileFunc's parent/root helpers.
-    StrCpy $4 "$1" 8
-    StrCmpS $4 "\\?\UNC\" move_path_info_unc
-    StrCpy $4 "$1" 4
-    StrCmpS $4 "\\?\" 0 move_path_info_identity
-    StrCpy $1 "$1" "" 4
-    Goto move_path_info_identity
+    System::Call '*$5(&w9.r1)'
+    StrCpy $6 ""
+    StrCpy $7 "$1" 8
+    StrCmpS $7 "\\?\UNC\" move_path_info_unc
+    StrCpy $7 "$1" 4
+    StrCmpS $7 "\\?\" 0 move_path_info_length
+    IntOp $5 $5 + 8
+    IntOp $4 $4 - 4
+    Goto move_path_info_length
 move_path_info_unc:
-    StrCpy $1 "$1" "" 8
-    StrCpy $1 "\\$1"
-move_path_info_identity:
+    IntOp $5 $5 + 16
+    IntOp $4 $4 - 7
+    StrCpy $6 "\\"
+move_path_info_length:
+    IntCmp $4 ${NSIS_MAX_STRLEN} move_path_info_failed 0 move_path_info_failed
+    System::Call '*$5(&w${NSIS_MAX_STRLEN}.r1)'
+    StrCpy $1 "$6$1"
     System::Call '*$3(i.r5, i.r6, i.r7, i.r8, i.r9, i.r0)'
     IntFmt $5 "%08X" $5
     IntFmt $6 "%08X" $6
