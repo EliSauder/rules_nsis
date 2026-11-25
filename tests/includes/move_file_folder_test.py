@@ -434,7 +434,10 @@ def _move_file_case_sensitive(harness, directory):
     source = directory / "file.txt"
     _write(source, "probe")
     harness.run(source=str(source), destination=str(source), expect_errors=False)
+    directory = directory / "case_sensitive"
+    directory.mkdir()
     _enable_case_sensitive(directory)
+    source = directory / "file.txt"
     destination = directory / "FILE.txt"
     _write(source, "source")
     _write(destination, "destination", _DAY)
@@ -448,7 +451,11 @@ def _move_folder_case_sensitive(harness, directory):
     source = directory / "folder"
     _write(source / "moved.txt", "source")
     harness.run(source=str(source), destination=str(source), mask="*", expect_errors=False)
+    directory = directory / "case_sensitive"
+    directory.mkdir()
     _enable_case_sensitive(directory)
+    source = directory / "folder"
+    _write(source / "moved.txt", "source")
     destination = directory / "FOLDER"
     _write(destination / "keep.txt", "destination")
     assert not os.path.samefile(source, destination)
@@ -480,9 +487,15 @@ def _move_file_cross_volume(harness, directory):
             _write(source, "retained source")
             if existing:
                 _write(destination, "older destination", _DAY)
-            harness.run(source=str(source), destination=str(destination), locked=str(source), expect_errors=True)
-            assert source.read_text(encoding="utf-8") == "retained source"
-            assert destination.read_text(encoding="utf-8") == "retained source"
+            os.chmod(source, stat.S_IREAD)
+            try:
+                harness.run(source=str(source), destination=str(destination), locked=str(probe), expect_errors=True)
+                assert source.read_text(encoding="utf-8") == "retained source"
+                assert destination.read_text(encoding="utf-8") == "retained source"
+            finally:
+                os.chmod(source, stat.S_IREAD | stat.S_IWRITE)
+                if destination.exists():
+                    os.chmod(destination, stat.S_IREAD | stat.S_IWRITE)
 
 
 def _move_folder_cross_volume(harness, directory):
@@ -491,14 +504,23 @@ def _move_folder_cross_volume(harness, directory):
     _write(locked, "retained source")
     _write(source / "child" / "later.txt", "not reached")
     harness.run(source=str(source), destination=str(source), locked=str(locked), expect_errors=False)
+    probe = directory / "probe.txt"
+    _write(probe, "probe")
     with tempfile.TemporaryDirectory(prefix="nsis-move-", dir=Path(os.environ["SystemRoot"]) / "Temp") as other:
         assert directory.stat().st_dev != Path(other).stat().st_dev, "Cross-volume fixture requires distinct volumes"
         destination = Path(other) / "destination"
-        harness.run(source=str(source), destination=str(destination), locked=str(locked), expect_errors=True)
-        assert locked.read_text(encoding="utf-8") == "retained source"
-        assert (destination / "first.txt").read_text(encoding="utf-8") == "retained source"
-        assert (source / "child" / "later.txt").read_text(encoding="utf-8") == "not reached"
-        assert not (destination / "child" / "later.txt").exists()
+        os.chmod(locked, stat.S_IREAD)
+        try:
+            harness.run(source=str(source), destination=str(destination), locked=str(probe), expect_errors=True)
+            assert locked.read_text(encoding="utf-8") == "retained source"
+            assert (destination / "first.txt").read_text(encoding="utf-8") == "retained source"
+            assert (source / "child" / "later.txt").read_text(encoding="utf-8") == "not reached"
+            assert not (destination / "child" / "later.txt").exists()
+        finally:
+            os.chmod(locked, stat.S_IREAD | stat.S_IWRITE)
+            copied = destination / "first.txt"
+            if copied.exists():
+                os.chmod(copied, stat.S_IREAD | stat.S_IWRITE)
 
 
 def run_case(case, harness, args):
