@@ -720,6 +720,15 @@ def _backup_file(harness, directory):
     harness.run(source="", expect_errors=True)
     assert parent.is_dir()
 
+    parent = directory / "wildcards"
+    for name in ("keep.txt", "other.txt"):
+        _write(parent / name, name)
+    for pattern in ("*.txt", "keep.?xt"):
+        harness.run(source=str(parent / pattern), expect_errors=True)
+        assert sorted(path.name for path in parent.iterdir()) == ["keep.txt", "other.txt"]
+        for name in ("keep.txt", "other.txt"):
+            assert (parent / name).read_text(encoding="utf-8") == name
+
     # A valid source filename whose backup exceeds the filesystem's component
     # limit must report the rename failure without deleting the source.
     source = directory / ("a" * 244 + ".txt")
@@ -756,6 +765,51 @@ def _backup_folder(harness, directory):
     harness.run(source=str(directory / "collision - Backup"), expect_errors=True)
     harness.run(source=str(directory.anchor), expect_errors=True)
     assert (directory / "collision - Backup").read_text(encoding="utf-8") == "existing file"
+
+    parent = directory / "wildcards"
+    for name in ("keep", "other"):
+        _write(parent / name / "payload.txt", name)
+    for pattern in ("keep*", "?ther"):
+        harness.run(source=str(parent / pattern), expect_errors=True)
+        assert sorted(path.name for path in parent.iterdir()) == ["keep", "other"]
+        for name in ("keep", "other"):
+            assert (parent / name / "payload.txt").read_text(encoding="utf-8") == name
+
+
+def _backup_limits(harness, directory, folder):
+    source = directory / "probe"
+    if folder:
+        source.mkdir()
+    else:
+        _write(source, "probe")
+    harness.run(source=str(source), expect_errors=False)
+    assert os.name == "nt", "Extended-length boundary fixtures require Windows"
+    path = str(directory)
+    directory = Path("\\\\?\\UNC\\" + path[2:] if path.startswith("\\\\") else "\\\\?\\" + path)
+    for length, number in ((1023, 1), (1024, 1), (1023, 2), (1024, 2)):
+        suffix = " - Backup" if number == 1 else " - Backup (2)"
+        source_length = length - len(suffix)
+        parent = directory / f"length_{length}_{number}"
+        while source_length - len(str(parent)) - 1 > 200:
+            parent /= "p" * 100
+        source = parent / ("x" * (source_length - len(str(parent)) - 1))
+        destination = source.with_name(source.name + suffix)
+        assert len(str(source)) == source_length
+        assert len(str(destination)) == length
+        if folder:
+            _write(source / "payload.txt", "source")
+        else:
+            _write(source, "source")
+        if number == 2:
+            first = source.with_name(source.name + " - Backup")
+            _write(first / "payload.txt" if folder else first, "first backup")
+        harness.run(source=str(source), expect_errors=length == 1024)
+        retained = source if length == 1024 else destination
+        assert (retained / "payload.txt" if folder else retained).read_text(encoding="utf-8") == "source"
+        assert source.exists() == (length == 1024)
+        assert destination.exists() == (length == 1023)
+        if number == 2:
+            assert (first / "payload.txt" if folder else first).read_text(encoding="utf-8") == "first backup"
 
 
 def run_case(case, harness, args):
@@ -826,6 +880,8 @@ def run_case(case, harness, args):
         _backup_file(harness, directory)
     elif base == "backup_folder":
         _backup_folder(harness, directory)
+    elif base in ("backup_file_limits", "backup_folder_limits"):
+        _backup_limits(harness, directory, base == "backup_folder_limits")
     elif base == "backup_twice":
         source_file = directory / "file.txt"
         source_folder = directory / "folder"

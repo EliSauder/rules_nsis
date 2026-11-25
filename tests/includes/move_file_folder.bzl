@@ -36,6 +36,8 @@ def move_file_folder_cases():
     for name, symbol in [
         ("backup_file", "BackupFile"),
         ("backup_folder", "BackupFolder"),
+        ("backup_file_limits", "BackupFile"),
+        ("backup_folder_limits", "BackupFolder"),
     ]:
         cases += include_api_case(
             name = name,

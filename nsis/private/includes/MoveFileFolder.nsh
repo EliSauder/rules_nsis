@@ -315,8 +315,9 @@ Function ${PREFIX}_BackupPath
 
     ClearErrors
     StrCmp $0 "" backup_invalid
-    GetFullPathName $0 "$0"
-    IfErrors backup_invalid
+    System::Call 'kernel32::GetFullPathNameW(w r0, i ${NSIS_MAX_STRLEN}, w .r0, p 0) i.r2'
+    IntCmp $2 0 backup_invalid
+    IntCmp $2 ${NSIS_MAX_STRLEN} backup_invalid 0 backup_invalid
 
     ; Normalize a trailing slash, but do not attempt to back up a drive/share root.
     ${${PREFIX}GetRoot} "$0" $2
@@ -354,11 +355,16 @@ backup_extension:
 
 backup_candidate:
     StrCpy $2 1
-    StrCpy $6 "$3\$4 - Backup$5"
 backup_try:
+    StrCpy $6 " - Backup"
+    StrCmp $2 1 +2
+    StrCpy $6 " - Backup ($2)"
     StrLen $3 "$6"
-    IntOp $3 $3 + 1
+    StrLen $7 "$0"
+    IntOp $3 $3 + $7
     IntCmp $3 ${NSIS_MAX_STRLEN} backup_invalid 0 backup_invalid
+    ${${PREFIX}GetParent} "$0" $3
+    StrCpy $6 "$3\$4$6$5"
     System::Call 'kernel32::GetFileAttributesW(w r6) i.r3'
     IntCmp $3 -1 0 backup_next backup_next
     ; Flags 0 forbid replacing a file OR directory, including a collision
@@ -377,8 +383,6 @@ backup_try:
 backup_next:
     IntOp $2 $2 + 1
     IntCmp $2 1 backup_invalid backup_invalid
-    ${${PREFIX}GetParent} "$0" $3
-    StrCpy $6 "$3\$4 - Backup ($2)$5"
     Goto backup_try
 
 backup_invalid:
