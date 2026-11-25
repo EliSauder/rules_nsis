@@ -201,6 +201,16 @@
     !insertmacro _HarnessMoveRecovery "un." "${SOURCE}" "${DESTINATION}" "${FIRST_FAILED}" 1
 !macroend
 
+!macro HarnessBackupTwice FIRST_SOURCE SECOND_SOURCE
+    ${BackupFile} "${FIRST_SOURCE}"
+    ${BackupFolder} "${SECOND_SOURCE}"
+!macroend
+
+!macro un.HarnessBackupTwice FIRST_SOURCE SECOND_SOURCE
+    ${un.BackupFile} "${FIRST_SOURCE}"
+    ${un.BackupFolder} "${SECOND_SOURCE}"
+!macroend
+
 !macro un.HarnessMoveFileTwice FIRST_SOURCE FIRST_DESTINATION SECOND_SOURCE SECOND_DESTINATION
     ${un.MoveFile} "${FIRST_SOURCE}" "${FIRST_DESTINATION}"
     ${un.MoveFile} "${SECOND_SOURCE}" "${SECOND_DESTINATION}"

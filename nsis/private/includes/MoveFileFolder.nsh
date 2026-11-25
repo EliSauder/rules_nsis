@@ -293,6 +293,146 @@ FunctionEnd
 !macroend
 !define un.MoveFile `!insertmacro un.MoveFile`
 
+;==================
+; BackupFile and BackupFolder macros
+;==================
+
+; Move to an unused sibling: "file - Backup.txt", "file - Backup (2).txt",
+; or "folder - Backup", "folder - Backup (2)". File extensions are preserved.
+; Both macros take only the source path, preserve registers, and set the error
+; flag on failure. Backups never overwrite, regardless of $switch_overwrite.
+!macro _BackupPath PREFIX
+Function ${PREFIX}_BackupPath
+    Exch $1
+    Exch
+    Exch $0
+    Push $2
+    Push $3
+    Push $4
+    Push $5
+    Push $6
+    Push $7
+
+    ClearErrors
+    StrCmp $0 "" backup_invalid
+    GetFullPathName $0 "$0"
+    IfErrors backup_invalid
+
+    ; Normalize a trailing slash, but do not attempt to back up a drive/share root.
+    ${${PREFIX}GetRoot} "$0" $2
+    StrCmp $0 $2 backup_invalid
+    StrCmp $0 "$2\" backup_invalid
+    StrCpy $2 "$0" 1 -1
+    StrCmp $2 "\" 0 +2
+    StrCpy $0 "$0" -1
+
+    System::Call 'kernel32::GetFileAttributesW(w r0) i.r2'
+    IntCmp $2 -1 backup_invalid
+    IntOp $2 $2 & 0x10
+    StrCmp $1 "folder" 0 backup_file
+    StrCmp $2 0 backup_invalid backup_name
+
+backup_file:
+    StrCmp $2 0 0 backup_invalid
+
+backup_name:
+    ${${PREFIX}GetParent} "$0" $3
+    ${${PREFIX}GetFileName} "$0" $4
+    StrCmp $4 "" backup_invalid
+    StrCpy $5 ""
+    StrCmp $1 "folder" backup_candidate
+
+    ; Only the final dot in the filename starts an extension; a leading dot does not.
+    StrLen $2 "$4"
+backup_extension:
+    IntOp $2 $2 - 1
+    IntCmp $2 0 backup_candidate backup_candidate
+    StrCpy $6 "$4" 1 $2
+    StrCmp $6 "." 0 backup_extension
+    StrCpy $5 "$4" "" $2
+    StrCpy $4 "$4" $2
+
+backup_candidate:
+    StrCpy $2 1
+    StrCpy $6 "$3\$4 - Backup$5"
+backup_try:
+    StrLen $3 "$6"
+    IntOp $3 $3 + 1
+    IntCmp $3 ${NSIS_MAX_STRLEN} backup_invalid 0 backup_invalid
+    System::Call 'kernel32::GetFileAttributesW(w r6) i.r3'
+    IntCmp $3 -1 0 backup_next backup_next
+    ; MoveFileW refuses an existing file OR directory, including a collision
+    ; created after our check. Never fall back to the destructive MoveFile macro.
+    System::Call 'kernel32::MoveFileW(w r0, w r6) i.r3 ?e'
+    Pop $7
+    StrCmp $3 0 0 backup_done
+    StrCpy $3 $7
+    StrCmp $3 80 backup_next
+    StrCmp $3 183 backup_next
+    System::Call 'kernel32::GetFileAttributesW(w r6) i.r7'
+    IntCmp $7 -1 0 backup_next backup_next
+    DetailPrint "Backup failed: $0 to $6 (Windows error $3)"
+    SetErrors
+    Goto backup_restore
+
+backup_next:
+    IntOp $2 $2 + 1
+    IntCmp $2 1 backup_invalid backup_invalid
+    ${${PREFIX}GetParent} "$0" $3
+    StrCpy $6 "$3\$4 - Backup ($2)$5"
+    Goto backup_try
+
+backup_invalid:
+    DetailPrint "Backup failed: invalid or missing $1 source: $0"
+    SetErrors
+    Goto backup_restore
+
+backup_done:
+    DetailPrint "Backed up $1: $0 to $6"
+
+backup_restore:
+    Pop $7
+    Pop $6
+    Pop $5
+    Pop $4
+    Pop $3
+    Pop $2
+    Pop $0
+    Pop $1
+FunctionEnd
+!macroend
+
+!insertmacro _BackupPath ""
+!insertmacro _BackupPath "un."
+
+!macro BackupFile sourceFile
+    Push "${sourceFile}"
+    Push "file"
+    Call _BackupPath
+!macroend
+!define BackupFile `!insertmacro BackupFile`
+
+!macro un.BackupFile sourceFile
+    Push "${sourceFile}"
+    Push "file"
+    Call un._BackupPath
+!macroend
+!define un.BackupFile `!insertmacro un.BackupFile`
+
+!macro BackupFolder sourceFolder
+    Push "${sourceFolder}"
+    Push "folder"
+    Call _BackupPath
+!macroend
+!define BackupFolder `!insertmacro BackupFolder`
+
+!macro un.BackupFolder sourceFolder
+    Push "${sourceFolder}"
+    Push "folder"
+    Call un._BackupPath
+!macroend
+!define un.BackupFolder `!insertmacro un.BackupFolder`
+
 !macro _MoveFolderSupport PREFIX
 Function ${PREFIX}_MoveFolderFreeList
     Exch $0

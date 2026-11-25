@@ -562,6 +562,18 @@ tree. Combined paths are length-checked before construction. Literal source and
 destination paths reject wildcards before normalization; folder masks still
 support wildcards.
 
+### File and folder backups
+
+`MoveFileFolder.nsh` provides `${BackupFile} "$INSTDIR\settings.ini"` and
+`${BackupFolder} "$INSTDIR\data"` (also `${un.BackupFile}` and `${un.BackupFolder}`).
+They **move**, rather than copy, the source to an unused sibling name:
+`file - Backup.txt`, then `file - Backup (2).txt`, and so on; folders use
+`folder - Backup`, then `folder - Backup (2)`. Files retain their final
+extension, and folders retain their entire contents, including empty folders.
+Existing files or folders are never overwritten, even with
+`$switch_overwrite = 1`. Missing sources, wrong source types, and rename
+failures are logged and set the NSIS error flag; check it with `IfErrors`.
+
 ### Stamping
 - Stamp values will be substituted with their workspace avlues when built with
   stamping.

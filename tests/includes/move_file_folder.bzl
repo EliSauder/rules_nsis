@@ -33,6 +33,19 @@ def move_file_folder_cases():
                 src = "move_file_folder_adapters.nsh" if symbol.startswith("Harness") else None,
             )
 
+    for name, symbol in [
+        ("backup_file", "BackupFile"),
+        ("backup_folder", "BackupFolder"),
+    ]:
+        cases += include_api_case(
+            name = name,
+            api = "move_file_folder",
+            include = "MoveFileFolder.nsh",
+            symbol = symbol,
+            parameters = ["in:source"],
+            on_init = ["StrCpy $switch_overwrite 1"],
+        )
+
     # Repeated expansions in one function must still compile and run.
     cases += include_api_case(
         name = "move_file_twice",
@@ -89,4 +102,12 @@ def move_file_folder_cases():
             symbol = "Move" + kind,
             parameters = ["in:source", "in:destination"] + (["in:mask"] if kind == "Folder" else []),
         )
+    cases += include_api_case(
+        name = "backup_twice",
+        api = "move_file_folder",
+        include = "MoveFileFolder.nsh",
+        src = "move_file_folder_adapters.nsh",
+        symbol = "HarnessBackupTwice",
+        parameters = ["in:first_source", "in:second_source"],
+    )
     return cases

@@ -688,6 +688,76 @@ def _move_folder_copy_only(harness, directory):
     assert not (destination / "child" / "later.txt").exists()
 
 
+def _backup_file(harness, directory):
+    # Dots in parent directories and leading dots are not file extensions.
+    parent = directory / "parent.with.dots"
+    for name, stem, extension in [
+        ("file.txt", "file", ".txt"),
+        ("archive.tar.gz", "archive.tar", ".gz"),
+        ("no_extension", "no_extension", ""),
+        (".hidden", ".hidden", ""),
+    ]:
+        source = parent / name
+        for number in range(1, 4):
+            _write(source, f"backup {number}")
+            harness.run(source=str(source), expect_errors=False)
+            suffix = "" if number == 1 else f" ({number})"
+            backup = parent / f"{stem} - Backup{suffix}{extension}"
+            assert backup.read_text(encoding="utf-8") == f"backup {number}"
+            assert not source.exists()
+        assert (parent / f"{stem} - Backup{extension}").read_text(encoding="utf-8") == "backup 1"
+
+    # A directory with the target filename is also a collision, even if empty.
+    source = directory / "collision.txt"
+    (directory / "collision - Backup.txt").mkdir()
+    _write(source, "file after directory")
+    harness.run(source=str(source), expect_errors=False)
+    assert (directory / "collision - Backup (2).txt").read_text(encoding="utf-8") == "file after directory"
+    assert (directory / "collision - Backup.txt").is_dir()
+
+    harness.run(source=str(directory / "missing.txt"), expect_errors=True)
+    harness.run(source=str(parent), expect_errors=True)
+    harness.run(source="", expect_errors=True)
+    assert parent.is_dir()
+
+    # A valid source filename whose backup exceeds the filesystem's component
+    # limit must report the rename failure without deleting the source.
+    source = directory / ("a" * 244 + ".txt")
+    if os.name == "nt":
+        path = str(source)
+        source = Path("\\\\?\\UNC\\" + path[2:] if path.startswith("\\\\") else "\\\\?\\" + path)
+    _write(source, "keep on failure")
+    harness.run(source=str(source), expect_errors=True)
+    assert source.read_text(encoding="utf-8") == "keep on failure"
+
+
+def _backup_folder(harness, directory):
+    source = directory / "folder.with.dots"
+    for number in range(1, 4):
+        _write(source / "child" / "file.txt", f"backup {number}")
+        (source / "empty").mkdir()
+        harness.run(source=str(source) + "\\", expect_errors=False)
+        suffix = "" if number == 1 else f" ({number})"
+        backup = directory / f"folder.with.dots - Backup{suffix}"
+        assert (backup / "child" / "file.txt").read_text(encoding="utf-8") == f"backup {number}"
+        assert (backup / "empty").is_dir()
+        assert not source.exists()
+    assert (directory / "folder.with.dots - Backup" / "child" / "file.txt").read_text(encoding="utf-8") == "backup 1"
+
+    source = directory / "collision"
+    _write(directory / "collision - Backup", "existing file")
+    source.mkdir()
+    harness.run(source=str(source), expect_errors=False)
+    assert (directory / "collision - Backup (2)").is_dir()
+    assert (directory / "collision - Backup").read_text(encoding="utf-8") == "existing file"
+    assert not source.exists()
+
+    harness.run(source=str(directory / "missing"), expect_errors=True)
+    harness.run(source=str(directory / "collision - Backup"), expect_errors=True)
+    harness.run(source=str(directory.anchor), expect_errors=True)
+    assert (directory / "collision - Backup").read_text(encoding="utf-8") == "existing file"
+
+
 def run_case(case, harness, args):
     base = common.base(case)
     directory = harness.directory
@@ -752,6 +822,19 @@ def run_case(case, harness, args):
         harness.run(source=str(source), destination=str(destination), expect_errors=False).assert_outputs(first_failed=True)
         assert destination_file.read_text(encoding="utf-8") == "recovered"
         assert not source.exists()
+    elif base == "backup_file":
+        _backup_file(harness, directory)
+    elif base == "backup_folder":
+        _backup_folder(harness, directory)
+    elif base == "backup_twice":
+        source_file = directory / "file.txt"
+        source_folder = directory / "folder"
+        _write(source_file, "file")
+        _write(source_folder / "child.txt", "folder")
+        harness.run(first_source=str(source_file), second_source=str(source_folder), expect_errors=False)
+        assert (directory / "file - Backup.txt").read_text(encoding="utf-8") == "file"
+        assert (directory / "folder - Backup" / "child.txt").read_text(encoding="utf-8") == "folder"
+        assert not source_file.exists() and not source_folder.exists()
     else:
         raise common.unhandled(case)
 
