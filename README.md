@@ -530,6 +530,50 @@ is included in the `plugin_licenses` output group.
   fails the build. Message file paths are stored as
   `REG_EXPAND_SZ`, so environment variables such as `%SystemRoot%` expand.
 
+### Moving files and folders
+
+`MoveFileFolder.nsh` provides `${MoveFile} source destination` and
+`${MoveFolder} source destination mask`, plus their `un.` variants.
+By default, an existing destination file is replaced only when the source is
+newer; otherwise the redundant source is removed. Set `$switch_overwrite` to
+`1` to replace regardless of age. Replacements use Windows `MoveFileExW` without
+deleting the destination first, and failed moves retain the source and report
+the NSIS error flag with a detail-log message.
+Replacing a read-only destination now fails, even with `$switch_overwrite = 1`;
+unlike the previous delete-then-rename implementation, its read-only attribute
+is not cleared. Each macro clears the error flag on entry, so check `IfErrors`
+immediately after **each** call, not just after a sequence of calls.
+
+Folder moves retain their merge/mask behavior: nonmatching files stay in the
+source. Processing stops on the first failure and skips subsequent empty-folder
+cleanup; files already moved are not rolled back. Failed empty-folder removals
+are reported instead of retried indefinitely. Moving onto the same normalized
+path is a no-op; moving a folder into its own descendant is rejected.
+These guards compare filesystem identities and resolve existing destination
+ancestors, including short-name and junction aliases, without conflating distinct
+case-sensitive names. Moves fail conservatively when identity/resolved-path
+queries are unavailable. A failed cross-volume move can leave a copied
+destination alongside the retained source; it is reported as an error, and
+folder processing stops rather than continuing to later files.
+Folder traversal checks Win32 enumeration failures and rejects cycles/repeated
+directory identities before creating output. Both logical and resolved destination
+ancestors, including mapped child directories, are checked against the source
+tree. Combined paths are length-checked before construction. Literal source and
+destination paths reject wildcards before normalization; folder masks still
+support wildcards.
+
+### File and folder backups
+
+`MoveFileFolder.nsh` provides `${BackupFile} "$INSTDIR\settings.ini"` and
+`${BackupFolder} "$INSTDIR\data"` (also `${un.BackupFile}` and `${un.BackupFolder}`).
+They **move**, rather than copy, the source to an unused sibling name:
+`file - Backup.txt`, then `file - Backup (2).txt`, and so on; folders use
+`folder - Backup`, then `folder - Backup (2)`. Files retain their final
+extension, and folders retain their entire contents, including empty folders.
+Existing files or folders are never overwritten, even with
+`$switch_overwrite = 1`. Missing sources, wrong source types, and rename
+failures are logged and set the NSIS error flag; check it with `IfErrors`.
+
 ### Stamping
 - Stamp values will be substituted with their workspace avlues when built with
   stamping.
