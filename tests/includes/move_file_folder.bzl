@@ -36,8 +36,6 @@ def move_file_folder_cases():
     for name, symbol in [
         ("backup_file", "BackupFile"),
         ("backup_folder", "BackupFolder"),
-        ("backup_file_limits", "BackupFile"),
-        ("backup_folder_limits", "BackupFolder"),
     ]:
         cases += include_api_case(
             name = name,
@@ -46,6 +44,16 @@ def move_file_folder_cases():
             symbol = symbol,
             parameters = ["in:source"],
             on_init = ["StrCpy $switch_overwrite 1"],
+        )
+
+    for kind in ["File", "Folder"]:
+        cases += include_api_case(
+            name = "backup_" + kind.lower() + "_limits",
+            api = "move_file_folder",
+            include = "MoveFileFolder.nsh",
+            src = "move_file_folder_adapters.nsh",
+            symbol = "HarnessBackup" + kind + "Limits",
+            parameters = ["in:parent", "in:leaf"],
         )
 
     # Repeated expansions in one function must still compile and run.

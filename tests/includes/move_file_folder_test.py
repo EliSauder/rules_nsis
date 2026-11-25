@@ -782,7 +782,7 @@ def _backup_limits(harness, directory, folder):
         source.mkdir()
     else:
         _write(source, "probe")
-    harness.run(source=str(source), expect_errors=False)
+    harness.run(parent=str(source.parent), leaf=source.name, expect_errors=False)
     assert os.name == "nt", "Extended-length boundary fixtures require Windows"
     path = str(directory)
     directory = Path("\\\\?\\UNC\\" + path[2:] if path.startswith("\\\\") else "\\\\?\\" + path)
@@ -803,7 +803,7 @@ def _backup_limits(harness, directory, folder):
         if number == 2:
             first = source.with_name(source.name + " - Backup")
             _write(first / "payload.txt" if folder else first, "first backup")
-        harness.run(source=str(source), expect_errors=length == 1024)
+        harness.run(parent=str(source.parent), leaf=source.name, expect_errors=length == 1024)
         retained = source if length == 1024 else destination
         assert (retained / "payload.txt" if folder else retained).read_text(encoding="utf-8") == "source"
         assert source.exists() == (length == 1024)

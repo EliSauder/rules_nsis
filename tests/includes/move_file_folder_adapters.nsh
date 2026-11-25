@@ -57,6 +57,30 @@
     !insertmacro _HarnessMoveFolderDriveRoot "un." "${SOURCE}" "${DESTINATION}" "${WORKING}"
 !macroend
 
+; Assemble boundary-length paths without exceeding a harness input line.
+!macro _HarnessBackupLimits PREFIX KIND PARENT LEAF
+    Push $0
+    StrCpy $0 "${PARENT}\${LEAF}"
+    ${${PREFIX}Backup${KIND}} "$0"
+    Pop $0
+!macroend
+
+!macro HarnessBackupFileLimits PARENT LEAF
+    !insertmacro _HarnessBackupLimits "" "File" "${PARENT}" "${LEAF}"
+!macroend
+
+!macro un.HarnessBackupFileLimits PARENT LEAF
+    !insertmacro _HarnessBackupLimits "un." "File" "${PARENT}" "${LEAF}"
+!macroend
+
+!macro HarnessBackupFolderLimits PARENT LEAF
+    !insertmacro _HarnessBackupLimits "" "Folder" "${PARENT}" "${LEAF}"
+!macroend
+
+!macro un.HarnessBackupFolderLimits PARENT LEAF
+    !insertmacro _HarnessBackupLimits "un." "Folder" "${PARENT}" "${LEAF}"
+!macroend
+
 ; Repeated expansions in one function must still compile and run.
 !macro HarnessMoveFileTwice FIRST_SOURCE FIRST_DESTINATION SECOND_SOURCE SECOND_DESTINATION
     ${MoveFile} "${FIRST_SOURCE}" "${FIRST_DESTINATION}"
