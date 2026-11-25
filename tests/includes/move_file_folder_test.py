@@ -305,10 +305,6 @@ def _move_folder_invalid(harness, directory):
         harness.run(source=invalid_source, destination=invalid_destination, mask="*", expect_errors=True)
         assert (source / "keep.txt").read_text(encoding="utf-8") == "source"
         assert (destination / "keep.txt").read_text(encoding="utf-8") == "destination"
-        _write(source / "nested.txt", "distinct sibling")
-        harness.run(source=str(source), destination=str(destination / "nested"), mask="*", expect_errors=False)
-        assert not source.exists()
-        assert (destination / "nested" / "nested.txt").read_text(encoding="utf-8") == "distinct sibling"
         assert (directory / "not_a_folder").read_text(encoding="utf-8") == "file"
         assert not (source / "nested").exists()
         assert not (source / "child").exists()
@@ -460,6 +456,10 @@ def _move_folder_case_sensitive(harness, directory):
     assert not source.exists()
     assert (destination / "moved.txt").read_text(encoding="utf-8") == "source"
     assert (destination / "keep.txt").read_text(encoding="utf-8") == "destination"
+    _write(source / "nested.txt", "distinct sibling")
+    harness.run(source=str(source), destination=str(destination / "nested"), mask="*", expect_errors=False)
+    assert not source.exists()
+    assert (destination / "nested" / "nested.txt").read_text(encoding="utf-8") == "distinct sibling"
 
 
 def _move_file_cross_volume(harness, directory):
