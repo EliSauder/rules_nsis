@@ -539,12 +539,22 @@ newer; otherwise the redundant source is removed. Set `$switch_overwrite` to
 `1` to replace regardless of age. Replacements use Windows `MoveFileExW` without
 deleting the destination first, and failed moves retain the source and report
 the NSIS error flag with a detail-log message.
+Replacing a read-only destination now fails, even with `$switch_overwrite = 1`;
+unlike the previous delete-then-rename implementation, its read-only attribute
+is not cleared. Each macro clears the error flag on entry, so check `IfErrors`
+immediately after **each** call, not just after a sequence of calls.
 
 Folder moves retain their merge/mask behavior: nonmatching files stay in the
 source. Processing stops on the first failure and skips subsequent empty-folder
 cleanup; files already moved are not rolled back. Failed empty-folder removals
 are reported instead of retried indefinitely. Moving onto the same normalized
 path is a no-op; moving a folder into its own descendant is rejected.
+These guards compare filesystem identities and resolve existing destination
+ancestors, including short-name and junction aliases, without conflating distinct
+case-sensitive names. Moves fail conservatively when identity/resolved-path
+queries are unavailable. A failed cross-volume move can leave a copied
+destination alongside the retained source; it is reported as an error, and
+folder processing stops rather than continuing to later files.
 
 ### Stamping
 - Stamp values will be substituted with their workspace avlues when built with

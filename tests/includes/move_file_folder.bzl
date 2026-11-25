@@ -13,6 +13,10 @@ def move_file_folder_cases():
         ("move_folder_paths", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
         ("move_folder_invalid", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
         ("move_folder_merge", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
+        ("move_file_aliases", "MoveFile", ["in:source", "in:destination"]),
+        ("move_folder_aliases", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
+        ("move_file_case_sensitive", "MoveFile", ["in:source", "in:destination"]),
+        ("move_folder_case_sensitive", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
     ]:
         # $switch_overwrite replaces existing destinations regardless of age.
         for suffix, on_init in [("", []), ("_overwrite", ["StrCpy $switch_overwrite 1"])]:
@@ -64,5 +68,14 @@ def move_file_folder_cases():
             src = "move_file_folder_adapters.nsh",
             symbol = "HarnessMove" + kind + "Recovery",
             parameters = ["in:source", "in:destination", "out:first_failed:bool"],
+        )
+    for kind in ["File", "Folder"]:
+        cases += include_api_case(
+            name = "move_" + kind.lower() + "_cross_volume",
+            api = "move_file_folder",
+            include = "MoveFileFolder.nsh",
+            src = "move_file_folder_adapters.nsh",
+            symbol = "HarnessMove" + kind + "Locked",
+            parameters = ["in:source", "in:destination", "in:locked"],
         )
     return cases

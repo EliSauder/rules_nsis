@@ -1,6 +1,9 @@
 import os
 import stat
+import subprocess
+import tempfile
 import time
+from pathlib import Path
 
 from tests.includes import common
 
@@ -188,6 +191,11 @@ def _move_file_paths(harness, directory):
     harness.run(source=str(destination), destination=str(destination).swapcase(), expect_errors=False)
     assert destination.read_bytes() == b"relative"
 
+    alias = directory / "hard_link.bin"
+    os.link(destination, alias)
+    harness.run(source=str(destination), destination=str(alias), expect_errors=False)
+    assert destination.read_bytes() == alias.read_bytes() == b"relative"
+
     source = directory / "read_only.bin"
     destination = directory / "read_only_moved.bin"
     source.write_bytes(b"read only")
@@ -297,6 +305,10 @@ def _move_folder_invalid(harness, directory):
         harness.run(source=invalid_source, destination=invalid_destination, mask="*", expect_errors=True)
         assert (source / "keep.txt").read_text(encoding="utf-8") == "source"
         assert (destination / "keep.txt").read_text(encoding="utf-8") == "destination"
+        _write(source / "nested.txt", "distinct sibling")
+        harness.run(source=str(source), destination=str(destination / "nested"), mask="*", expect_errors=False)
+        assert not source.exists()
+        assert (destination / "nested" / "nested.txt").read_text(encoding="utf-8") == "distinct sibling"
         assert (directory / "not_a_folder").read_text(encoding="utf-8") == "file"
         assert not (source / "nested").exists()
         assert not (source / "child").exists()
@@ -342,6 +354,153 @@ def _move_folder_merge(harness, directory):
     assert not source.exists()
 
 
+def _windows_kernel():
+    import ctypes
+    from ctypes import wintypes
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    kernel.CreateFileW.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel.SetFileInformationByHandle.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    kernel.GetShortPathNameW.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+    return kernel
+
+
+def _short_path(path):
+    import ctypes
+
+    buffer = ctypes.create_unicode_buffer(32768)
+    length = _windows_kernel().GetShortPathNameW(str(path), buffer, len(buffer))
+    if not length:
+        raise ctypes.WinError(ctypes.get_last_error())
+    assert length < len(buffer)
+    print(f"Short-name fixture: {path} -> {buffer.value}", flush=True)
+    return Path(buffer.value)
+
+
+def _junction(alias, target):
+    subprocess.run(
+        ["cmd.exe", "/d", "/c", "mklink", "/J", str(alias), str(target)],
+        check=True, capture_output=True, text=True,
+    )
+
+
+def _enable_case_sensitive(path):
+    import ctypes
+
+    kernel = _windows_kernel()
+    handle = kernel.CreateFileW(str(path), 0x100, 7, None, 3, 0x02000000, None)
+    if handle == ctypes.c_void_p(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        flags = ctypes.c_uint32(1)
+        if not kernel.SetFileInformationByHandle(handle, 23, ctypes.byref(flags), ctypes.sizeof(flags)):
+            raise ctypes.WinError(ctypes.get_last_error())
+    finally:
+        if not kernel.CloseHandle(handle):
+            raise ctypes.WinError(ctypes.get_last_error())
+
+
+def _move_file_aliases(harness, directory):
+    parent = directory / "Long parent directory"
+    source = parent / "Long filename.txt"
+    _write(source, "only copy")
+    harness.run(source=str(source), destination=str(source), expect_errors=False)
+    alias = directory / "junction"
+    _junction(alias, parent)
+    for destination in (alias / source.name, _short_path(source)):
+        harness.run(source=str(source), destination=str(destination), expect_errors=False)
+        assert source.read_text(encoding="utf-8") == "only copy"
+        assert destination.read_text(encoding="utf-8") == "only copy"
+
+
+def _move_folder_aliases(harness, directory):
+    source = directory / "Long source directory"
+    _write(source / "child" / "keep.txt", "only copy")
+    harness.run(source=str(source), destination=str(source), mask="*", expect_errors=False)
+    alias = directory / "junction"
+    child_alias = directory / "child_junction"
+    _junction(alias, source)
+    _junction(child_alias, source / "child")
+    short = _short_path(source)
+    for destination in (alias, short):
+        harness.run(source=str(source), destination=str(destination), mask="*", expect_errors=False)
+        assert (source / "child" / "keep.txt").read_text(encoding="utf-8") == "only copy"
+    for parent in (alias, child_alias, short):
+        harness.run(source=str(source), destination=str(parent / "new" / "nested"), mask="*", expect_errors=True)
+        assert (source / "child" / "keep.txt").read_text(encoding="utf-8") == "only copy"
+        assert not (source / "new").exists()
+        assert not (source / "child" / "new").exists()
+
+
+def _move_file_case_sensitive(harness, directory):
+    source = directory / "file.txt"
+    _write(source, "probe")
+    harness.run(source=str(source), destination=str(source), expect_errors=False)
+    _enable_case_sensitive(directory)
+    destination = directory / "FILE.txt"
+    _write(source, "source")
+    _write(destination, "destination", _DAY)
+    assert not os.path.samefile(source, destination)
+    harness.run(source=str(source), destination=str(destination), expect_errors=False)
+    assert not source.exists()
+    assert destination.read_text(encoding="utf-8") == "source"
+
+
+def _move_folder_case_sensitive(harness, directory):
+    source = directory / "folder"
+    _write(source / "moved.txt", "source")
+    harness.run(source=str(source), destination=str(source), mask="*", expect_errors=False)
+    _enable_case_sensitive(directory)
+    destination = directory / "FOLDER"
+    _write(destination / "keep.txt", "destination")
+    assert not os.path.samefile(source, destination)
+    harness.run(source=str(source), destination=str(destination), mask="*", expect_errors=False)
+    assert not source.exists()
+    assert (destination / "moved.txt").read_text(encoding="utf-8") == "source"
+    assert (destination / "keep.txt").read_text(encoding="utf-8") == "destination"
+
+
+def _move_file_cross_volume(harness, directory):
+    probe = directory / "probe.txt"
+    _write(probe, "probe")
+    harness.run(source=str(probe), destination=str(probe), locked=str(probe), expect_errors=False)
+    with tempfile.TemporaryDirectory(prefix="nsis-move-", dir=Path(os.environ["SystemRoot"]) / "Temp") as other:
+        assert directory.stat().st_dev != Path(other).stat().st_dev, "Cross-volume fixture requires distinct volumes"
+        source = directory / "success.txt"
+        destination = Path(other) / "success.txt"
+        _write(source, "moved across volumes")
+        harness.run(source=str(source), destination=str(destination), locked=str(probe), expect_errors=False)
+        assert not source.exists()
+        assert destination.read_text(encoding="utf-8") == "moved across volumes"
+        for existing in (False, True):
+            source = directory / f"source_{existing}.txt"
+            destination = Path(other) / f"destination_{existing}.txt"
+            _write(source, "retained source")
+            if existing:
+                _write(destination, "older destination", _DAY)
+            harness.run(source=str(source), destination=str(destination), locked=str(source), expect_errors=True)
+            assert source.read_text(encoding="utf-8") == "retained source"
+            assert destination.read_text(encoding="utf-8") == "retained source"
+
+
+def _move_folder_cross_volume(harness, directory):
+    source = directory / "source"
+    locked = source / "first.txt"
+    _write(locked, "retained source")
+    _write(source / "child" / "later.txt", "not reached")
+    harness.run(source=str(source), destination=str(source), locked=str(locked), expect_errors=False)
+    with tempfile.TemporaryDirectory(prefix="nsis-move-", dir=Path(os.environ["SystemRoot"]) / "Temp") as other:
+        assert directory.stat().st_dev != Path(other).stat().st_dev, "Cross-volume fixture requires distinct volumes"
+        destination = Path(other) / "destination"
+        harness.run(source=str(source), destination=str(destination), locked=str(locked), expect_errors=True)
+        assert locked.read_text(encoding="utf-8") == "retained source"
+        assert (destination / "first.txt").read_text(encoding="utf-8") == "retained source"
+        assert (source / "child" / "later.txt").read_text(encoding="utf-8") == "not reached"
+        assert not (destination / "child" / "later.txt").exists()
+
+
 def run_case(case, harness, args):
     base = common.base(case)
     directory = harness.directory
@@ -352,6 +511,12 @@ def run_case(case, harness, args):
         "move_folder_paths": _move_folder_paths,
         "move_folder_invalid": _move_folder_invalid,
         "move_folder_merge": _move_folder_merge,
+        "move_file_aliases": _move_file_aliases,
+        "move_folder_aliases": _move_folder_aliases,
+        "move_file_case_sensitive": _move_file_case_sensitive,
+        "move_folder_case_sensitive": _move_folder_case_sensitive,
+        "move_file_cross_volume": _move_file_cross_volume,
+        "move_folder_cross_volume": _move_folder_cross_volume,
     }
     if base.removesuffix("_overwrite") in edge_cases:
         edge_cases[base.removesuffix("_overwrite")](harness, directory)
