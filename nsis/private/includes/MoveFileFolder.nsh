@@ -361,10 +361,9 @@ backup_try:
     IntCmp $3 ${NSIS_MAX_STRLEN} backup_invalid 0 backup_invalid
     System::Call 'kernel32::GetFileAttributesW(w r6) i.r3'
     IntCmp $3 -1 0 backup_next backup_next
-    ; MoveFileW refuses an existing file OR directory, including a collision
-    ; created after our check. Never fall back to the destructive MoveFile macro.
-    System::Call 'kernel32::MoveFileW(w r0, w r6) i.r3 ?e'
-    Pop $7
+    ; Flags 0 forbid replacing a file OR directory, including a collision
+    ; created after our check. Do not apply MoveFile's timestamp/overwrite policy.
+    !insertmacro _MoveFileFolderRename r0 r6 0 r3 $7
     StrCmp $3 0 0 backup_done
     StrCpy $3 $7
     StrCmp $3 80 backup_next
