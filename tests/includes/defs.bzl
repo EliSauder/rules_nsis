@@ -112,25 +112,32 @@ def include_api_suite(name, cases, extra_tests = [], extra_binaries = []):
         srcs = [":" + case.name + "_harness" for case in cases] + extra_binaries,
         testonly = True,
     )
-    data = []
-    for case in cases:
-        for label in [":" + case.name + "_symbol"] + case.data:
-            if label not in data:
-                data.append(label)
     apis = []
     for case in cases:
         if case.api not in apis:
             apis.append(case.api)
-    py_test(
+    # Keep each test's arguments below Windows' command-line length limit.
+    for api in apis:
+        api_cases = [case for case in cases if case.api == api]
+        data = []
+        for case in api_cases:
+            for label in [":" + case.name + "_symbol"] + case.data:
+                if label not in data:
+                    data.append(label)
+        py_test(
+            name = api + "_contract_test",
+            size = "small",
+            srcs = ["contract_test.py", api + "_test.py"],
+            main = "contract_test.py",
+            # Each case is api|case|description[|extra args...].
+            args = [
+                "|".join([case.api, case.name, "$(rlocationpath :" + case.name + "_symbol)"] + case.args)
+                for case in api_cases
+            ],
+            data = data,
+            deps = [":common"],
+        )
+    native.test_suite(
         name = "contract_test",
-        size = "small",
-        srcs = ["contract_test.py"] + [api + "_test.py" for api in apis],
-        main = "contract_test.py",
-        # Each case is api|case|description[|extra args...].
-        args = [
-            "|".join([case.api, case.name, "$(rlocationpath :" + case.name + "_symbol)"] + case.args)
-            for case in cases
-        ],
-        data = data,
-        deps = [":common"],
+        tests = [":" + api + "_contract_test" for api in apis],
     )
