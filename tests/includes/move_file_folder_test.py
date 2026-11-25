@@ -78,8 +78,8 @@ def _move_file(harness, directory, overwrite):
 
     # Keep the timestamp high words equal while crossing the low word's sign bit.
     ticks = int((time.time() + 11644473600) * 10_000_000) & ~0xFFFFFFFF
-    earlier = (ticks + 0x7FFFFFFF) / 10_000_000 - 11644473600
-    later = (ticks + 0x80000000 + 10_000_000) / 10_000_000 - 11644473600
+    earlier = (ticks + 0x7F000000) / 10_000_000 - 11644473600
+    later = (ticks + 0x81000000) / 10_000_000 - 11644473600
     source = directory / "timestamp.src"
     destination = directory / "timestamp.dst"
     _write(source, "newer")
@@ -88,6 +88,13 @@ def _move_file(harness, directory, overwrite):
     os.utime(destination, (earlier, earlier))
     harness.run(source=str(source), destination=str(destination), expect_errors=False)
     assert destination.read_text(encoding="utf-8") == "newer"
+    assert not source.exists()
+    _write(source, "older")
+    _write(destination, "newer")
+    os.utime(source, (earlier, earlier))
+    os.utime(destination, (later, later))
+    harness.run(source=str(source), destination=str(destination), expect_errors=False)
+    assert destination.read_text(encoding="utf-8") == ("older" if overwrite else "newer")
     assert not source.exists()
 
 
@@ -124,6 +131,8 @@ def _move_folder(harness, directory, overwrite):
     source = directory / "failed_source"
     destination = directory / "failed_destination"
     _write(source / "child" / "file.txt", "source")
+    _write(source / "first.txt", "moved before failure")
+    _write(source / "child" / "deeper" / "unprocessed.txt", "not reached")
     _write(destination / "child" / "file.txt", "destination", _DAY)
     (source / "empty").mkdir()
     (destination / "existing_empty").mkdir()
@@ -135,6 +144,10 @@ def _move_folder(harness, directory, overwrite):
         assert blocked.read_text(encoding="utf-8") == "destination"
         assert (source / "empty").is_dir()
         assert (destination / "existing_empty").is_dir()
+        assert (destination / "first.txt").read_text(encoding="utf-8") == "moved before failure"
+        assert not (source / "first.txt").exists()
+        assert (source / "child" / "deeper" / "unprocessed.txt").read_text(encoding="utf-8") == "not reached"
+        assert not (destination / "child" / "deeper" / "unprocessed.txt").exists()
     finally:
         os.chmod(blocked, stat.S_IREAD | stat.S_IWRITE)
 
@@ -156,9 +169,193 @@ def _move_folder(harness, directory, overwrite):
     assert not missing_destination.exists()
 
 
+def _move_file_paths(harness, directory):
+    for index, name in enumerate(("file with spaces.txt", "\u65e5\u672c\u8a9e.txt", "$literal&[1].bin", ".hidden", "no_extension")):
+        source = directory / name
+        destination = directory / ("moved " + name)
+        payload = b"" if index == 0 else bytes(range(256)) * 4
+        source.write_bytes(payload)
+        harness.run(source=name, destination=destination.name, expect_errors=False)
+        assert destination.read_bytes() == payload, name
+        assert not source.exists(), name
+
+    source = directory / "relative.bin"
+    destination = directory / "relative_moved.bin"
+    source.write_bytes(b"relative")
+    (directory / "child").mkdir()
+    harness.run(source="child\\..\\relative.bin", destination=".\\relative_moved.bin", expect_errors=False)
+    assert destination.read_bytes() == b"relative" and not source.exists()
+    harness.run(source=str(destination), destination=str(destination).swapcase(), expect_errors=False)
+    assert destination.read_bytes() == b"relative"
+
+    source = directory / "read_only.bin"
+    destination = directory / "read_only_moved.bin"
+    source.write_bytes(b"read only")
+    os.chmod(source, stat.S_IREAD)
+    try:
+        harness.run(source=str(source), destination=str(destination), expect_errors=False)
+        assert destination.read_bytes() == b"read only" and not source.exists()
+    finally:
+        os.chmod(destination if destination.exists() else source, stat.S_IREAD | stat.S_IWRITE)
+
+
+def _move_file_invalid(harness, directory):
+    source = directory / "source.txt"
+    destination = directory / "destination.txt"
+    _write(source, "source")
+    _write(destination, "destination", _DAY)
+    (directory / "a_directory").mkdir()
+    _write(directory / "a_file", "parent file")
+    for invalid_source, invalid_destination in [
+        ("", str(destination)),
+        (str(source), ""),
+        (str(directory / "missing.txt"), str(destination)),
+        (str(directory / "a_directory"), str(destination)),
+        (str(source), str(directory / "missing_parent" / "file.txt")),
+        (str(source), str(directory / "a_file" / "file.txt")),
+        (str(source), str(directory / "invalid<name>.txt")),
+        (str(directory / "*.txt"), str(destination)),
+    ]:
+        harness.run(source=invalid_source, destination=invalid_destination, expect_errors=True)
+        assert source.read_text(encoding="utf-8") == "source"
+        assert destination.read_text(encoding="utf-8") == "destination"
+        assert (directory / "a_directory").is_dir()
+        assert (directory / "a_file").read_text(encoding="utf-8") == "parent file"
+        assert not (directory / "missing_parent").exists()
+
+    harness.run(source=str(source), destination=str(destination), expect_errors=False)
+    assert destination.read_text(encoding="utf-8") == "source" and not source.exists()
+
+
+def _move_file_locked(harness, directory):
+    for name in ("source_new_destination", "source_existing_destination", "destination"):
+        source = directory / (name + ".src")
+        destination = directory / (name + ".dst")
+        _write(source, "source", _DAY if name == "source_existing_destination" else 0)
+        existing = name != "source_new_destination"
+        if existing:
+            _write(destination, "destination", 0 if name == "source_existing_destination" else _DAY)
+        harness.run(
+            source=str(source), destination=str(destination),
+            locked=str(destination if name == "destination" else source),
+            expect_errors=True,
+        )
+        assert source.read_text(encoding="utf-8") == "source", name
+        if existing:
+            assert destination.read_text(encoding="utf-8") == "destination", name
+        else:
+            assert not destination.exists(), name
+
+
+def _move_folder_paths(harness, directory):
+    source = directory / "source"
+    destination = directory / "destination"
+    (source / "empty" / "nested").mkdir(parents=True)
+    harness.run(source=str(source), destination=str(destination), mask="*", expect_errors=False)
+    assert not source.exists() and destination.is_dir()
+    assert not list(destination.iterdir())
+
+    _write(source / "nested" / "kept.log", "not selected")
+    harness.run(source=str(source), destination=str(destination), mask="*.txt", expect_errors=False)
+    assert (source / "nested" / "kept.log").read_text(encoding="utf-8") == "not selected"
+    assert not list(destination.iterdir())
+
+    for name in ("with spaces", "\u65e5\u672c\u8a9e", "$literal&[1]"):
+        source = directory / name
+        destination = directory / (name + " moved")
+        _write(source / "child" / "file.txt", name)
+        harness.run(
+            source=source.name + "\\", destination=destination.name + "\\",
+            mask="*.txt", expect_errors=False,
+        )
+        assert (destination / "child" / "file.txt").read_text(encoding="utf-8") == name
+        assert not source.exists()
+
+    source = directory / "case_source"
+    _write(source / "keep.txt", "same folder")
+    harness.run(source=str(source), destination=str(source).swapcase() + "\\.", mask="*", expect_errors=False)
+    assert (source / "keep.txt").read_text(encoding="utf-8") == "same folder"
+
+
+def _move_folder_invalid(harness, directory):
+    source = directory / "source"
+    destination = directory / "destination"
+    _write(source / "keep.txt", "source")
+    _write(destination / "keep.txt", "destination", _DAY)
+    _write(directory / "not_a_folder", "file")
+    for invalid_source, invalid_destination in [
+        ("", str(destination)),
+        (str(source), ""),
+        (str(directory / "missing"), str(destination)),
+        (str(directory / "not_a_folder"), str(destination)),
+        (str(source), str(directory / "not_a_folder")),
+        (str(source), str(directory / "not_a_folder" / "child")),
+        (str(source), str(source / "nested")),
+        (str(source), str(source) + "\\child\\..\\nested"),
+        (str(source.anchor), str(destination)),
+    ]:
+        harness.run(source=invalid_source, destination=invalid_destination, mask="*", expect_errors=True)
+        assert (source / "keep.txt").read_text(encoding="utf-8") == "source"
+        assert (destination / "keep.txt").read_text(encoding="utf-8") == "destination"
+        assert (directory / "not_a_folder").read_text(encoding="utf-8") == "file"
+        assert not (source / "nested").exists()
+        assert not (source / "child").exists()
+
+    conflict = destination / "keep.txt"
+    conflict.unlink()
+    conflict.mkdir()
+    _write(conflict / "child.txt", "existing directory")
+    harness.run(source=str(source), destination=str(destination), mask="*.txt", expect_errors=True)
+    assert (source / "keep.txt").read_text(encoding="utf-8") == "source"
+    assert (conflict / "child.txt").read_text(encoding="utf-8") == "existing directory"
+
+
+def _move_folder_merge(harness, directory):
+    source = directory / "source"
+    destination = directory / "source_sibling"
+    _write(source / "root.TXT", "root")
+    _write(source / "child" / "nested" / "leaf.txt", "leaf")
+    _write(source / "child" / "kept.log", "keep")
+    _write(destination / "child" / "destination_only.txt", "existing")
+    harness.run(source=str(source), destination=str(destination), mask="*.txt", expect_errors=False)
+    assert (destination / "root.TXT").read_text(encoding="utf-8") == "root"
+    assert (destination / "child" / "nested" / "leaf.txt").read_text(encoding="utf-8") == "leaf"
+    assert (destination / "child" / "destination_only.txt").read_text(encoding="utf-8") == "existing"
+    assert (source / "child" / "kept.log").read_text(encoding="utf-8") == "keep"
+    assert not (source / "root.TXT").exists()
+    assert not (source / "child" / "nested").exists()
+
+    _write(source / "child" / "no_extension", "")
+    harness.run(source=str(source), destination=str(destination), mask="*", expect_errors=False)
+    assert not source.exists()
+    assert (destination / "child" / "no_extension").read_bytes() == b""
+    assert (destination / "child" / "kept.log").read_text(encoding="utf-8") == "keep"
+
+    # Moving into an ancestor must not treat successful source cleanup as an error.
+    source = directory / "ancestor" / "child"
+    destination = source.parent
+    _write(source / "nested" / "file.txt", "up")
+    _write(destination / "keep.log", "existing ancestor")
+    harness.run(source=str(source), destination=str(destination), mask="*", expect_errors=False)
+    assert (destination / "nested" / "file.txt").read_text(encoding="utf-8") == "up"
+    assert (destination / "keep.log").read_text(encoding="utf-8") == "existing ancestor"
+    assert not source.exists()
+
+
 def run_case(case, harness, args):
     base = common.base(case)
     directory = harness.directory
+    edge_cases = {
+        "move_file_paths": _move_file_paths,
+        "move_file_invalid": _move_file_invalid,
+        "move_file_locked": _move_file_locked,
+        "move_folder_paths": _move_folder_paths,
+        "move_folder_invalid": _move_folder_invalid,
+        "move_folder_merge": _move_folder_merge,
+    }
+    if base.removesuffix("_overwrite") in edge_cases:
+        edge_cases[base.removesuffix("_overwrite")](harness, directory)
+        return
     if base in ("move_file", "move_file_overwrite"):
         _move_file(harness, directory, base.endswith("_overwrite"))
     elif base == "move_file_twice":
@@ -189,6 +386,15 @@ def run_case(case, harness, args):
         harness.run(source=str(source), destination=str(destination), expect_errors=True)
         assert source.is_dir()
         assert (destination / "empty").is_dir()
+    elif base in ("move_file_recovery", "move_folder_recovery"):
+        source = directory / "source"
+        destination = directory / "destination"
+        source_file = source / "child.txt" if base == "move_folder_recovery" else source
+        destination_file = destination / "child.txt" if base == "move_folder_recovery" else destination
+        _write(source_file, "recovered")
+        harness.run(source=str(source), destination=str(destination), expect_errors=False).assert_outputs(first_failed=True)
+        assert destination_file.read_text(encoding="utf-8") == "recovered"
+        assert not source.exists()
     else:
         raise common.unhandled(case)
 

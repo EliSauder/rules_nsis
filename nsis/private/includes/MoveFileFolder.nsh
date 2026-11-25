@@ -174,20 +174,22 @@ move_folder_delete_source:
     IfErrors move_folder_failed
     StrCmp $R3 0 0 move_folder_delete_source
 
-move_folder_delete_destination:
-    StrCpy $R3 0
-    ${${PREFIX}Locate} "$R1" "/L=DE" "${PREFIX}_MoveFolder_Locate_deleteDir"
-    IfErrors move_folder_failed
-    StrCmp $R3 0 0 move_folder_delete_destination
-
     ; Nonmatching files deliberately remain in the source and are not errors.
     ${${PREFIX}DirState} "$R0" $0
     StrCmp $0 -1 move_folder_failed
     ; DirState uses FindNext's error flag to signal an empty directory.
     ClearErrors
-    StrCmp $0 0 0 move_folder_done
+    StrCmp $0 0 0 move_folder_delete_destination
     RMDir "$R0"
     IfErrors move_folder_failed
+
+    ; Remove the source first: when moving into an ancestor, destination cleanup
+    ; can also visit and remove the now-empty source directory.
+move_folder_delete_destination:
+    StrCpy $R3 0
+    ${${PREFIX}Locate} "$R1" "/L=DE" "${PREFIX}_MoveFolder_Locate_deleteDir"
+    IfErrors move_folder_failed
+    StrCmp $R3 0 0 move_folder_delete_destination
     Goto move_folder_done
 
 move_folder_failed:

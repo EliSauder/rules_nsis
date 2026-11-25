@@ -7,6 +7,12 @@ def move_file_folder_cases():
     for name, symbol, parameters in [
         ("move_file", "MoveFile", ["in:source", "in:destination"]),
         ("move_folder", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
+        ("move_file_paths", "MoveFile", ["in:source", "in:destination"]),
+        ("move_file_invalid", "MoveFile", ["in:source", "in:destination"]),
+        ("move_file_locked", "HarnessMoveFileLocked", ["in:source", "in:destination", "in:locked"]),
+        ("move_folder_paths", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
+        ("move_folder_invalid", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
+        ("move_folder_merge", "MoveFolder", ["in:source", "in:destination", "in:mask"]),
     ]:
         # $switch_overwrite replaces existing destinations regardless of age.
         for suffix, on_init in [("", []), ("_overwrite", ["StrCpy $switch_overwrite 1"])]:
@@ -17,6 +23,7 @@ def move_file_folder_cases():
                 symbol = symbol,
                 parameters = parameters,
                 on_init = on_init,
+                src = "move_file_folder_adapters.nsh" if name == "move_file_locked" else None,
             )
 
     # Repeated expansions in one function must still compile and run.
@@ -49,4 +56,13 @@ def move_file_folder_cases():
         symbol = "HarnessMoveFolderLockedDirectory",
         parameters = ["in:source", "in:destination"],
     )
+    for kind in ["File", "Folder"]:
+        cases += include_api_case(
+            name = "move_" + kind.lower() + "_recovery",
+            api = "move_file_folder",
+            include = "MoveFileFolder.nsh",
+            src = "move_file_folder_adapters.nsh",
+            symbol = "HarnessMove" + kind + "Recovery",
+            parameters = ["in:source", "in:destination", "out:first_failed:bool"],
+        )
     return cases
