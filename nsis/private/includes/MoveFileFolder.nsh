@@ -315,6 +315,9 @@ Function ${PREFIX}_BackupPath
 
     ClearErrors
     StrCmp $0 "" backup_invalid
+    Push "$0"
+    Call ${PREFIX}_MoveCheckLiteralPath
+    IfErrors backup_invalid
     System::Call 'kernel32::GetFullPathNameW(w r0, i ${NSIS_MAX_STRLEN}, w .r0, p 0) i.r2'
     IntCmp $2 0 backup_invalid
     IntCmp $2 ${NSIS_MAX_STRLEN} backup_invalid 0 backup_invalid

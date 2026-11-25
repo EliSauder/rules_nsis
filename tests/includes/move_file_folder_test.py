@@ -723,7 +723,7 @@ def _backup_file(harness, directory):
     parent = directory / "wildcards"
     for name in ("keep.txt", "other.txt"):
         _write(parent / name, name)
-    for pattern in ("*.txt", "keep.?xt"):
+    for pattern in ("*.txt", "keep.?xt", "*\\..\\keep.txt", "?\\..\\keep.txt"):
         harness.run(source=str(parent / pattern), expect_errors=True)
         assert sorted(path.name for path in parent.iterdir()) == ["keep.txt", "other.txt"]
         for name in ("keep.txt", "other.txt"):
@@ -769,7 +769,7 @@ def _backup_folder(harness, directory):
     parent = directory / "wildcards"
     for name in ("keep", "other"):
         _write(parent / name / "payload.txt", name)
-    for pattern in ("keep*", "?ther"):
+    for pattern in ("keep*", "?ther", "*\\..\\keep", "?\\..\\keep"):
         harness.run(source=str(parent / pattern), expect_errors=True)
         assert sorted(path.name for path in parent.iterdir()) == ["keep", "other"]
         for name in ("keep", "other"):
