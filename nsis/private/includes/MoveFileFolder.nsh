@@ -10,7 +10,7 @@ Var /GLOBAL switch_overwrite
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ; MoveFile and MoveFolder macros
 ;
-; Author:  theblazingangel@aol.com (for the AutoPatcher project - www.autopatcher.com)
+; Based On: MoveFileFolder by theblazingangel@aol.com (for the AutoPatcher project - www.autopatcher.com)
 ; Created: June 2007
 ; Source: https://nsis.sourceforge.io/MoveFileFolder
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
